@@ -1,0 +1,218 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+# LAMMPS Stage 3: CG Equilibration (FENE Restore)
+
+read_restart    2.restart
+Reading restart file ...
+  restart file = 2 Apr 2025, LAMMPS = 2 Apr 2025
+  restoring atom style full from restart
+  orthogonal box = (0 0 0) to (17.19976 17.19976 17.19976)
+  1 by 1 by 1 MPI processor grid
+  restoring pair style lj/cut from restart
+  restoring bond style harmonic from restart
+  restoring angle style harmonic from restart
+  4325 atoms
+  4410 bonds
+  4752 angles
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        1        1       
+  special bond factors coul:  0        0        0       
+     4 = max # of 1-2 neighbors
+     4 = max # of 1-3 neighbors
+     8 = max # of 1-4 neighbors
+    12 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_restart CPU = 0.003 seconds
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Phase A: Harmonic Pre-Minimization ---
+bond_style      harmonic
+bond_coeff      1 466.1 0.97
+angle_style     harmonic
+angle_coeff     1 466.1 180.0
+pair_style      lj/cut 2.5
+pair_coeff      * * 1.0 1.0 2.5
+min_style       cg
+minimize        1.0e-4 1.0e-6 1000 10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 4.5
+  ghost atom cutoff = 5
+  binsize = 2.25, bins = 8 8 8
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 22.43 | 22.43 | 22.43 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+     20024   18.202433      1.3680321      158.32224      186.98761      35.076572    
+     20071   18.202433     -1.8590854      134.16213      159.60038      30.897848    
+Loop time of 0.212959 on 1 procs for 47 steps with 4325 atoms
+
+88.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      159.690273721873   132.315837625699   132.303046996212
+  Force two-norm initial, final = 39537.598 949.09856
+  Force max component initial, final = 2516.7708 268.16167
+  Final line search alpha, max atom move = 0.00055155018 0.14790462
+  Iterations, force evaluations = 47 82
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.19492    | 0.19492    | 0.19492    |   0.0 | 91.53
+Bond    | 0.012356   | 0.012356   | 0.012356   |   0.0 |  5.80
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.002111   | 0.002111   | 0.002111   |   0.0 |  0.99
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.003571   |            |       |  1.68
+
+Nlocal:           4325 ave        4325 max        4325 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12729 ave       12729 max       12729 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         696106 ave      696106 max      696106 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 696106
+Ave neighs/atom = 160.94936
+Ave special neighs/atom = 6.5923699
+Neighbor list builds = 0
+Dangerous builds = 0
+
+# --- Phase B: Switch to FENE ---
+delete_bonds    all angle 1-1 remove
+System init for delete_bonds ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Deleting bonds ...
+  4410 total bonds, 4410 turned on, 0 turned off
+  0 total angles, 0 turned on, 0 turned off
+  0 total dihedrals, 0 turned on, 0 turned off
+  0 total impropers, 0 turned on, 0 turned off
+bond_style      fene
+special_bonds   fene
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        1        1       
+  special bond factors coul:  0        1        1       
+     4 = max # of 1-2 neighbors
+    12 = max # of special neighbors
+  special bonds CPU = 0.000 seconds
+bond_coeff      1 30.0 1.5 1.0 1.0
+minimize        1.0e-4 1.0e-6 1000 10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 22.43 | 22.43 | 22.43 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+     20071   18.202433     -1.8590854      24.072398      49.510648      41.345171    
+     20248   18.202433     -5.4098034      20.64593       42.533462      11.891033    
+Loop time of 0.877681 on 1 procs for 177 steps with 4325 atoms
+
+89.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      22.2133124849402   15.2375385981503   15.2361261356139
+  Force two-norm initial, final = 19082.451 111.80071
+  Force max component initial, final = 8775.0478 23.292583
+  Final line search alpha, max atom move = 0.0031436796 0.07322442
+  Iterations, force evaluations = 177 322
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.77406    | 0.77406    | 0.77406    |   0.0 | 88.19
+Bond    | 0.047215   | 0.047215   | 0.047215   |   0.0 |  5.38
+Neigh   | 0.035308   | 0.035308   | 0.035308   |   0.0 |  4.02
+Comm    | 0.008436   | 0.008436   | 0.008436   |   0.0 |  0.96
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.01266    |            |       |  1.44
+
+Nlocal:           4325 ave        4325 max        4325 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12439 ave       12439 max       12439 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         700290 ave      700290 max      700290 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 700290
+Ave neighs/atom = 161.91676
+Ave special neighs/atom = 2.0393064
+Neighbor list builds = 3
+Dangerous builds = 0
+
+# --- Phase C: Dynamics ---
+reset_timestep  0
+timestep        0.005
+velocity        all create 1.0 12345
+
+fix             1 all nvt temp 1.0 1.0 1.0
+thermo          1000
+run             10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 20.18 | 20.18 | 20.18 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   1             -5.4098034      20.64593       16.735779     -2.7276543    
+      1000   0.87324394    -4.7637001      21.161313      17.707176     -1.7760771    
+      2000   1.005521      -4.6518237      21.235759      18.091869     -1.5989734    
+      3000   1.0263411     -4.6582053      21.243507      18.124457     -2.1143392    
+      4000   1.0159238     -4.6679384      21.238126      18.093721     -1.877767     
+      5000   1.0165661     -4.6795383      21.218979      18.063937     -1.9747557    
+      6000   0.98809389    -4.656041       21.212776      18.038533     -1.6867766    
+      7000   0.98075723    -4.6895733      21.240352      18.021575     -2.1279803    
+      8000   0.9993134     -4.6802612      21.234214      18.052576     -1.878979     
+      9000   1.0164939     -4.6689139      21.234392      18.089867     -1.9729227    
+     10000   1.0072277     -4.6815954      21.223854      18.052751     -1.8572604    
+Loop time of 21.3456 on 1 procs for 10000 steps with 4325 atoms
+
+Performance: 202383.591 tau/day, 468.481 timesteps/s, 2.026 Matom-step/s
+99.6% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 19.122     | 19.122     | 19.122     |   0.0 | 89.58
+Bond    | 0.23449    | 0.23449    | 0.23449    |   0.0 |  1.10
+Neigh   | 1.3345     | 1.3345     | 1.3345     |   0.0 |  6.25
+Comm    | 0.2484     | 0.2484     | 0.2484     |   0.0 |  1.16
+Output  | 0.000213   | 0.000213   | 0.000213   |   0.0 |  0.00
+Modify  | 0.30836    | 0.30836    | 0.30836    |   0.0 |  1.44
+Other   |            | 0.09733    |            |       |  0.46
+
+Nlocal:           4325 ave        4325 max        4325 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12418 ave       12418 max       12418 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         698148 ave      698148 max      698148 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 698148
+Ave neighs/atom = 161.4215
+Ave special neighs/atom = 2.0393064
+Neighbor list builds = 115
+Dangerous builds = 0
+unfix           1
+
+write_data      system_equilibrated.data
+System init for write_data ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+Total wall time: 0:00:22

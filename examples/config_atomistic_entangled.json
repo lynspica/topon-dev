@@ -1,0 +1,37 @@
+{
+    "study": {
+        "name": "atomistic_entangled",
+        "output_dir": "output_atomistic_entangled"
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "monomer_type": "PDMS",
+        "crosslinker_type": "Si",
+        "degree_of_polymerization": 10
+    },
+    "assignment": {
+        "entanglements": {
+            "enabled": true,
+            "target": 5,
+            "target_type": "count",
+            "kink_params": {
+                "overshoot": 0.2,
+                "z_amp": 0.5,
+                "sigma": 0.15
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "pair_style": "dreiding",
+        "dielectric": 1.0
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

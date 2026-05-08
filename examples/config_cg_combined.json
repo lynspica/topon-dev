@@ -1,0 +1,41 @@
+{
+    "study": {
+        "name": "cg_combined",
+        "output_dir": "output_combined"
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "bead_density": 0.85,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "entanglements": {
+            "enabled": true,
+            "target": 5,
+            "target_type": "count"
+        },
+        "grafts": {
+            "enabled": true,
+            "per_edge_type": {
+                "A": {
+                    "graft_density": 0.05,
+                    "side_chain_dp": 5,
+                    "side_chain_monomer": "G"
+                }
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.01,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "include_angles": true,
+        "pair_style": "attractive"
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

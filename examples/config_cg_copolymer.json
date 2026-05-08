@@ -1,0 +1,44 @@
+{
+    "study": {
+        "name": "cg_copolymer",
+        "output_dir": "output_copolymer"
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "bead_density": 0.85,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "copolymer": {
+            "enabled": true,
+            "per_edge_type": {
+                "A": {
+                    "arrangement": "block",
+                    "composition": [
+                        {
+                            "monomer": "A",
+                            "fraction": 0.5
+                        },
+                        {
+                            "monomer": "B",
+                            "fraction": 0.5
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.01,
+        "overlap_max_iters": 10
+    },
+    "simulation": {
+        "include_angles": true,
+        "pair_style": "attractive"
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

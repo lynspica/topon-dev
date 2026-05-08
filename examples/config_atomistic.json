@@ -1,0 +1,18 @@
+{
+    "study": {
+        "name": "atomistic_polynet",
+        "output_dir": "output_atomistic"
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "target_density": 0.9,
+        "degree_of_polymerization": 5
+    },
+    "conformation": {
+        "overlap_cutoff": 0.1,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "include_angles": true
+    }
+}

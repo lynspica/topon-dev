@@ -1,0 +1,37 @@
+{
+    "study": {
+        "name": "cg_entangled",
+        "output_dir": "output_entangled"
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "bead_density": 0.85,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "entanglements": {
+            "enabled": true,
+            "target": 5,
+            "target_type": "count",
+            "kink_params": {
+                "overshoot": 0.2,
+                "z_amp": 0.5,
+                "sigma": 0.15
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.01,
+        "overlap_max_iters": 10
+    },
+    "simulation": {
+        "include_angles": true,
+        "remove_cg_angles": true,
+        "pair_style": "attractive"
+    },
+    "execution": {
+        "auto_run": false,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

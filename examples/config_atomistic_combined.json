@@ -1,0 +1,45 @@
+{
+    "study": {
+        "name": "atomistic_combined",
+        "output_dir": "output_atomistic_combined"
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "target_density": 0.9,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "entanglements": {
+            "enabled": true,
+            "target": 5,
+            "target_type": "count",
+            "kink_params": {
+                "overshoot": 0.2,
+                "z_amp": 0.5,
+                "sigma": 0.15
+            }
+        },
+        "grafts": {
+            "enabled": true,
+            "per_edge_type": {
+                "A": {
+                    "graft_density": 0.05,
+                    "side_chain_dp": 5,
+                    "side_chain_monomer": "PDMS"
+                }
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "run_steps": 2000
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

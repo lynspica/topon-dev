@@ -1,0 +1,63 @@
+{
+    "study": {
+        "name": "test_network",
+        "output_dir": "./output"
+    },
+    "topology": {
+        "source": "load",
+        "existing_files": {
+            "nodes_file": null,
+            "edges_file": null,
+            "gpickle_file": null
+        }
+    },
+    "assignment": {
+        "node_types": {
+            "method": "degree",
+            "degree": {
+                "mapping": {
+                    "1": "end",
+                    "2": "A",
+                    "3": "A",
+                    "4": "A"
+                }
+            }
+        },
+        "edge_types": {
+            "method": "uniform",
+            "uniform": {
+                "type": "A"
+            }
+        },
+        "dp_distribution": {
+            "default": {
+                "mean": 25,
+                "pdi": 1.0
+            }
+        }
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "target_density": 0.9,
+        "node_type_map": {
+            "end": {
+                "molecule": "[Si](C)(C)C",
+                "is_end_cap": true
+            },
+            "A": {
+                "molecule": "Si",
+                "is_end_cap": false
+            }
+        },
+        "edge_type_map": {
+            "A": {
+                "monomer": "PDMS"
+            }
+        }
+    },
+    "output": {
+        "lammps_data": true,
+        "lammps_inputs": true,
+        "visualization": true
+    }
+}

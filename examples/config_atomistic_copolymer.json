@@ -1,0 +1,56 @@
+{
+    "study": {
+        "name": "atomistic_copolymer",
+        "output_dir": "output_atomistic_copolymer"
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "monomer_type": "PDMS",
+        "degree_of_polymerization": 10,
+        "monomers": {
+            "PDMS": {
+                "smiles": "[Si](C)(C)O",
+                "chain_head": "Si",
+                "chain_tail": "O"
+            },
+            "Phenyl": {
+                "smiles": "[Si](C)(c1ccccc1)O",
+                "chain_head": "Si",
+                "chain_tail": "O"
+            }
+        }
+    },
+    "assignment": {
+        "copolymer": {
+            "enabled": true,
+            "per_edge_type": {
+                "A": {
+                    "arrangement": "block",
+                    "composition": [
+                        {
+                            "monomer": "PDMS",
+                            "fraction": 0.5
+                        },
+                        {
+                            "monomer": "Phenyl",
+                            "fraction": 0.5
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "pair_style": "dreiding",
+        "dielectric": 1.0
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

@@ -1,0 +1,199 @@
+{
+    "study": {
+        "name": "full_example",
+        "output_dir": "./output"
+    },
+    "topology": {
+        "source": "generate",
+        "generator": {
+            "exe_path": null,
+            "lattice_size": "6x6x6",
+            "lattice_type": "SC",
+            "periodicity": "111",
+            "max_functionality": 6,
+            "max_trials": 1000000,
+            "max_saves": 1,
+            "degree_distribution": "0:15,1:30,2:10,3:43,4:42,5:47,6:29"
+        },
+        "existing_files": {
+            "nodes_file": null,
+            "edges_file": null,
+            "gpickle_file": null
+        }
+    },
+    "assignment": {
+        "node_types": {
+            "method": "degree",
+            "degree": {
+                "mapping": {
+                    "1": "end",
+                    "2": "A",
+                    "3": "A",
+                    "4": "A",
+                    "5": "A",
+                    "6": "B"
+                }
+            },
+            "positional": {
+                "dimension": "z",
+                "num_layers": 2,
+                "layer_types": [
+                    "A",
+                    "B"
+                ]
+            },
+            "random": {
+                "type_ratios": {
+                    "A": 70,
+                    "B": 30
+                }
+            },
+            "explicit": {}
+        },
+        "edge_types": {
+            "method": "composite",
+            "uniform": {
+                "type": "A"
+            },
+            "random": {
+                "type_ratios": {
+                    "A": 50,
+                    "B": 50
+                }
+            },
+            "composite": {
+                "dimension": "x",
+                "num_layers": 4,
+                "layer_types": [
+                    "A",
+                    "B",
+                    "A",
+                    "B"
+                ]
+            }
+        },
+        "dp_distribution": {
+            "default": {
+                "mean": 25,
+                "pdi": 1.0
+            },
+            "per_edge_type": {
+                "A": {
+                    "mean": 30,
+                    "pdi": 1.0
+                },
+                "B": {
+                    "mean": 20,
+                    "pdi": 1.2
+                }
+            }
+        },
+        "defects": {
+            "primary_loops": {
+                "enabled": false,
+                "target": 10,
+                "target_type": "count"
+            },
+            "secondary_loops": {
+                "enabled": false,
+                "target": 5,
+                "target_type": "count"
+            }
+        },
+        "entanglements": {
+            "enabled": false,
+            "target": 20,
+            "target_type": "percentage",
+            "kink_params": {
+                "overshoot": 0.2,
+                "z_amp": 0.5,
+                "sigma": 0.15
+            }
+        },
+        "grafts": {
+            "enabled": false,
+            "per_edge_type": {
+                "A": {
+                    "graft_density": 0.5,
+                    "side_chain_monomer": "PDMS",
+                    "side_chain_dp": 5
+                }
+            }
+        },
+        "copolymer": {
+            "enabled": false,
+            "per_edge_type": {
+                "A": {
+                    "arrangement": "block",
+                    "composition": [
+                        {
+                            "monomer": "PDMS",
+                            "fraction": 0.5
+                        },
+                        {
+                            "monomer": "FPDMS",
+                            "fraction": 0.5
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "simulation": {
+        "remove_cg_angles": true
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "target_density": 0.9,
+        "node_type_map": {
+            "end": {
+                "molecule": "[Si](C)(C)C",
+                "is_end_cap": true
+            },
+            "A": {
+                "molecule": "Si",
+                "is_end_cap": false
+            },
+            "B": {
+                "molecule": "POSS",
+                "is_end_cap": false
+            }
+        },
+        "edge_type_map": {
+            "A": {
+                "monomer": "PDMS"
+            },
+            "B": {
+                "monomer": "FPDMS"
+            }
+        },
+        "monomers": {
+            "PDMS": {
+                "smiles": "[Si](C)(C)O",
+                "chain_head": "Si",
+                "chain_tail": "O"
+            },
+            "FPDMS": {
+                "smiles": "[Si](C)(CCC(F)(F)F)O",
+                "chain_head": "Si",
+                "chain_tail": "O"
+            },
+            "Phenyl": {
+                "smiles": "[Si](C)(c1ccccc1)O",
+                "chain_head": "Si",
+                "chain_tail": "O"
+            }
+        },
+        "connection": {
+            "auto_bridge": true,
+            "default_bridge_atom": "O"
+        }
+    },
+    "output": {
+        "lammps_data": true,
+        "lammps_inputs": true,
+        "visualization": true,
+        "analysis_report": true,
+        "save_attributed_graph": true
+    }
+}

@@ -1,0 +1,36 @@
+{
+    "study": {
+        "name": "cg_grafts",
+        "output_dir": "output_grafts"
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "bead_density": 0.85,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "grafts": {
+            "enabled": true,
+            "per_edge_type": {
+                "A": {
+                    "graft_density": 0.2,
+                    "side_chain_dp": 5,
+                    "side_chain_monomer": "B"
+                }
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.01,
+        "overlap_max_iters": 10
+    },
+    "simulation": {
+        "include_angles": true,
+        "pair_style": "attractive"
+    },
+    "execution": {
+        "auto_run": true,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

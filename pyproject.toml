@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topon"
+version = "0.1.0"
+description = "A modular Python package for polymer network generation and LAMMPS input file creation"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Ahmet Burak Yildirim"}
+]
+requires-python = ">=3.9"
+keywords = ["polymer", "network", "simulation", "LAMMPS", "molecular dynamics", "coarse-grained"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+dependencies = [
+    "networkx>=3.0",
+    "numpy>=1.21",
+    "pandas>=1.4",
+    "rdkit>=2023.3.1",
+    "pydantic>=2.0",
+    "click>=8.0",
+    "plotly>=5.0",
+    "scipy>=1.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+gui = [
+    "streamlit>=1.28",
+]
+
+[project.scripts]
+topon = "topon.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/lynspica/topon"
+Repository = "https://github.com/lynspica/topon"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["topon*"]
+
+[tool.setuptools.package-data]
+topon = ["data/*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
