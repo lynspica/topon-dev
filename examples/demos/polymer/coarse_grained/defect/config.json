@@ -1,0 +1,33 @@
+{
+    "study": {
+        "name": "cg_defect",
+        "output_dir": "output_cg_defect"
+    },
+    "chemistry": {
+        "model_type": "coarse_grained",
+        "bead_density": 0.85,
+        "degree_of_polymerization": 20
+    },
+    "assignment": {
+        "defects": {
+            "primary_loops": {
+                "enabled": true,
+                "target": 5,
+                "target_type": "count"
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.01,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "include_angles": true,
+        "pair_style": "attractive"
+    },
+    "execution": {
+        "auto_run": false,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

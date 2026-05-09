@@ -1,0 +1,32 @@
+{
+    "study": {
+        "name": "atomistic_defect",
+        "output_dir": "output_atomistic_defect"
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "target_density": 0.9,
+        "degree_of_polymerization": 10
+    },
+    "assignment": {
+        "defects": {
+            "primary_loops": {
+                "enabled": true,
+                "target": 5,
+                "target_type": "count"
+            }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "run_steps": 2000
+    },
+    "execution": {
+        "auto_run": false,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

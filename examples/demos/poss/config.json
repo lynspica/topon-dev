@@ -1,0 +1,55 @@
+{
+    "study": {
+        "name": "atomistic_poss",
+        "output_dir": "output_atomistic_poss"
+    },
+    "topology": {
+        "source": "generate",
+        "generator": {
+            "lattice_size": "5x5x5",
+            "lattice_type": "SC",
+            "max_functionality": 4,
+            "degree_distribution": "0:0,1:0"
+        }
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "target_density": 1.1,
+        "degree_of_polymerization": 10,
+        "node_type_map": {
+            "end":  { "molecule": "[Si](C)(C)C", "is_end_cap": true },
+            "A":    { "molecule": "Si",          "is_end_cap": false },
+            "POSS": { "molecule": "POSS_AM0270", "is_end_cap": false }
+        },
+        "edge_type_map": {
+            "A": { "monomer": "PDMS" }
+        }
+    },
+    "assignment": {
+        "node_types": {
+            "method": "degree",
+            "degree": {
+                "mapping": { "1": "end", "2": "A", "3": "A", "4": "POSS" }
+            }
+        },
+        "edge_types": {
+            "method": "uniform",
+            "uniform": { "type": "A" }
+        },
+        "dp_distribution": {
+            "default": { "mean": 10, "pdi": 1.0 }
+        }
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "run_steps": 2000
+    },
+    "execution": {
+        "auto_run": false,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}
