@@ -50,7 +50,9 @@ def run_protein_network(
     """Generate a MARTINI protein network and write LAMMPS input files.
 
     Returns a dict mapping artifact name -> path:
-      ``data``, ``settings``, ``groups``, ``in``, optionally ``topology_json``.
+      ``topology_json``, ``data``, ``settings``, ``groups``,
+      ``stage1``, ``stage2``, ``stage3`` (the three relaxation input scripts
+      under ``relaxation/``).
 
     The workflow is deterministic given ``seed``: the same arguments produce
     bitwise-identical files across runs.

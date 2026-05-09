@@ -2,7 +2,7 @@
 
 Maps canonical version tags to their reference output directories and the workflow scripts that generated them.
 
-For detailed per-version changelogs see `docs/development/changelog.md`.
+For detailed per-version changelogs see [`../docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md).
 
 ---
 
@@ -51,4 +51,4 @@ When the generation code changes in a way that intentionally alters output:
 2. Verify the output is correct (atom count, type ordering, header counts).
 3. Copy output to a new version subdirectory (e.g. `v5/poss_0/`).
 4. Update `REF_DIR` in the relevant regression test file.
-5. Add an entry to this file and to `docs/development/changelog.md`.
+5. Add an entry to this file and to [`../docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md).

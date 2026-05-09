@@ -81,10 +81,22 @@ Unit tests live in `tests/unit/`. Regression tests live in `tests/regression/`. 
 
 ## Docs
 
-User-facing docs live in `docs/`. Keep them updated when changing behaviour:
+User-facing docs live in `docs/` (committed) and `internal/` (gitignored, owner-local). Keep them updated when changing behaviour:
 
-- `docs/cli.md` — update when adding/changing CLI options
-- `docs/config_reference.md` — update when adding config keys to `schema.py`
-- `docs/simbox.md` — update when changing simbox API
-- `docs/development/changelog.md` — add entry for every significant change
-- `docs/development/tasks.md` — mark tasks complete as you finish them
+- [`docs/USAGE.md`](docs/USAGE.md) — update when changing CLI options, config schema keys, or sub-system APIs
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — update when changing module structure, pipeline stages, or design principles
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — add a changelog entry for every significant change
+- [`internal/DEVELOPMENT_INTERNAL.md`](internal/DEVELOPMENT_INTERNAL.md) (local only) — track open issues, planned next steps, source-side drift
+
+When a change touches multiple of these, update them in the same commit. New AI agents in fresh sessions should read `ARCHITECTURE.md` first.
+
+---
+
+## Agents
+
+Two specialized review agents live under `.claude/agents/`:
+
+- [`topon-reviewer`](.claude/agents/topon-reviewer.md) — topon-specific code reviewer (LAMMPS conventions, force-field rules, has `Edit`/`Write` authority for fixes).
+- [`investigator`](.claude/agents/investigator.md) — unbiased read-only auditor for scientific correctness, doc consistency, and cross-module changes (no `Edit`/`Write` tools by design).
+
+Pattern: draft → `investigator` review → fix → commit. Use `topon-reviewer` for code-level fixes; use `investigator` before declaring a non-trivial change complete.

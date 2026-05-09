@@ -50,7 +50,7 @@ Phases 1 through 13 from the original task tracker are largely complete. Items s
 - **Conformation** (Phase 5) — displacement-file generation, entanglement kink geometry, coordinate wrapping.
 - **Writers** (Phase 6) — `DreidingWriter`, `CGWriter`, `ConformationManager`, `LammpsInputGenerator`. *Externalising LAMMPS parameters to `experimental.json` remains open.*
 - **CLI** (Phase 7) — `topon generate`, `validate`, `init`, `simbox`, `analyze`, `chain`. *GUI/notebook items remain open.*
-- **Python topology port** (Phase 8) — pure-Python port of the C generator (`generator_python.py`). Validated against C output. 60% success rate on the "Hard Case" benchmark (~0.3 s median).
+- **Python topology port** (Phase 8) — pure-Python port of the C generator (`generator_python.py`). Validated against C output. Solved the "Hard Case" benchmark in 0.23 s; 60 % success rate on a 20-case batch with ~0.3 s median success time.
 - **Martini 3 experiment** (Phase 9, **archived**) — `chemistry.martini` and Polyply integration shelved at V24.2 due to parameter-mixing complexity. Material moved to `legacy/older_versions/martini_experiment_2026/`. The current MARTINI work in `protein_network/` (V36) takes a different path: library lookup from a polyply-generated ITP, no automated mixing.
 - **Advanced features** (Phase 12) — GraphML export with entanglement edges, multi-entanglement, custom topology input, POSS junctions (full chemistry + sweeps).
 - **simbox sub-system** (Phase 13) — `Molecule`, `BoxPacker`, `AssembledSystem`, `MoleculeLibrary`, writers, CLI, regression tests.
@@ -79,11 +79,11 @@ Notable changes are documented in reverse chronological order.
   - `system.py` — `Bead`, `Bond`, `Constraint`, `Angle`, `Dihedral`, `Exclusion`, `System` dataclasses shared between builder, water packer, and writer.
   - `builder.py` — `build_protein_system(snapshot, sequence_3letter, library)` walks each chain residue-by-residue, places BB beads at BFM-node-interpolated positions, jitters SC beads, applies terminal patches, emits intra- and inter-residue bonded terms, translates BFM `reactions` into SC4–SC4 dityrosine bonds. Uses minimum-image vectors across periodic boundaries.
   - `water.py` — voxel-grid W bead packer with cell-list-accelerated exclusion check around protein beads.
-  - `lammps_writer.py` — emits four files: `<base>.data` (atom_style full, Bonds/Angles/Dihedrals/Impropers + Masses), `<base>.in.settings` (explicit pair_coeff for every bead-type pair, plus bond/angle/dihedral/improper coeffs), `<base>.in.groups` (protein vs water), `<base>.in` (units real, lj/cut/coul/cut, dielectric=15, minimize → NVT → NPT recipe). Constraints emitted as ULTRA-stiff harmonic bonds matching the reference's `#ifdef FLEXIBLE` block.
+  - `lammps_writer.py` — emits the LAMMPS data + settings + groups files (`<base>.data` with `atom_style full` Bonds/Angles/Dihedrals/Impropers + Masses; `<base>.in.settings` with explicit pair_coeff for every bead-type pair plus bond/angle/dihedral/improper coeffs; `<base>.in.groups` for protein vs water) plus the three relaxation input scripts under `relaxation/` (`stage1.in` soft-push overlap removal; `stage2.in` LJ-epsilon ramp 0.001 → 1.0 via `nve/limit`; `stage3.in` tight CG min + brief NVT/NPT at 310 K). Stage scripts use `units real`, `lj/cut/coul/cut`, `dielectric=15`, no PPPM. Constraints emitted as ULTRA-stiff harmonic bonds matching the reference's `#ifdef FLEXIBLE` block.
   - `workflow.py` — `run_protein_network(...)` end-to-end orchestrator.
   - `cli.py` + `__main__.py` — argparse CLI (`python -m topon.protein_network {generate, sweep, topology}`).
 - **`tools/extract_residues_from_itp.py`** — one-shot data-file generator. Reads a polyply-generated protein ITP and emits both `topon/protein_network/residues.py` and the pruned protein-FF ITP. Honours `#ifdef FLEXIBLE` / `#ifndef FLEXIBLE`. Re-running it after dropping a new polyply ITP regenerates the residue table without code edits.
-- **`docs/protein_network.md`** — user-facing reference (now consolidated into `USAGE.md` §4.1).
+- Topro user-facing reference doc — since consolidated into [`USAGE.md`](USAGE.md) §4.1 (2026-05-08).
 - **`tests/output/v33_protein_network_resilin_dry/`** — frozen LAMMPS golden for the regression test.
 - **`tests/regression/test_protein_network.py`** — byte-equivalence regression on a 4-chain × 2-repeat resilin system, `seed=42`.
 - **`tests/unit/test_protein_network_*.py`** — six unit-test files (residues, FF, BFM/sequence, builder, water, writer) totalling 65 assertions.
@@ -135,7 +135,7 @@ Notable changes are documented in reverse chronological order.
 - **`topon analyze` CLI** (`cli.py`) — wired to `analysis/report.py`; accepts `.gpickle`, `.nodes`, `.edges`; supports `--format text|json`.
 - **Single-chain in solvent** (`singlechain/workflow.py`, `cli.py`) — new `topon chain` command; builds a single atomistic DREIDING polymer chain with optional grafts/copolymers and packs it with arbitrary solvent molecules.
 - **`CLAUDE.md`** — root-level architecture rules.
-- **`docs/cli.md`**, **`docs/config_reference.md`** — complete reference documentation (now consolidated into `USAGE.md`).
+- Complete CLI and config-reference documentation — since consolidated into [`USAGE.md`](USAGE.md) (2026-05-08).
 
 #### Fixed
 - **CRITICAL** (`chemistry/builder.py`) — SMILES chain fallback silently returned a 1-unit chain on failure; now raises `ValueError` with caller `RuntimeWarning`.
@@ -211,7 +211,7 @@ Notable changes are documented in reverse chronological order.
 
 - Replicated C generator logic in pure Python (`topon.topology.generator_python`).
 - Implemented "Strict Sculpting" and "Systematic Search" algorithms.
-- 60 % success rate on the "Hard Case" benchmark (~0.3 s median time). Validated against original C output.
+- Solved the "Hard Case" benchmark in 0.23 s. 60 % success rate on a 20-case batch (`network_candidates_SC_6x6x6_v2.txt`) with a 15 s timeout; ~0.3 s median success time. Validated against original C output.
 
 ### [V21.2] — 2026-01-21 — Defect injection
 

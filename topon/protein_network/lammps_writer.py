@@ -1,15 +1,22 @@
 """LAMMPS data + settings + input-script writer for a MARTINI protein system.
 
-Emits four files (all sibling, base name controllable):
+Emits six files (the first three sibling to ``output_dir``, the three relaxation
+stage scripts under ``output_dir/relaxation/``):
 
-* ``<base>.data``           LAMMPS data file (atom_style full): Atoms, Bonds,
-                             Angles, Dihedrals, Impropers + their type counts.
-* ``<base>.in.settings``    pair_coeff / bond_coeff / angle_coeff / etc.
-                             lines covering every type id used in the data file.
-* ``<base>.in.groups``      group definitions for protein vs. water.
-* ``<base>.in``             top-level LAMMPS script: read_data, includes,
-                             pair/bond/angle/dihedral styles, brief minimize +
-                             equilibration recipe.
+* ``<base>.data``                       LAMMPS data file (atom_style full):
+                                         Atoms, Bonds, Angles, Dihedrals,
+                                         Impropers + their type counts.
+* ``<base>.in.settings``                pair_coeff / bond_coeff / angle_coeff /
+                                         etc. lines covering every type id used
+                                         in the data file.
+* ``<base>.in.groups``                  group definitions for protein vs. water.
+* ``relaxation/<base>_stage1.in``       soft-push overlap removal.
+* ``relaxation/<base>_stage2.in``       LJ-epsilon ramp 0.001 -> 1.0 via
+                                         nve/limit dynamics.
+* ``relaxation/<base>_stage3.in``       tight CG min + brief NVT/NPT @ 310 K
+                                         (uses ``units real``,
+                                         ``lj/cut/coul/cut``, ``dielectric=15``,
+                                         no PPPM).
 
 LAMMPS units: ``real`` (Angstrom, kcal/mol). MARTINI bonded-term conversions
 live in `martini_ff` and are exercised here.
@@ -109,7 +116,8 @@ def write_lammps(
     coord_perturbation_ang: float = 0.05,
     coord_perturbation_seed: int = 7,
 ) -> dict[str, Path]:
-    """Write the four LAMMPS files for `sys_`. Returns paths keyed by extension.
+    """Write the LAMMPS files for `sys_`. Returns paths keyed by artifact name
+    (``data``, ``settings``, ``groups``, ``stage1``, ``stage2``, ``stage3``).
 
     If `hierarchical_stage1=True`, emits the core-topon-style progressive
     freeze/unfreeze stage 1 (mirrors `topon/writers/lammps_inputs.py:33` for

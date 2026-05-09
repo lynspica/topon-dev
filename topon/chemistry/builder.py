@@ -24,7 +24,7 @@ from topon.config.schema import ChemistryConfig
 # True since the fix that removed the trailing "[O]" placeholder from
 # `_create_chain_from_smiles`, which produced a peroxide -O-O- bond at the
 # chain tail for O-terminal monomers (e.g. PDMS, PTFPMS) under the atomistic
-# auto-bridge path. See docs/topon_issues_from_solubility_v2.md §P0-1.
+# auto-bridge path. See the V35 entry in docs/DEVELOPMENT.md.
 _PEROXIDE_FIX_APPLIED = True
 
 
