@@ -81,9 +81,10 @@ def test_copolymer_edge_conflict(base_config):
 
 def test_missing_node_type_mapping(base_config):
     """Test detection of used node types missing from chemistry map."""
-    # Assign 'C' node type in random method
+    # Switch to the random method and use a type 'C' not in the chemical map
+    base_config.assignment.node_types.method = "random"
     base_config.assignment.node_types.random.type_ratios = {"A": 50, "C": 50}
-    
+
     # 'C' is not in default chemical mapping
     errors = validate_config(base_config)
     assert any("Node type 'C'" in e for e in errors)

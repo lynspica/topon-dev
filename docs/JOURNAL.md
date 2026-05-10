@@ -14,6 +14,24 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Schema/loader/validator polish (P1-F + P2-G + public loader API + active-method validator)
+
+**Change**
+- **P1-F** — `topon/topology/generator_python.py:35`: chain `getattr(config, 'lattice_type', getattr(config, 'lattice_source', 'SC'))`. Accepts both schema's `lattice_type` and the legacy `lattice_source` attribute name. BCC/FCC no longer silently downgrade to SC on the Python topology path.
+- **P2-G** — `topon/config/loader.py::load_config_full`: hoist legacy keys before schema validation. `chemistry.degree_of_polymerization` → `assignment.dp_distribution.default.mean`; `chemistry.bead_density` → `chemistry.target_density`. Demo configs keep working with their old shape; user's typed DP value is now respected.
+- **Promoted loader API** — renamed `_remove_vacancies` → `remove_vacancies` and `_infer_dims_from_graph` → `infer_dims_from_graph` in `topon/topology/loader.py`. Updated the import in `topon/pipeline.py`. Underscore prefix was a misleading "private" marker; both are real graph-prep helpers other modules legitimately need.
+- **Validator tightening** — `topon/config/validator.py::_check_type_mappings` now only checks the *active* `node_types.method` / `edge_types.method` source (e.g. `degree.mapping` when `method=="degree"`); ignores defaults of unused branches. Adjusted `tests/unit/config/test_config.py::test_missing_node_type_mapping` to set `method="random"` to match the new contract.
+
+**Why**
+- P1-F + P2-G clean up the silent-data-loss bugs the smoke tests surfaced.
+- Promoting the loader helpers makes `Pipeline._generate_topology` (Python branch) idiomatic instead of reaching into a private API.
+- The validator was reporting spurious "type 'B' missing" warnings on default configs because it inspected layer-types lists from inactive methods; now it only validates what the config will actually use.
+
+**Result**
+131 unit + smoke tests pass; no regressions. The smoke-test JSON fixture's `chemistry.degree_of_polymerization: 5` is now honored.
+
+---
+
 ## 2026-05-09 — Fix P0-A (schema gap) — `topon generate` now accepts existing-style configs
 
 **Change**

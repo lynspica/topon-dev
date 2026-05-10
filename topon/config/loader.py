@@ -47,6 +47,20 @@ def load_config_full(
     with open(config_path, "r", encoding="utf-8") as f:
         config_data = json.load(f)
 
+    # Backward-compat hoists for deprecated key locations:
+    #   chemistry.degree_of_polymerization -> assignment.dp_distribution.default.mean
+    #   chemistry.bead_density            -> chemistry.target_density (CG)
+    # See P2-G note in internal/DEVELOPMENT_INTERNAL.md sec.1.
+    chem = config_data.get("chemistry", {})
+    if "degree_of_polymerization" in chem:
+        dp = chem.pop("degree_of_polymerization")
+        assignment = config_data.setdefault("assignment", {})
+        dp_dist = assignment.setdefault("dp_distribution", {})
+        default = dp_dist.setdefault("default", {})
+        default["mean"] = float(dp)
+    if "bead_density" in chem:
+        chem["target_density"] = float(chem.pop("bead_density"))
+
     schema_data = {k: v for k, v in config_data.items() if k in _SCHEMA_KEYS}
     raw_data = {k: v for k, v in config_data.items() if k not in _SCHEMA_KEYS}
 

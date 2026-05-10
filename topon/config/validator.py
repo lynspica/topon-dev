@@ -82,52 +82,50 @@ def _check_copolymer_edge_conflict(config: ToponConfig) -> list[str]:
 
 
 def _check_type_mappings(config: ToponConfig) -> list[str]:
-    """Check that all assigned types have corresponding chemistry mappings."""
+    """Check that all assigned types have corresponding chemistry mappings.
+
+    Only inspects the *active* method's type sources (e.g. ``degree.mapping``
+    when ``node_types.method == "degree"``); unused branches' default
+    ``layer_types`` lists are ignored.
+    """
     errors = []
-    
-    # Get all possible node types from assignment config
-    node_types_used = set()
-    
-    # From degree mapping
-    for node_type in config.assignment.node_types.degree.mapping.values():
-        node_types_used.add(node_type)
-    
-    # From positional
-    for node_type in config.assignment.node_types.positional.layer_types:
-        node_types_used.add(node_type)
-    
-    # From random
-    for node_type in config.assignment.node_types.random.type_ratios.keys():
-        node_types_used.add(node_type)
-    
-    # Check all are in node_type_map
+
+    # --- Node types: read only the active method's source ----------------
+    node_types_used: set[str] = set()
+    n_method = config.assignment.node_types.method
+    if n_method == "degree":
+        node_types_used.update(config.assignment.node_types.degree.mapping.values())
+    elif n_method == "positional":
+        node_types_used.update(config.assignment.node_types.positional.layer_types)
+    elif n_method == "random":
+        node_types_used.update(config.assignment.node_types.random.type_ratios.keys())
+    elif n_method == "explicit":
+        node_types_used.update(config.assignment.node_types.explicit.values())
+
     for node_type in node_types_used:
         if node_type not in config.chemistry.node_type_map:
             errors.append(
-                f"Node type '{node_type}' is used in assignment but not defined in chemistry.node_type_map"
+                f"Node type '{node_type}' is used in assignment but not "
+                f"defined in chemistry.node_type_map"
             )
-    
-    # Get all possible edge types from assignment config
-    edge_types_used = set()
-    
-    # From uniform
-    edge_types_used.add(config.assignment.edge_types.uniform.type)
-    
-    # From random
-    for edge_type in config.assignment.edge_types.random.type_ratios.keys():
-        edge_types_used.add(edge_type)
-    
-    # From composite
-    for edge_type in config.assignment.edge_types.composite.layer_types:
-        edge_types_used.add(edge_type)
-    
-    # Check all are in edge_type_map
+
+    # --- Edge types: read only the active method's source ----------------
+    edge_types_used: set[str] = set()
+    e_method = config.assignment.edge_types.method
+    if e_method == "uniform":
+        edge_types_used.add(config.assignment.edge_types.uniform.type)
+    elif e_method == "random":
+        edge_types_used.update(config.assignment.edge_types.random.type_ratios.keys())
+    elif e_method == "composite":
+        edge_types_used.update(config.assignment.edge_types.composite.layer_types)
+
     for edge_type in edge_types_used:
         if edge_type not in config.chemistry.edge_type_map:
             errors.append(
-                f"Edge type '{edge_type}' is used in assignment but not defined in chemistry.edge_type_map"
+                f"Edge type '{edge_type}' is used in assignment but not "
+                f"defined in chemistry.edge_type_map"
             )
-    
+
     return errors
 
 

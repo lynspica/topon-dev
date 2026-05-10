@@ -68,7 +68,7 @@ def _load_from_gpickle(path: Union[str, Path]) -> tuple[nx.MultiGraph, Optional[
     elif isinstance(data, nx.Graph):
         # Format: just the graph
         G = data
-        dims = _infer_dims_from_graph(G)
+        dims = infer_dims_from_graph(G)
     elif isinstance(data, dict) and "graph" in data:
         # Format: dict with 'graph' and optionally 'dims'
         G = data["graph"]
@@ -81,7 +81,7 @@ def _load_from_gpickle(path: Union[str, Path]) -> tuple[nx.MultiGraph, Optional[
         G = nx.MultiGraph(G)
     
     # Remove vacancies (degree-0 nodes)
-    n_removed = _remove_vacancies(G)
+    n_removed = remove_vacancies(G)
     
     print(f"Loaded graph from {path.name}")
     print(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
@@ -150,10 +150,10 @@ def _load_from_nodes_edges(
             G.add_edge(u, v)
     
     # Infer dimensions from positions
-    dims = _infer_dims_from_graph(G)
+    dims = infer_dims_from_graph(G)
     
     # Remove vacancies (degree-0 nodes)
-    n_removed = _remove_vacancies(G)
+    n_removed = remove_vacancies(G)
     
     print(f"Loaded graph from {nodes_path.name} + {edges_path.name}")
     print(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
@@ -163,7 +163,7 @@ def _load_from_nodes_edges(
     return G, dims
 
 
-def _remove_vacancies(G: nx.Graph) -> int:
+def remove_vacancies(G: nx.Graph) -> int:
     """
     Remove degree-0 nodes (vacancies) from graph.
     
@@ -182,7 +182,7 @@ def _remove_vacancies(G: nx.Graph) -> int:
     return len(vacancies)
 
 
-def _infer_dims_from_graph(G: nx.Graph) -> Optional[np.ndarray]:
+def infer_dims_from_graph(G: nx.Graph) -> Optional[np.ndarray]:
     """
     Infer box dimensions from node positions.
     

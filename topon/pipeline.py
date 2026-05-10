@@ -105,9 +105,9 @@ class Pipeline:
         from topon.topology.generator import run_generator
         from topon.topology.generator_python import PythonTopologyGenerator
         from topon.topology.loader import (
-            _infer_dims_from_graph,
-            _remove_vacancies,
+            infer_dims_from_graph,
             load_graph,
+            remove_vacancies,
         )
 
         gen_cfg = self.config.topology.generator
@@ -141,9 +141,9 @@ class Pipeline:
             G = graphs[0]
             if not isinstance(G, nx.MultiGraph):
                 G = nx.MultiGraph(G)
-            _remove_vacancies(G)
+            remove_vacancies(G)
             self.graph = G
-            self.dims = _infer_dims_from_graph(G)
+            self.dims = infer_dims_from_graph(G)
 
     def _load_existing_topology(self) -> None:
         from topon.topology.loader import load_graph

@@ -32,7 +32,12 @@ class PythonTopologyGenerator:
                  print(f"Warning: Could not parse dimension string '{self.dims}', using default (6,6,6)")
                  self.dims = (6, 6, 6)
         
-        self.lattice_type = getattr(config, 'lattice_source', 'SC')
+        # Accept either the schema's `lattice_type` (current) or the legacy
+        # `lattice_source` attribute name (older callers / namedtuples).
+        self.lattice_type = getattr(
+            config, 'lattice_type',
+            getattr(config, 'lattice_source', 'SC'),
+        )
         self.max_func = getattr(config, 'max_functionality', getattr(config, 'functionality', 4))
         
         # Parse degree distribution string
