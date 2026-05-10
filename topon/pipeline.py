@@ -18,8 +18,9 @@ Usage::
     pipe = Pipeline(config)
     pipe.run()
 
-NOTE: The topology stage with ``source="generate"`` requires a compiled
-``generator.exe`` on PATH.  All other stages are fully wired.
+NOTE: The topology stage with ``source="generate"`` uses the C subprocess
+generator when ``topology.generator.exe_path`` is set (faster), and the
+pure-Python ``PythonTopologyGenerator`` otherwise (no compiler required).
 """
 
 from pathlib import Path
@@ -99,28 +100,50 @@ class Pipeline:
         print()
 
     def _generate_topology(self) -> None:
+        import networkx as nx
+
         from topon.topology.generator import run_generator
-        from topon.topology.loader import load_graph
+        from topon.topology.generator_python import PythonTopologyGenerator
+        from topon.topology.loader import (
+            _infer_dims_from_graph,
+            _remove_vacancies,
+            load_graph,
+        )
 
         gen_cfg = self.config.topology.generator
-        output_prefix = str(self.output_dir / "topology" / "network")
-        Path(output_prefix).parent.mkdir(parents=True, exist_ok=True)
+        topology_dir = self.output_dir / "topology"
+        topology_dir.mkdir(parents=True, exist_ok=True)
 
-        result = run_generator(
-            exe_path=gen_cfg.exe_path,
-            lattice_size=gen_cfg.lattice_size,
-            lattice_type=gen_cfg.lattice_type,
-            periodicity=gen_cfg.periodicity,
-            max_functionality=gen_cfg.max_functionality,
-            degree_distribution=gen_cfg.degree_distribution,
-            max_trials=gen_cfg.max_trials,
-            max_saves=gen_cfg.max_saves,
-            output_prefix=output_prefix,
-        )
-        self.graph, self.dims = load_graph(
-            nodes_path=result["nodes_files"][0],
-            edges_path=result["edges_files"][0],
-        )
+        if gen_cfg.exe_path:
+            # C subprocess path: writes <topology_dir>/output/*.nodes + *.edges,
+            # then re-load via the standard loader.
+            nodes_path, edges_path = run_generator(
+                gen_cfg, topology_dir, exe_path=gen_cfg.exe_path
+            )
+            self.graph, self.dims = load_graph(
+                nodes_path=str(nodes_path),
+                edges_path=str(edges_path),
+            )
+        else:
+            # Pure-Python path: in-memory graph, no file round-trip.
+            gen = PythonTopologyGenerator(gen_cfg)
+            graphs = gen.generate(
+                trials=gen_cfg.max_trials,
+                max_saves=gen_cfg.max_saves,
+            )
+            if not graphs:
+                raise RuntimeError(
+                    f"PythonTopologyGenerator produced no graphs after "
+                    f"{gen_cfg.max_trials} trials (constraints may be too "
+                    f"strict for lattice {gen_cfg.lattice_size} "
+                    f"with degree_distribution={gen_cfg.degree_distribution!r})."
+                )
+            G = graphs[0]
+            if not isinstance(G, nx.MultiGraph):
+                G = nx.MultiGraph(G)
+            _remove_vacancies(G)
+            self.graph = G
+            self.dims = _infer_dims_from_graph(G)
 
     def _load_existing_topology(self) -> None:
         from topon.topology.loader import load_graph

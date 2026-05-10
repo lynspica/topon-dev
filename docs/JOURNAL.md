@@ -14,6 +14,32 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Fix P0-B (Pipeline `source="generate"` dispatch) + Python topology smoke test
+
+**Change**
+- `topon/pipeline.py:101-145`: rewrote `_generate_topology` to dispatch on `gen_cfg.exe_path`:
+  - **C path** (`exe_path` set): `run_generator(gen_cfg, topology_dir, exe_path=...)` returns `(nodes_path, edges_path)`; reload through `load_graph`.
+  - **Python path** (`exe_path=None`): `PythonTopologyGenerator(gen_cfg).generate(trials, max_saves)`; take `graphs[0]`, wrap `MultiGraph`, then `_remove_vacancies` + `_infer_dims_from_graph` for parity with the file-round-trip path. No I/O.
+- Updated the module docstring at `pipeline.py:21-22` — `source="generate"` no longer requires a compiled C binary; pure-Python is the default fallback.
+- Added `tests/smoke/test_polymer_generate_smoke.py` (4×4×4 SC, `exe_path=None`, atomistic DP=10). Passes after the fix.
+- Marked P0-B fixed in `internal/DEVELOPMENT_INTERNAL.md` §1.
+- Logged a new P1-F: `PythonTopologyGenerator.__init__` reads `lattice_source` instead of the schema's `lattice_type`, so BCC/FCC silently downgrade to SC on the Python path. Out of scope for this commit.
+
+**Why**
+P0-B was the user-facing blocker that prevented `topon generate` from working without a compiled C binary on PATH. With the dispatch in place, the package becomes self-contained — anyone who clones the repo and runs `pip install -e .` can use the full pipeline immediately.
+
+**Issue / solution**
+Plan agent flagged two latent issues during the research pass. (a) `PythonTopologyGenerator` reads the wrong attribute name (`lattice_source` vs `lattice_type`) — logged as P1-F for a follow-up. (b) `_remove_vacancies` / `_infer_dims_from_graph` are loader-private; the pipeline now imports them by underscored name. Both flagged for cleanup; not blocking for today's correctness fix.
+
+**Follow-up**
+- Fix P1-F (one-line attribute-name fallback in `generator_python.py:35`).
+- Promote loader's `_remove_vacancies` / `_infer_dims_from_graph` to public names.
+- One P0 remaining: **P0-A** (schema gap blocking JSON-config loading). Largest of the wave; will need new Pydantic schemas for `conformation`/`simulation`/`execution` sections.
+
+Smoke-test count: now 3, all passing. Total wall-clock ~20 s.
+
+---
+
 ## 2026-05-09 — Fix P0-C (model_type literal mapping) + add CG smoke test
 
 **Change**
