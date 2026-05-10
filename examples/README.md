@@ -16,6 +16,7 @@ For the full CLI reference and the JSON-config schema, see [`docs/USAGE.md`](../
 examples/
 ├── templates/              minimal.json + full.json starter configs (also produced by `topon init`)
 ├── defaults/               default node-type / edge-type assignment fragments
+├── showcase/               small reference data files (input format examples)
 ├── run_via_api.py          generic Python-API runner (equivalent to `topon generate`)
 ├── demos/
 │   ├── polymer/
@@ -37,6 +38,7 @@ examples/
 - [demos/protein/](demos/protein/README.md) — protein networks (the user-facing name is **topro**), CHARMM legacy + MARTINI current.
 - [demos/topology/](demos/topology/README.md) — topology generation only (no chemistry), C vs Python paths plus BFM.
 - [demos/poss/](demos/poss/README.md) — POSS-junction node chemistry in atomistic networks.
+- [showcase/](showcase/README.md) — small reference data files (input format examples; not generated demos).
 
 ## npjcompmat
 
