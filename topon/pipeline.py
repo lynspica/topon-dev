@@ -282,8 +282,11 @@ class Pipeline:
         experimental = self.raw_config.get("experimental", {})
         model = self.config.chemistry.model_type
 
+        # Pass the BASE output_dir (not self.output_dir which already includes
+        # study.name) — LammpsInputGenerator re-appends study.name internally.
+        # Matches the ConformationManager call pattern at line 259-263.
         gen = LammpsInputGenerator(
-            str(self.output_dir),
+            str(self.config.study.output_dir),
             self.config.study.name,
             config=sim_cfg,
             experimental=experimental,

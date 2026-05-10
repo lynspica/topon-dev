@@ -14,6 +14,27 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Fix P0-E (Stage 6 path doubling) — smoke test now PASSES end-to-end
+
+**Change**
+- `topon/pipeline.py:285-286`: changed `LammpsInputGenerator(str(self.output_dir), study_name, ...)` to `LammpsInputGenerator(str(self.config.study.output_dir), study_name, ...)`. The previous call passed `self.output_dir`, which already had `study.name` appended (`pipeline.py:64`); the writer re-appended internally, putting Stage 6 outputs at `<base>/<name>/<name>/04_Simulation/`. Now matches the `ConformationManager` call pattern (line 259-263).
+- Removed the `xfail` marker from `tests/smoke/test_polymer_atomistic_smoke.py`.
+- Marked P0-E as fixed in `internal/DEVELOPMENT_INTERNAL.md` §1.
+
+**Why**
+P0-D + P0-E were the two bugs blocking the smoke test from passing. P0-D fixed the in-Pipeline crash; P0-E fixed the on-disk layout so LAMMPS could find files from earlier stages. After both, the full atomistic load-path runs cleanly: Pipeline emits 6 stages of output and LAMMPS runs the stage-1 minimize without error.
+
+**Issue / solution**
+The path doubling looked cosmetic but was actually fatal: the LAMMPS stage-1 input script in `04_Simulation/` references `../02_Chemistry/system.data` — a relative path that only resolves correctly when both directories share the same parent. With the doubled `study.name`, `02_Chemistry` was at `<base>/<name>/02_Chemistry` while `04_Simulation` was at `<base>/<name>/<name>/04_Simulation`, so the relative reference broke. The one-line fix collapses everything back to the same parent.
+
+**Follow-up**
+Three P0s remaining:
+- **P0-C** (next): one-line literal mapping in the same `_run_output_stage`. Will unlock CG smoke tests.
+- **P0-B**: dispatch in `_generate_topology` between C subprocess (`run_generator`) and pure-Python (`PythonTopologyGenerator`). Will unlock `source="generate"` smoke tests.
+- **P0-A**: schema extensions for `conformation`/`simulation`/`execution` sections. Will unlock JSON-loaded smoke tests.
+
+---
+
 ## 2026-05-09 — Fix P0-D (Stage 4 bead-displacement TypeError)
 
 **Change**

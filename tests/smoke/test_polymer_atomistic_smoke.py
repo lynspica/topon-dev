@@ -5,24 +5,23 @@ full 6-stage Pipeline at DP=5 atomistic (DREIDING + PDMS), then invokes
 LAMMPS to run the stage-1 minimize script. Asserts the pipeline emits
 the expected files and LAMMPS exits 0.
 
-CURRENTLY XFAIL — the polymer Pipeline path is blocked by three
-pre-existing bugs (P0-B / P0-C / P0-D in
-internal/DEVELOPMENT_INTERNAL.md sec.1). This test is wired and ready;
-remove the xfail marker once the upstream bugs are fixed.
-
-P0-B blocks `topology.source="generate"` (run_generator signature mismatch
-+ no Python-only path). Worked around here with `source="load"`.
-P0-C blocks `chemistry.model_type="coarse_grained"` (literal mismatch in
-the writer). Worked around here with `"atomistic"`.
-P0-D is the active blocker: a `'>=' tuple vs int` comparison crashes the
-chemistry/conformation handoff after Stage 4 finishes writing displacement
-files. Root cause not yet traced; the smoke test reproduces it
-deterministically with a 5x5x5 + DP=5 atomistic config.
-
 Why a smoke test matters: pure-Python unit tests can't catch regressions
 where the pipeline emits a syntactically valid LAMMPS file that LAMMPS
-nevertheless rejects. This is the cheapest end-to-end check that the
-Python -> LAMMPS handoff still works.
+nevertheless rejects (atom-style mismatches, bad coefficient lines, NaN
+positions, path-resolution bugs across stages, etc.). This is the cheapest
+end-to-end check that the Python -> LAMMPS handoff still works.
+
+Workarounds for still-open Pipeline issues (see
+internal/DEVELOPMENT_INTERNAL.md sec.1):
+- Uses `topology.source="load"` to sidestep P0-B (run_generator signature
+  mismatch + no Python-only path).
+- Uses `chemistry.model_type="atomistic"` to sidestep P0-C (writer
+  literal mismatch on "coarse_grained").
+- Builds `ToponConfig` programmatically to sidestep P0-A (load_config's
+  extra-forbid rejects existing-style configs).
+
+A CG-path smoke test should follow once P0-C is fixed; a generate-path
+smoke test once P0-B is fixed; a JSON-loaded smoke test once P0-A is fixed.
 """
 from __future__ import annotations
 
@@ -45,18 +44,7 @@ from topon.config.schema import (
 from topon.pipeline import Pipeline
 
 
-pytestmark = [
-    pytest.mark.requires_lammps,
-    pytest.mark.xfail(
-        reason=(
-            "Pipeline reaches '=== Pipeline Complete ===' after the P0-D fix "
-            "(2026-05-09) but P0-E (Stage 6 path-doubling) still misroutes the "
-            "LAMMPS input scripts to <output_dir>/<name>/<name>/04_Simulation. "
-            "See internal/DEVELOPMENT_INTERNAL.md sec.1."
-        ),
-        strict=False,
-    ),
-]
+pytestmark = [pytest.mark.requires_lammps]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
