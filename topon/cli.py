@@ -11,21 +11,85 @@ import click
 from topon import __version__
 
 
-@click.group()
+_BANNER = r"""
+   +==================================================================+
+   |     ########   ########   ########    ########   ###     ##      |
+   |        ##      ##    ##   ##     ##   ##    ##   ####    ##      |
+   |        ##      ##    ##   ########    ##    ##   ## ##   ##      |
+   |        ##      ##    ##   ##          ##    ##   ##  ##  ##      |
+   |        ##      ########   ##          ########   ##   #####      |
+   |                                                                  |
+   |     Topological polymer & protein network generator for LAMMPS   |
+   |                                                      v{version:<7s}     |
+   +==================================================================+
+
+   Pipeline (`topon generate`):
+
+      +----------+   +----------+   +------------+
+      | Topology |-->| Analysis |-->| Assignment |--+
+      +----------+   +----------+   +------------+  |
+                                                    |
+      +----------+   +-------------+   +----------+ |
+      |  Output  |<--| Conformation|<--| Chemistry|<+
+      +----------+   +-------------+   +----------+
+
+   Commands
+     generate <config>     Run the 6-stage pipeline end-to-end
+     validate <config>     Validate a JSON config file
+     init [--full]         Create a starter config (minimal or full)
+     analyze <graph>       Print graph statistics
+     simbox                Pack a crosslink simulation box
+     chain                 Build a single chain in solvent
+
+   Sub-systems
+     python -m topon.protein_network    topro: MARTINI 3 protein networks
+
+   Help
+     topon <command> --help
+
+   Docs
+     AGENTS.md             onboarding for new contributors / AI agents
+     docs/USAGE.md         CLI reference + recipes + JSON-config schema
+"""
+
+
+@click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="topon")
-def main():
-    """Topon: Polymer network generation for molecular simulations."""
-    pass
+@click.pass_context
+def main(ctx):
+    """Topon: topological polymer + protein network generator for LAMMPS.
+
+    Run `topon` with no arguments to see the pipeline diagram and command list.
+    Run `topon <command> --help` for per-command flags.
+    """
+    if ctx.invoked_subcommand is None:
+        click.echo(_BANNER.format(version=__version__))
 
 
 @main.command()
 @click.argument("config_path", type=click.Path(exists=True))
 @click.option("--output", "-o", type=click.Path(), help="Override output directory")
 @click.option("--dry-run", is_flag=True, help="Validate config without running pipeline")
-def generate(config_path: str, output: str, dry_run: bool):
+@click.option(
+    "--export-graphml",
+    is_flag=True,
+    help="Also export the dual-graph (chains + entanglement edges) as <name>.graphml",
+)
+@click.option(
+    "--export-npz",
+    is_flag=True,
+    help="Also export the graph as <name>.npz for downstream GNN pipelines (planned; falls back gracefully if writer not yet implemented)",
+)
+def generate(
+    config_path: str,
+    output: str,
+    dry_run: bool,
+    export_graphml: bool,
+    export_npz: bool,
+):
     """
     Run the full pipeline from a configuration file.
-    
+
     CONFIG_PATH: Path to the JSON configuration file.
     """
     from topon.config import load_config_full, validate_config
@@ -42,6 +106,12 @@ def generate(config_path: str, output: str, dry_run: bool):
     # Override output directory if specified
     if output:
         config.study.output_dir = output
+
+    # CLI flags override config.output.*
+    if export_graphml:
+        config.output.export_graphml = True
+    if export_npz:
+        config.output.export_npz = True
 
     # Validate configuration
     errors = validate_config(config)
@@ -68,6 +138,40 @@ def generate(config_path: str, output: str, dry_run: bool):
     pipeline.run()
 
     click.echo(f"Pipeline complete. Output written to: {config.study.output_dir}")
+
+
+@main.command()
+@click.option("--port", default=8501, type=int, help="Streamlit server port (default 8501)")
+def gui(port: int):
+    """Launch the Streamlit GUI (scaffold; install with `pip install topon[gui]`)."""
+    import shutil
+    import subprocess
+
+    try:
+        import streamlit  # noqa: F401
+    except ImportError:
+        click.echo(
+            "streamlit is not installed. Install with `pip install topon[gui]` "
+            "or `pip install streamlit`, then re-run `topon gui`.",
+            err=True,
+        )
+        sys.exit(1)
+
+    app_path = Path(__file__).parent / "gui" / "app.py"
+    if not app_path.exists():
+        click.echo(f"GUI app not found at: {app_path}", err=True)
+        sys.exit(1)
+
+    streamlit_bin = shutil.which("streamlit")
+    if streamlit_bin is None:
+        click.echo("streamlit binary not on PATH; falling back to `python -m streamlit`.")
+        cmd = [sys.executable, "-m", "streamlit", "run", str(app_path),
+               "--server.port", str(port)]
+    else:
+        cmd = [streamlit_bin, "run", str(app_path), "--server.port", str(port)]
+
+    click.echo(f"Launching topon GUI on http://localhost:{port}/ ...")
+    sys.exit(subprocess.call(cmd))
 
 
 @main.command()

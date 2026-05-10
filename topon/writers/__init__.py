@@ -8,10 +8,12 @@ from .lammps_atomistic import DreidingWriter
 from .lammps_cg import CGWriter
 from .lammps_inputs import LammpsInputGenerator
 from .graphml_writer import write_graphml
+from .npz_writer import write_npz
 
 __all__ = [
     "DreidingWriter",
     "CGWriter",
     "LammpsInputGenerator",
     "write_graphml",
+    "write_npz",
 ]

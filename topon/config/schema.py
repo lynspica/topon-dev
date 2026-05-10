@@ -287,6 +287,14 @@ class OutputConfig(BaseModel):
     visualization: bool = Field(default=True, description="Generate visualization HTML")
     analysis_report: bool = Field(default=True, description="Generate analysis report")
     save_attributed_graph: bool = Field(default=True, description="Save attributed graph as gpickle")
+    export_graphml: bool = Field(
+        default=False,
+        description="Export the dual-graph (chains + entanglement edges) as a GraphML file",
+    )
+    export_npz: bool = Field(
+        default=False,
+        description="Export the graph as a compressed NPZ dataset for downstream GNN pipelines",
+    )
 
 
 # =============================================================================

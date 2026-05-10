@@ -301,6 +301,31 @@ class Pipeline:
         print("--- Stage 6: Output ---")
         from topon.writers import LammpsInputGenerator
 
+        # Optional graph-format exports (GraphML, NPZ).
+        if self.config.output.export_graphml:
+            from topon.writers.graphml_writer import write_graphml
+            graphml_path = self.output_dir / f"{self.config.study.name}.graphml"
+            mean_dp = int(self.config.assignment.dp_distribution.default.mean)
+            write_graphml(
+                self.graph,
+                str(graphml_path),
+                dp=mean_dp,
+                dims=self.dims,
+            )
+            print(f"  GraphML written to: {graphml_path}")
+        if self.config.output.export_npz:
+            try:
+                from topon.writers.npz_writer import write_npz
+            except ImportError:
+                print(
+                    "  [skip] NPZ export requested but topon.writers.npz_writer "
+                    "is not yet implemented (see internal/specs/npz_format.md)."
+                )
+            else:
+                npz_path = self.output_dir / f"{self.config.study.name}.npz"
+                write_npz(self.graph, str(npz_path), dims=self.dims)
+                print(f"  NPZ written to: {npz_path}")
+
         sim_cfg = self.raw_config.get("simulation", {})
         experimental = self.raw_config.get("experimental", {})
         # LammpsInputGenerator branches on "cg" vs "atomistic" literals
