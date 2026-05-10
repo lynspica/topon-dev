@@ -1,0 +1,34 @@
+{
+    "study": {
+        "name": "smoke_json",
+        "output_dir": "_will_be_overridden_by_test_"
+    },
+    "topology": {
+        "source": "load",
+        "existing_files": {
+            "nodes_file": "_filled_in_by_test_",
+            "edges_file": "_filled_in_by_test_"
+        }
+    },
+    "assignment": {
+        "dp_distribution": {
+            "default": { "mean": 5, "pdi": 1.0 }
+        }
+    },
+    "chemistry": {
+        "model_type": "atomistic",
+        "target_density": 0.9
+    },
+    "conformation": {
+        "overlap_cutoff": 0.2,
+        "overlap_max_iters": 20
+    },
+    "simulation": {
+        "run_steps": 100
+    },
+    "execution": {
+        "auto_run": false,
+        "executable": "lmp",
+        "n_procs": 1
+    }
+}

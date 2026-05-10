@@ -14,6 +14,36 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Fix P0-A (schema gap) — `topon generate` now accepts existing-style configs
+
+**Change**
+- Added `load_config_full(path) -> (ToponConfig, raw_dict)` in `topon/config/loader.py`. Splits the JSON into the five schema-known keys (`study`, `topology`, `assignment`, `chemistry`, `output`) and "everything else" (the raw dict — typically `conformation`, `simulation`, `execution`, `experimental`).
+- Updated `topon/cli.py::generate` to use `load_config_full` and pass `raw_cfg` through to `Pipeline(config, raw_config=raw_cfg)`.
+- Kept `load_config(path) -> ToponConfig` as a backward-compat thin wrapper (silently drops extras).
+- Added `topon/config/__init__.py` export for `load_config_full`.
+- Added `tests/smoke/test_polymer_json_load_smoke.py` + `tests/smoke/fixtures/json_load_smoke.json` — exercises a JSON config with all three extras sections through `load_config_full` → `Pipeline.run()` → LAMMPS stage-1.
+- Marked P0-A fixed in `internal/DEVELOPMENT_INTERNAL.md` §1; logged a new P2-G for the secondary `chemistry.degree_of_polymerization` silent-drop issue.
+
+**Why**
+The headline blocker for `topon generate <config>`. Every existing-style config bundled with the repo had `conformation`/`simulation`/`execution` sections that `ToponConfig`'s `extra: "forbid"` rejected. The CLI was unusable for real workflows; users had to bypass via the `tests/workflows/run_*.py` scripts. After this fix, the CLI is the canonical entry point.
+
+**Issue / solution**
+Two valid approaches: (a) add full Pydantic schemas for `ConformationConfig`/`SimulationConfig`/`ExecutionConfig` and consume them validated; (b) split at load time and forward as raw. Picked (b) — smaller diff, no risk of changing semantics for sections the Pipeline already handled as raw dicts. Added (a) to follow-up notes; promoting these to validated schemas is still desirable but no longer urgent.
+
+A separate gotcha during smoke-test wiring: `validate_config` raised warnings about node/edge type "B" being missing from `node_type_map`, even though the active `node_types.method = "degree"` doesn't use "B". The validator is iterating over default `positional.layer_types` / `composite.layer_types` regardless of active method. Out-of-scope spurious warning; documented and the smoke test skips that assertion. Fix is cheap when revisited.
+
+**Result**
+All 131 tests pass (127 fast unit + 4 smoke). Smoke harness now covers four orthogonal end-to-end paths: atomistic+load, cg+load, atomistic+generate (Python topology), and JSON-loaded with full extras. The five P0 bugs surfaced over the last day are all closed; the package's `topon generate` CLI is now functional end-to-end.
+
+**Follow-up**
+- P1-F (PythonTopologyGenerator silent SC downgrade for BCC/FCC).
+- P2-G (chemistry.degree_of_polymerization silently ignored).
+- Promote loader's `_remove_vacancies`/`_infer_dims_from_graph` to public names.
+- Cleanup the `validate_config` spurious-type-warning issue (only check active method's layer types).
+- Promote `conformation`/`simulation`/`execution`/`experimental` from raw dicts to Pydantic schemas (no longer urgent — load_config_full unblocks usage).
+
+---
+
 ## 2026-05-09 — Fix P0-B (Pipeline `source="generate"` dispatch) + Python topology smoke test
 
 **Change**

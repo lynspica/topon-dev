@@ -11,7 +11,7 @@ from topon.config.schema import (
     ChemistryConfig,
     OutputConfig,
 )
-from topon.config.loader import load_config, merge_configs
+from topon.config.loader import load_config, load_config_full, merge_configs
 from topon.config.validator import validate_config
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "ChemistryConfig",
     "OutputConfig",
     "load_config",
+    "load_config_full",
     "merge_configs",
     "validate_config",
 ]

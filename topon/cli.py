@@ -28,21 +28,21 @@ def generate(config_path: str, output: str, dry_run: bool):
     
     CONFIG_PATH: Path to the JSON configuration file.
     """
-    from topon.config import load_config, validate_config
+    from topon.config import load_config_full, validate_config
     from topon.pipeline import Pipeline
-    
+
     click.echo(f"Loading configuration from: {config_path}")
-    
+
     try:
-        config = load_config(config_path)
+        config, raw_cfg = load_config_full(config_path)
     except Exception as e:
         click.echo(f"Error loading configuration: {e}", err=True)
         sys.exit(1)
-    
+
     # Override output directory if specified
     if output:
         config.study.output_dir = output
-    
+
     # Validate configuration
     errors = validate_config(config)
     if errors:
@@ -50,18 +50,23 @@ def generate(config_path: str, output: str, dry_run: bool):
         for error in errors:
             click.echo(f"  - {error}", err=True)
         sys.exit(1)
-    
+
     click.echo("Configuration is valid.")
-    
+    if raw_cfg:
+        click.echo(
+            f"  Raw extras forwarded to Pipeline: {sorted(raw_cfg.keys())}"
+        )
+
     if dry_run:
         click.echo("Dry run - not executing pipeline.")
         return
-    
-    # Run pipeline
+
+    # Run pipeline (raw_config carries conformation / simulation /
+    # execution / experimental sections that aren't in ToponConfig).
     click.echo("Running pipeline...")
-    pipeline = Pipeline(config)
+    pipeline = Pipeline(config, raw_config=raw_cfg)
     pipeline.run()
-    
+
     click.echo(f"Pipeline complete. Output written to: {config.study.output_dir}")
 
 
