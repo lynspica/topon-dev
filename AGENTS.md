@@ -81,7 +81,7 @@ topon/
 │   ├── agents/topon-reviewer.md      code-review agent (has Edit/Write)
 │   └── agents/investigator.md        unbiased read-only auditor
 ├── internal/                    GITIGNORED — owner-local notes (see §5)
-└── legacy/                      ARCHIVED OUT OF REPO 2026-05-09 → `C:\Users\ahmet\topon_archive\`
+└── legacy/                      ARCHIVED OUT OF REPO 2026-05-09 → `~/topon_archive/`
 ```
 
 ---
@@ -114,7 +114,7 @@ Several locations are gitignored — they exist on the project owner's machine b
 
 - `internal/` — owner's working notes, planned next steps, P0/P1 issue tracker
 - `internal/specs/` — feature specs from collaborators (e.g. NPZ output format)
-- `legacy/` — moved out of the repo entirely on 2026-05-09 to `C:\Users\ahmet\topon_archive\` (8.3 GB of frozen earlier attempts; reference for fork-provenance comments only)
+- `legacy/` — moved out of the repo entirely on 2026-05-09 to `~/topon_archive/` (8.3 GB of frozen earlier attempts; reference for fork-provenance comments only)
 - `tests/output/` — accumulated LAMMPS run artifacts
 - `.vscode/`, `.pytest_cache/`, build artefacts
 

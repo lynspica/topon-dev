@@ -65,7 +65,7 @@ All behaviour is controlled through Pydantic config objects (`topon/config/schem
 
 - `tests/output/` — regression reference outputs (update only by running the generator with `--update-refs`)
 
-> Note: `legacy/` was moved out of the repo on 2026-05-09 to `C:\Users\ahmet\topon_archive\` (with `older_versions/` inside it). Don't re-import either tree into the working copy; if you need a historical reference, open the file in place from the archive.
+> Note: `legacy/` was moved out of the repo on 2026-05-09 to `~/topon_archive/` (with `older_versions/` inside it). Don't re-import either tree into the working copy; if you need a historical reference, open the file in place from the archive.
 
 ---
 

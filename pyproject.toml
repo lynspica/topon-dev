@@ -52,8 +52,8 @@ gui = [
 topon = "topon.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/lynspica/topon"
-Repository = "https://github.com/lynspica/topon"
+Homepage = "https://github.com/lynspica/topon-dev"
+Repository = "https://github.com/lynspica/topon-dev"
 
 [tool.setuptools.packages.find]
 where = ["."]

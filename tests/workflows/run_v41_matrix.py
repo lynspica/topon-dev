@@ -26,6 +26,7 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import time
@@ -33,8 +34,8 @@ from pathlib import Path
 
 from topon.protein_network import workflow
 
-# Site-specific LAMMPS executable.
-LMP = r"C:/Users/ahmet/AppData/Local/LAMMPS 64-bit 2Apr2025/bin/lmp.exe"
+# LAMMPS executable: respects the LMP env var; otherwise looks for `lmp` on PATH.
+LMP = os.environ.get("LMP", "lmp")
 
 # (label, block_seq, water_type, density, n_chains, n_repeats, n_na, n_cl)
 MATRIX: list[tuple] = [

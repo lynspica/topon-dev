@@ -135,7 +135,7 @@ Fix P0-E next (one-line constructor call change in `pipeline.py:285`). Then P0-C
 - Registered four pytest markers in `pyproject.toml`: `fast`, `smoke`, `regression`, `requires_lammps`.
 - Added `tests/conftest.py` with two responsibilities: (a) auto-apply the tier marker to any test based on its parent directory (`tests/unit/` → `fast`, `tests/smoke/` → `smoke`, `tests/regression/` → `regression`), and (b) auto-skip any `requires_lammps` test when `lmp` is not on `PATH`.
 - Added `tests/smoke/` with `test_polymer_cg_smoke.py` — a tiny end-to-end test that builds a 3×3×3 SC CG network, runs `Pipeline.run()` through all six stages, then invokes LAMMPS to run `minimize_1_serial.in` and asserts a clean exit + stage-1 output file.
-- Moved `tests/tmp_hsp_audit.py` and `tests/Martini_Ahmet.zip` (no longer needed in tracked tree — the zip is already extracted to gitignored `tests/_martini_extracted/`) to `C:\Users\ahmet\topon_archive\old_examples\`.
+- Moved `tests/tmp_hsp_audit.py` and `tests/Martini_Ahmet.zip` (no longer needed in tracked tree — the zip is already extracted to gitignored `tests/_martini_extracted/`) to `~/topon_archive/old_examples\`.
 
 **Why**
 - The "I changed X, retest X" workflow needs per-component subdirs (`pytest tests/unit/chemistry/` is now self-explanatory).
@@ -176,7 +176,7 @@ Five-step project consolidation completed across multiple commits:
 3. Cleanup commit: deleted 14 stale source docs (cli.md, config_reference.md, simbox.md, walkthrough.md, implementation_plan.md, etc.) now subsumed by the new four. Updated `README.md` and `CLAUDE.md` cross-refs. Fixed source-side drift (V36 four-files claim, V22 Hard Case framing, `workflow.py` docstring).
 4. `examples/` curation: restructured into `demos/{polymer,protein,topology,poss}/` with READMEs at every category level; copied the npj-paper companion data into `examples/npjcompmat/` (1001 files, ~23 MB); archived old workflow scripts to `legacy/old_examples/`.
 5. Wired up two GitHub remotes: `personal` → `https://github.com/lynspica/topon-dev` (public, primary), `stable` → `https://github.com/keten-group/topon` (URL only — paper-companion v0.1.0 left untouched).
-6. Moved the entire 8.3 GB `legacy/` tree out of the repo working directory to `C:\Users\ahmet\topon_archive\` (atomic same-volume rename; instant; reversible).
+6. Moved the entire 8.3 GB `legacy/` tree out of the repo working directory to `~/topon_archive/` (atomic same-volume rename; instant; reversible).
 7. Added `AGENTS.md` at the root: single "read this first" doc for any AI agent (Claude / ChatGPT / Cursor / etc.) starting a session on the project.
 8. Added `examples/showcase/network_5x5x5/` — small reference graph files for users to load via `topology.source = "load"`.
 

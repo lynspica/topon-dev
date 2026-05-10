@@ -35,6 +35,9 @@ log.lammps
 *.restart
 restart.*
 
+# Claude Code: per-machine permission allowlist (leaks home path)
+.claude/settings.local.json
+
 # Private devlog, plans, scratch notes
 internal/
 
