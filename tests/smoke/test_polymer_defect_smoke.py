@@ -27,19 +27,7 @@ from topon.config.schema import (
 from topon.pipeline import Pipeline
 
 
-pytestmark = [
-    pytest.mark.requires_lammps,
-    pytest.mark.xfail(
-        reason=(
-            "LAMMPS 'Neighbor list overflow, boost neigh_modify one' on the "
-            "5x5x5 + DP=5 atomistic + 5 primary loops case (high local "
-            "density before stage-1 squeezing). Pipeline build is fine; "
-            "the LAMMPS-side input script needs neigh_modify tuning for "
-            "defect-heavy small systems. Tracked in JOURNAL."
-        ),
-        strict=False,
-    ),
-]
+pytestmark = [pytest.mark.requires_lammps]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

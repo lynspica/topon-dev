@@ -14,6 +14,21 @@ Newest first.
 
 ---
 
+## 2026-05-10 — Smoke-test reality check: defect actually passes; POSS reveals a real bug (P0-H)
+
+**Change**
+- Removed `xfail` marker from `tests/smoke/test_polymer_defect_smoke.py` after verifying it passes 3/3 in isolation in ~5.5 s. The earlier "1 failed, 6 passed" run had attributed the failure to defect; that was wrong. The slow / failing test in that run was POSS, not defect.
+- Tightened the `xfail` reason on `tests/smoke/test_polymer_poss_smoke.py` to point at the real bug: `Bond/angle/dihedral extent > half of periodic box length`. Confirmed it's NOT a density issue — reproduces at `target_density=0.9` as well as `1.1`.
+- Logged the underlying bug as **P0-H** in `internal/DEVELOPMENT_INTERNAL.md` §1: atomistic chemistry-stage placement leaves cross-boundary chains attached to POSS junctions un-wrapped. Suspected fix area: `chemistry/builder.py::_build_chain_atomistic` / `_place_poss_am0270` — compare to how non-POSS junctions handle the same cross-boundary case.
+
+**Why**
+User correctly questioned why these tests were now flagged xfail when nothing seemed to have regressed. Answer: defect was never failing — that was misattribution on my part during the rapid cycle of adding 3 smoke tests. POSS, on the other hand, is hitting a real previously-hidden bug that only became visible because the P0-D/E/C/B/A fixes finally let `Pipeline.run()` complete end-to-end. Workflow scripts probably bypassed the case (different lattice size, or different node-placement code path).
+
+**Result**
+6 of 7 smoke tests now pass cleanly. The one xfail (POSS) is a pinned bug, not flakiness — fixing it requires a chemistry-builder change.
+
+---
+
 ## 2026-05-09 — Schema/loader/validator polish (P1-F + P2-G + public loader API + active-method validator)
 
 **Change**

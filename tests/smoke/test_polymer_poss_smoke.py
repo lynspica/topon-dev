@@ -36,11 +36,14 @@ pytestmark = [
     pytest.mark.requires_lammps,
     pytest.mark.xfail(
         reason=(
-            "LAMMPS 'Neighbor list overflow' on the 5x5x5 + DP=5 atomistic "
-            "+ POSS junctions at target_density=1.1 (high local density "
-            "before stage-1 squeezing). Pipeline build is fine. "
-            "Tune the LAMMPS-side neigh_modify one parameter for dense "
-            "atomistic smoke configs, or lower the smoke-test density."
+            "LAMMPS warns 'Bond/angle/dihedral extent > half of periodic "
+            "box length' then errors 'Neighbor list overflow' on this "
+            "5x5x5 + DP=5 atomistic + POSS-junction case. Verified NOT a "
+            "density issue (reproduces at target_density=0.9 as well as "
+            "1.1). Symptom: chemistry-stage placement of chains attached "
+            "to POSS junctions that span the periodic boundary leaves "
+            "atoms across-the-box instead of min-image-wrapped. Logged "
+            "as P0-H in internal/DEVELOPMENT_INTERNAL.md."
         ),
         strict=False,
     ),
