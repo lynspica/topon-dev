@@ -14,6 +14,23 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Fix P0-D (Stage 4 bead-displacement TypeError)
+
+**Change**
+- `topon/pipeline.py:209-221`: rewrote the bead-displacement loop to unpack `(u, v, _key)` directly from `self._builder.edge_atom_map.items()` instead of treating the dict keys as int indices into `list(self.graph.edges(data=True))`. The dict keys are `(u, v, key)` tuples from MultiGraph edges; the old code's `if edge_idx >= len(edges)` raised `TypeError: '>=' not supported between instances of 'tuple' and 'int'`.
+- Updated `internal/DEVELOPMENT_INTERNAL.md` §1 to mark P0-D as **fixed** (kept the entry for traceability).
+
+**Why**
+First of the four P0 bugs surfaced by the smoke test. Smallest, most obvious — quick win to validate the fix-via-smoke-test workflow.
+
+**Issue / solution**
+The fix unblocks the rest of the pipeline; running the smoke test now reaches "=== Pipeline Complete ===" successfully. But it surfaces a new pre-existing bug, **P0-E**: Stage 6's `LammpsInputGenerator` double-applies `study.name`, so LAMMPS scripts land at `<output_dir>/<name>/<name>/04_Simulation/` instead of `<output_dir>/<name>/04_Simulation/`. Pipeline-internally, Stage 4 and Stage 5 outputs are at the correct single-level depth; only Stage 6 doubles. Logged as P0-E in INTERNAL.md §1.
+
+**Follow-up**
+Fix P0-E next (one-line constructor call change in `pipeline.py:285`). Then P0-C, then P0-B, then P0-A.
+
+---
+
 ## 2026-05-09 — Test infrastructure: tiers, per-component subdirs, smoke path
 
 **Change**

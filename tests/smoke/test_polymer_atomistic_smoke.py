@@ -49,8 +49,10 @@ pytestmark = [
     pytest.mark.requires_lammps,
     pytest.mark.xfail(
         reason=(
-            "Pipeline blocked by P0-D (TypeError: '>=' tuple vs int after Stage 4) "
-            "+ P0-B + P0-C; see internal/DEVELOPMENT_INTERNAL.md sec.1"
+            "Pipeline reaches '=== Pipeline Complete ===' after the P0-D fix "
+            "(2026-05-09) but P0-E (Stage 6 path-doubling) still misroutes the "
+            "LAMMPS input scripts to <output_dir>/<name>/<name>/04_Simulation. "
+            "See internal/DEVELOPMENT_INTERNAL.md sec.1."
         ),
         strict=False,
     ),

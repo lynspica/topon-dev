@@ -206,12 +206,12 @@ class Pipeline:
             str(chem_dir / "system_nodes.displace"), "nodes"
         )
 
-        edges = list(self.graph.edges(data=True))
+        # edge_atom_map keys are (u, v, key) tuples from the MultiGraph
+        # (see chemistry/builder.py::_build_chains). Iterate via dict keys
+        # rather than treating them as sequential int indices into the
+        # graph.edges() list.
         chain_coords: dict[int, tuple] = {}
-        for edge_idx, atom_indices in self._builder.edge_atom_map.items():
-            if edge_idx >= len(edges):
-                continue
-            u, v, _ = edges[edge_idx]
+        for (u, v, _key), atom_indices in self._builder.edge_atom_map.items():
             pos_u = np.array(self.graph.nodes[u].get("pos", (0.0, 0.0, 0.0)))
             pos_v = np.array(self.graph.nodes[v].get("pos", (0.0, 0.0, 0.0)))
             vec = pos_v - pos_u
