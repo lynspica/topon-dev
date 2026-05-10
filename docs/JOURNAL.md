@@ -1,0 +1,87 @@
+# topon — Engineering Journal
+
+A live log of changes, issues encountered, and the resolutions taken. More granular than [`DEVELOPMENT.md`](DEVELOPMENT.md) (which is the formal version-by-version changelog), and complementary to [`internal/DEVELOPMENT_INTERNAL.md`](../internal/DEVELOPMENT_INTERNAL.md) (which tracks open issues and planned work).
+
+Append a new entry whenever you ship something non-trivial. Each entry follows:
+
+- **Date — short headline**
+- **Change:** what was done.
+- **Why:** motivation.
+- **Issue / solution:** any non-obvious problems and how they were fixed.
+- **Follow-up:** (optional) what remains.
+
+Newest first.
+
+---
+
+## 2026-05-09 — Test infrastructure: tiers, per-component subdirs, smoke path
+
+**Change**
+- Reorganized `tests/unit/` into per-component subdirectories: `topology/`, `assignment/`, `chemistry/`, `config/`, `simbox/`, `protein_network/`. The 6 protein-network test files dropped their `protein_network_` filename prefix (subdir naming makes it redundant).
+- Registered four pytest markers in `pyproject.toml`: `fast`, `smoke`, `regression`, `requires_lammps`.
+- Added `tests/conftest.py` with two responsibilities: (a) auto-apply the tier marker to any test based on its parent directory (`tests/unit/` → `fast`, `tests/smoke/` → `smoke`, `tests/regression/` → `regression`), and (b) auto-skip any `requires_lammps` test when `lmp` is not on `PATH`.
+- Added `tests/smoke/` with `test_polymer_cg_smoke.py` — a tiny end-to-end test that builds a 3×3×3 SC CG network, runs `Pipeline.run()` through all six stages, then invokes LAMMPS to run `minimize_1_serial.in` and asserts a clean exit + stage-1 output file.
+- Moved `tests/tmp_hsp_audit.py` and `tests/Martini_Ahmet.zip` (no longer needed in tracked tree — the zip is already extracted to gitignored `tests/_martini_extracted/`) to `C:\Users\ahmet\topon_archive\old_examples\`.
+
+**Why**
+- The "I changed X, retest X" workflow needs per-component subdirs (`pytest tests/unit/chemistry/` is now self-explanatory).
+- Tiered markers let the same files participate in tier-based filtering (`pytest -m fast` for a quick pre-commit, `pytest -m "fast or smoke"` for pre-push).
+- LAMMPS-running smoke tests catch regressions where the pipeline emits a syntactically valid LAMMPS file that LAMMPS still rejects — pure-Python unit tests can't see those.
+
+**Issue / solution**
+The first cut of the smoke test exposed **four** pre-existing package bugs in the `Pipeline` path. None were caused by the test-infra work; the smoke test surfaced them — which is exactly its job.
+
+- **P0-A** (already documented): `load_config` rejects existing-style configs because `ToponConfig` has `extra: "forbid"`. Worked around by constructing `ToponConfig` programmatically in the smoke fixture.
+- **P0-B** (newly logged): `Pipeline._generate_topology` calls `run_generator(...)` with the wrong signature; `run_generator` only supports the C-binary path. Worked around by using `topology.source="load"`.
+- **P0-C** (newly logged): `Pipeline` passes `"coarse_grained"` to `LammpsInputGenerator`, which only branches on `"cg"` vs `"atomistic"`. Worked around by using `model_type="atomistic"`.
+- **P0-D** (newly logged): `TypeError: '>=' tuple vs int` mid-Pipeline, after Stage 4 chemistry succeeds. Likely in the bead-displacement loop (`pipeline.py:212`); edge map keys appear to be tuples being treated as int indices. **Active blocker for the smoke test.**
+
+The shipped smoke test (`tests/smoke/test_polymer_atomistic_smoke.py`) is **marked `xfail`** because of P0-D — pytest reports it as expected-failure rather than skip, so it's visible as a pinned reminder; flips to `xpass` automatically when the bug is fixed (`strict=False`). The test exercises the path we *want* to work: load 5×5×5 sample → DP=5 atomistic → Pipeline.run() → LAMMPS stage-1.
+
+A simbox-based smoke test was attempted as a workaround (simbox is a separate code path that doesn't go through `Pipeline`), but its writer also produced LAMMPS-rejected output ("Unknown identifier in data file: 29 0.500000 -1 3" — likely a force-field-coefficients format mismatch with newer LAMMPS). Logged as part of the same P0 wave; not yet root-caused.
+
+**Bottom line:** test infrastructure ships; one smoke test ships as xfail. No smoke test currently passes against this LAMMPS install (`2 Apr 2025`). The good news is that the smoke harness will catch regressions immediately once the P0 bugs are fixed.
+
+**Follow-up**
+- Trace and fix P0-D (chemistry → conformation handoff) — should be a few-line patch in `Pipeline._run_chemistry_stage`.
+- Then P0-C (writer literal mismatch — one line).
+- Then P0-B (run_generator signature + Python-only dispatch — small refactor).
+- Then P0-A (schema extensions — moderate refactor).
+- Investigate simbox writer's data-file format compatibility with LAMMPS 2 Apr 2025; if the failure is real (not just a regression-test golden mismatch), add a simbox smoke test once fixed.
+- Add per-component fast tests where coverage is thin (current: assignment, chemistry, simbox, protein_network all have at least one fast test; topology has one; config has one; conformation and writers are covered indirectly).
+
+---
+
+## 2026-05-08 → 2026-05-09 — Documentation and examples consolidation (5-step roadmap)
+
+**Change**
+Five-step project consolidation completed across multiple commits:
+
+1. Set up the `investigator` agent (`.claude/agents/investigator.md`) — unbiased read-only auditor used as a pre-commit reviewer for every non-trivial doc/code change in this consolidation.
+2. Drafted four canonical docs: `docs/{ARCHITECTURE,USAGE,DEVELOPMENT}.md` and `internal/DEVELOPMENT_INTERNAL.md`. Each went through the loop *draft → investigator review → fix → commit*.
+3. Cleanup commit: deleted 14 stale source docs (cli.md, config_reference.md, simbox.md, walkthrough.md, implementation_plan.md, etc.) now subsumed by the new four. Updated `README.md` and `CLAUDE.md` cross-refs. Fixed source-side drift (V36 four-files claim, V22 Hard Case framing, `workflow.py` docstring).
+4. `examples/` curation: restructured into `demos/{polymer,protein,topology,poss}/` with READMEs at every category level; copied the npj-paper companion data into `examples/npjcompmat/` (1001 files, ~23 MB); archived old workflow scripts to `legacy/old_examples/`.
+5. Wired up two GitHub remotes: `personal` → `https://github.com/lynspica/topon-dev` (public, primary), `stable` → `https://github.com/keten-group/topon` (URL only — paper-companion v0.1.0 left untouched).
+6. Moved the entire 8.3 GB `legacy/` tree out of the repo working directory to `C:\Users\ahmet\topon_archive\` (atomic same-volume rename; instant; reversible).
+7. Added `AGENTS.md` at the root: single "read this first" doc for any AI agent (Claude / ChatGPT / Cursor / etc.) starting a session on the project.
+8. Added `examples/showcase/network_5x5x5/` — small reference graph files for users to load via `topology.source = "load"`.
+
+**Why**
+The repo had drifted into 16+ scattered markdown files with mutually contradictory content (4-stage vs 6-stage pipeline, dead module names, non-existent workflow scripts), 8 GB of legacy artefacts in the working tree, and no clear onboarding path for new AI agents in fresh chats. The consolidation gave us a stable spine: AGENTS.md (entry point) → CLAUDE.md (rules) → ARCHITECTURE / USAGE / DEVELOPMENT (the canonical three).
+
+**Issue / solution**
+- **Schema gap (P0-A)**: surfaced when the investigator tried to validate the example configs through `topon generate`. Existing-style configs with `conformation`/`simulation`/`execution` sections are rejected by `ToponConfig`'s `extra: "forbid"`. Did not fix in this consolidation (out of scope) — documented as P0-A in `INTERNAL.md`, made the demo READMEs honest about the limitation, and added the workaround note to the smoke-test fixture.
+- **Image-flag contradiction**: `topon-reviewer.md` said "wrap-only, image flags failed in v33-v38"; `martini_devlog.md` said "image flags mandatory at MARTINI scale". Resolved by reading the actual `protein_network/lammps_writer.py:188-217`: code is wrap-only, the topon-reviewer is correct. Updated `ARCHITECTURE.md` design principles 3 + 4 accordingly; flagged the docstring drift in `topro_issues_for_later.md` (now in `INTERNAL.md` §5).
+- **Forgotten remote rename**: I created `lynspica/topon` initially, but the user clarified they wanted `topon-dev`. Renamed via `gh repo rename`; GitHub auto-redirects from the old URL.
+
+**Follow-up**
+All open work is tracked in `internal/DEVELOPMENT_INTERNAL.md`:
+- P0-A: schema gap (above)
+- P0-2: silent `Si` fallthrough in `_build_nodes`
+- P1 polish (logger, default `min_dist`, `_guess_head` regex)
+- P2 housekeeping (verbose prints, hot-loop imports)
+- Future-work: SELFIES, NPZ output, GraphML CLI flag, RESP charges, GUI, Streamlit, Jupyter
+
+---
+
+*Earlier history lives in [`DEVELOPMENT.md`](DEVELOPMENT.md) §4 (V1–V36 changelog).*

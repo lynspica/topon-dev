@@ -63,19 +63,26 @@ All behaviour is controlled through Pydantic config objects (`topon/config/schem
 
 ## Do Not Modify
 
-- `legacy/` and `older_versions/` — frozen reference code
 - `tests/output/` — regression reference outputs (update only by running the generator with `--update-refs`)
+
+> Note: `legacy/` was moved out of the repo on 2026-05-09 to `C:\Users\ahmet\topon_archive\` (with `older_versions/` inside it). Don't re-import either tree into the working copy; if you need a historical reference, open the file in place from the archive.
 
 ---
 
 ## Testing
 
+Tier markers are registered in `pyproject.toml` and auto-applied by `tests/conftest.py` based on each test's parent directory:
+
 ```bash
-pytest tests/unit/         # fast, no LAMMPS needed (~5s)
-pytest tests/regression/   # slow, generates full LAMMPS systems (~1.5h)
+pytest -m fast                       # fast unit tests (~5s)
+pytest tests/unit/chemistry/         # focused on a component you just changed
+pytest -m "fast or smoke"            # major pre-push check (smoke includes LAMMPS if `lmp` is on PATH)
+pytest -m regression                 # full byte-equivalence suite (~1.5h)
 ```
 
-Unit tests live in `tests/unit/`. Regression tests live in `tests/regression/`. Integration / workflow scripts live in `tests/workflows/` (not pytest — run directly with Python).
+Unit tests live in `tests/unit/<component>/` (one subdir per `topon/` sub-package). Smoke tests live in `tests/smoke/` and run end-to-end pipeline + LAMMPS at small scale. Regression tests live in `tests/regression/`. Integration / workflow scripts live in `tests/workflows/` (not pytest — run directly with Python).
+
+`@pytest.mark.requires_lammps` is auto-skipped when `lmp` is not on PATH.
 
 ---
 
@@ -86,6 +93,7 @@ User-facing docs live in `docs/` (committed) and `internal/` (gitignored, owner-
 - [`docs/USAGE.md`](docs/USAGE.md) — update when changing CLI options, config schema keys, or sub-system APIs
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — update when changing module structure, pipeline stages, or design principles
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — add a changelog entry for every significant change
+- [`docs/JOURNAL.md`](docs/JOURNAL.md) — append a dated journal entry (Change / Why / Issue+solution) for any non-trivial work
 - [`internal/DEVELOPMENT_INTERNAL.md`](internal/DEVELOPMENT_INTERNAL.md) (local only) — track open issues, planned next steps, source-side drift
 
 When a change touches multiple of these, update them in the same commit. New AI agents in fresh sessions should read `ARCHITECTURE.md` first.

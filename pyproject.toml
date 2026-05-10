@@ -75,3 +75,9 @@ ignore = ["E501"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+markers = [
+    "fast: pure-Python unit tests; auto-applied to anything under tests/unit/ (~5s total)",
+    "smoke: end-to-end pipeline tests at small scale; auto-applied to anything under tests/smoke/ (~1-3 min)",
+    "regression: byte-equivalence vs frozen golden outputs; auto-applied to anything under tests/regression/ (~1.5h)",
+    "requires_lammps: skipped automatically if `lmp` is not on PATH",
+]

@@ -62,9 +62,17 @@ topon/
 │   │   └── poss/                POSS-junction atomistic
 │   └── npjcompmat/              paper companion dataset (1001 files)
 ├── tests/
-│   ├── unit/                    pytest tests/unit/ (~5s)
-│   ├── regression/              pytest tests/regression/ (~1.5h)
-│   ├── workflows/               run with `python <path>` (sweep drivers)
+│   ├── conftest.py              auto-applies tier markers + skips requires_lammps when no `lmp`
+│   ├── unit/                    fast tests, organised per component (~5s total)
+│   │   ├── topology/            tests for topon/topology/
+│   │   ├── assignment/          tests for topon/assignment/
+│   │   ├── chemistry/           tests for topon/chemistry/
+│   │   ├── config/              tests for topon/config/
+│   │   ├── simbox/              tests for topon/simbox/
+│   │   └── protein_network/     tests for topon/protein_network/ (topro)
+│   ├── smoke/                   end-to-end LAMMPS-running smoke tests (~1-3 min)
+│   ├── regression/              byte-equivalence vs frozen golden outputs (~1.5h)
+│   ├── workflows/               run with `python <path>` (sweep drivers; not pytest)
 │   ├── data/                    pre-generated input topologies
 │   ├── sample_graphs/           small sample networks
 │   └── output/                  GITIGNORED — accumulated run artifacts
@@ -144,6 +152,21 @@ If the user asks you to do something that touches one of these, surface the trad
 
 ---
 
-## 9. Saying hi to the user
+## 9. Test tiers (registered in `pyproject.toml`)
+
+```
+pytest -m fast                  # quick check after editing one part (~5s)
+pytest tests/unit/chemistry/    # focused on one component you just changed
+pytest -m "fast or smoke"       # major pre-push check (includes LAMMPS if `lmp` is on PATH)
+pytest -m regression            # full suite (~1.5h)
+```
+
+`tests/conftest.py` auto-applies the tier markers based on each test's parent directory and skips `@pytest.mark.requires_lammps` tests when LAMMPS is not available.
+
+## 10. Engineering journal
+
+Material changes (especially anything non-trivial) get a dated entry in [`docs/JOURNAL.md`](docs/JOURNAL.md) with `**Change:** / **Why:** / **Issue+solution:**` structure. More granular than `DEVELOPMENT.md`'s formal version-by-version changelog.
+
+## 11. Saying hi to the user
 
 Once you've finished reading AGENTS.md and the four canonical docs, ask the user what they want to work on. Don't pre-emptively make changes; the user gives instructions and you execute them with full context.

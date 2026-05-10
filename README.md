@@ -51,6 +51,7 @@ For ready-to-use configs, see `examples/config_*.json`. For full CLI options, re
 | [docs/USAGE.md](docs/USAGE.md) | **How to run topon** — CLI reference, sub-system APIs, recipes, JSON-config schema (appendix) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **How topon is organised** — six-stage pipeline, module map, design principles |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Version-by-version history + Q→R→R→R methodology |
+| [docs/JOURNAL.md](docs/JOURNAL.md) | Engineering journal — dated entries on changes, issues, fixes |
 | [CLAUDE.md](CLAUDE.md) | Rules every change must follow |
 | [tests/VERSION_HISTORY.md](tests/VERSION_HISTORY.md) | Test-output directory reference map |
 
