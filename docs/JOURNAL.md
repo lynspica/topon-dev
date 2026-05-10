@@ -14,6 +14,26 @@ Newest first.
 
 ---
 
+## 2026-05-09 — Fix P0-C (model_type literal mapping) + add CG smoke test
+
+**Change**
+- `topon/pipeline.py:283`: map `"coarse_grained"` → `"cg"` at the call site before passing to `LammpsInputGenerator`. The writer only knows the legacy `"cg"` / `"atomistic"` literals; the schema's chemistry field uses `"coarse_grained"` / `"atomistic"`. Previously every CG system silently mis-routed through the atomistic writer branch.
+- Added `tests/smoke/test_polymer_cg_smoke.py` — mirror of the atomistic smoke test with `model_type="coarse_grained"` and DP=10. Passes after the P0-C fix.
+- Marked P0-C fixed in `internal/DEVELOPMENT_INTERNAL.md` §1.
+
+**Why**
+P0-C silently corrupted CG runs: PPPM electrostatics on a charge-neutral CG system, atomistic bond styles, etc. Pure-Python tests couldn't see this — the symptom only shows when LAMMPS reads the resulting input scripts. The CG smoke test pins the fix.
+
+**Issue / solution**
+Two valid fix locations: the call site (one literal map in `pipeline.py`) or the writer (normalization at its entry). Chose the call site to avoid touching the writer's many `if model_type == "cg"` branches; if the writer is later normalized to accept both literals, the call-site map becomes a harmless no-op.
+
+**Follow-up**
+Two P0s remaining:
+- **P0-B**: dispatch in `_generate_topology` between C subprocess and pure-Python topology generation. Will unlock `source="generate"` smoke tests.
+- **P0-A**: schema extensions for `conformation`/`simulation`/`execution` sections. Will unlock JSON-loaded smoke tests.
+
+---
+
 ## 2026-05-09 — Fix P0-E (Stage 6 path doubling) — smoke test now PASSES end-to-end
 
 **Change**

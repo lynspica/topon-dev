@@ -280,7 +280,11 @@ class Pipeline:
 
         sim_cfg = self.raw_config.get("simulation", {})
         experimental = self.raw_config.get("experimental", {})
-        model = self.config.chemistry.model_type
+        # LammpsInputGenerator branches on "cg" vs "atomistic" literals
+        # (see topon/writers/lammps_inputs.py); the schema's chemistry.model_type
+        # uses "coarse_grained" / "atomistic". Map at the call site rather than
+        # touching every comparison in the writer.
+        model = "cg" if self.config.chemistry.model_type == "coarse_grained" else "atomistic"
 
         # Pass the BASE output_dir (not self.output_dir which already includes
         # study.name) — LammpsInputGenerator re-appends study.name internally.
