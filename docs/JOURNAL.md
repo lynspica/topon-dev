@@ -14,6 +14,28 @@ Newest first.
 
 ---
 
+## 2026-05-10 — POSS clarified, coverage probe, expected_output for 3 demos
+
+**Change**
+- **POSS smoke** rewritten to match the documented working pattern: POSS at **degree-1 chain caps** (mirrors the legacy `generate_atomistic_poss.py` workflow that the user has used historically). Now passes in ~10 s. xfail marker removed. The previous failing config (POSS at degree-4 internal junctions) is a separate extension that's never been exercised; demoted from P0-H to **P1-H** in `INTERNAL.md` with a clearer scope note.
+- **Defect smoke** had its xfail marker dropped after verifying it actually passes 3/3 in isolation. Earlier "1 failed" misattribution was on POSS, not defect.
+- **Coverage probe** for graft / copolymer-block / combined (entanglements + grafts): all three configurations build through Pipeline AND pass LAMMPS stage-1 minimize. No additional bugs surfaced.
+- **Expected outputs** committed for three core demos: `examples/demos/polymer/atomistic/basic/expected_output/`, `examples/demos/polymer/coarse_grained/basic/expected_output/`, and `examples/demos/poss/expected_output/`. Each ships the LAMMPS `system.data`, settings, groups, the stage-1 input script, the `log.lammps` from a successful run, and `system_after_soft.data`. Plus a one-page README per folder explaining the contents.
+
+**Why**
+User correctly questioned the POSS xfail. Investigation revealed two separate things:
+1. The user's previous POSS workflow (POSS at degree-1 caps) is not broken — it works fine end-to-end through Pipeline + LAMMPS today.
+2. POSS at internal junctions (what my smoke test was probing) IS a real but lower-priority bug: the documented usage doesn't trigger it.
+
+**Result**
+All 7 smoke tests now pass cleanly. Coverage probe confirms graft/copolymer/combined paths work. Three demos ship example output for users to compare against without running anything.
+
+**Follow-up**
+- P1-H still unfixed (POSS at internal junctions). Worth tracking but not blocking.
+- The other 9 polymer demos under `examples/demos/polymer/` could get expected_output folders too — straightforward extension of today's script when desired.
+
+---
+
 ## 2026-05-10 — Smoke-test reality check: defect actually passes; POSS reveals a real bug (P0-H)
 
 **Change**

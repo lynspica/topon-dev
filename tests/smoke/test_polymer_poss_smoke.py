@@ -1,8 +1,15 @@
-"""Smoke test: POSS-junction atomistic network through Pipeline + LAMMPS stage 1.
+"""Smoke test: POSS at chain end-caps (atomistic) + LAMMPS stage 1.
 
-Loads the 5x5x5 sample graph, maps degree-4 nodes to POSS_AM0270 junctions
-(Si8O12 cage), runs the full Pipeline at DP=5 atomistic, and runs LAMMPS
-stage-1 minimize. Pins the chemistry-builder POSS placement path.
+Loads the 5x5x5 sample graph, maps degree-1 (chain-cap) nodes to
+POSS_AM0270, leaves degree-2/3 as bare Si, runs the full Pipeline at
+DP=5 atomistic, and runs LAMMPS stage-1 minimize.
+
+This mirrors the documented original workflow (legacy
+`generate_atomistic_poss.py`): POSS at dangling chain ends, where each
+POSS has exactly one chain attached. The internal-junction case (POSS
+at degree-4 nodes) is broken on the periodic boundary — see P0-H in
+internal/DEVELOPMENT_INTERNAL.md — and is intentionally NOT exercised
+here.
 """
 from __future__ import annotations
 
@@ -32,22 +39,7 @@ from topon.config.schema import (
 from topon.pipeline import Pipeline
 
 
-pytestmark = [
-    pytest.mark.requires_lammps,
-    pytest.mark.xfail(
-        reason=(
-            "LAMMPS warns 'Bond/angle/dihedral extent > half of periodic "
-            "box length' then errors 'Neighbor list overflow' on this "
-            "5x5x5 + DP=5 atomistic + POSS-junction case. Verified NOT a "
-            "density issue (reproduces at target_density=0.9 as well as "
-            "1.1). Symptom: chemistry-stage placement of chains attached "
-            "to POSS junctions that span the periodic boundary leaves "
-            "atoms across-the-box instead of min-image-wrapped. Logged "
-            "as P0-H in internal/DEVELOPMENT_INTERNAL.md."
-        ),
-        strict=False,
-    ),
-]
+pytestmark = [pytest.mark.requires_lammps]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +49,7 @@ SAMPLE_EDGES = REPO_ROOT / "tests" / "sample_graphs" / "network_N5x5x5_trial3.ed
 
 @pytest.fixture
 def smoke_poss_config(tmp_path: Path) -> ToponConfig:
-    """5x5x5 atomistic with degree-4 nodes mapped to POSS_AM0270."""
+    """5x5x5 atomistic with degree-1 (chain-cap) nodes -> POSS_AM0270."""
     return ToponConfig(
         study=StudyConfig(name="smoke_poss", output_dir=str(tmp_path)),
         topology=TopologyConfig(
@@ -70,8 +62,10 @@ def smoke_poss_config(tmp_path: Path) -> ToponConfig:
         assignment=AssignmentConfig(
             node_types=NodeTypesConfig(
                 method="degree",
+                # POSS at degree-1 caps; bare Si elsewhere. Mirrors the
+                # legacy generate_atomistic_poss.py pattern.
                 degree=DegreeNodeTypeConfig(
-                    mapping={"1": "end", "2": "A", "3": "A", "4": "POSS"}
+                    mapping={"1": "POSS", "2": "A", "3": "A", "4": "A"}
                 ),
             ),
             edge_types=EdgeTypesConfig(
@@ -84,9 +78,10 @@ def smoke_poss_config(tmp_path: Path) -> ToponConfig:
             model_type="atomistic",
             target_density=1.1,
             node_type_map={
-                "end": NodeMoleculeConfig(molecule="[Si](C)(C)C", is_end_cap=True),
                 "A": NodeMoleculeConfig(molecule="Si"),
-                "POSS": NodeMoleculeConfig(molecule="POSS_AM0270"),
+                "POSS": NodeMoleculeConfig(
+                    molecule="POSS_AM0270", is_end_cap=True
+                ),
             },
             edge_type_map={"A": EdgeChemistryConfig(monomer="PDMS")},
             monomers={
