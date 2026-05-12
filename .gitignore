@@ -49,3 +49,9 @@ tests/output/
 
 # Extracted reference bundle
 tests/_martini_extracted/
+
+# Session-local scratch files (one-off runners)
+_tmp_*
+
+# Claude harness state
+.claude/scheduled_tasks.lock
