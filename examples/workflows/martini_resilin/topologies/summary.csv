@@ -1,0 +1,13 @@
+system,n_chains,segs_per_block,target_packing,seed,snapshot_label,conversion,n_crosslinks,max_crosslinks,active_frac,lcc_chain_frac,n_lcc_chains,n_lcc_tyr_reacted,Nx,gel_conv,topology_json
+natpro_50chain,50,2,0.45,500,gel_point,0.2022,91,450,0.2022,1.0,50,182,17,0.2022,examples\workflows\martini_resilin\topologies\natpro_50chain_gel_point.json
+natpro_50chain,50,2,0.45,500,post_gel_1,0.2289,103,450,0.2289,1.0,50,206,17,0.2022,examples\workflows\martini_resilin\topologies\natpro_50chain_post_gel_1.json
+natpro_50chain,50,2,0.45,500,post_gel_2,0.2556,115,450,0.2556,1.0,50,230,17,0.2022,examples\workflows\martini_resilin\topologies\natpro_50chain_post_gel_2.json
+natpro_100chain,100,3,0.6,1000,gel_point,0.1978,178,900,0.1978,1.0,100,356,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_gel_point.json
+natpro_100chain,100,3,0.6,1000,post_gel_1,0.2233,201,900,0.2233,1.0,100,402,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_1.json
+natpro_100chain,100,3,0.6,1000,post_gel_2,0.2489,224,900,0.2489,1.0,100,448,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_2.json
+natpro_100chain,100,3,0.6,1000,post_gel_3,0.2744,247,900,0.2744,1.0,100,494,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_3.json
+natpro_100chain,100,3,0.6,1000,post_gel_4,0.3,270,900,0.3,1.0,100,540,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_4.json
+natpro_100chain,100,3,0.6,1000,post_gel_5,0.3256,293,900,0.3256,1.0,100,586,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_5.json
+natpro_100chain,100,3,0.6,1000,post_gel_6,0.3511,316,900,0.3511,1.0,100,632,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_6.json
+natpro_100chain,100,3,0.6,1000,post_gel_7,0.3767,339,900,0.3767,1.0,100,678,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_7.json
+natpro_100chain,100,3,0.6,1000,post_gel_8,0.4022,362,900,0.4022,1.0,100,724,21,0.1978,examples\workflows\martini_resilin\topologies\natpro_100chain_post_gel_8.json

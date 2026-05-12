@@ -1,0 +1,50 @@
+# LAMMPS Stage 3: Parallel Equilibration
+# METHODOLOGY: Set 1 (Tight Min -> NVT -> NPT)
+
+units           real
+atom_style      full
+boundary        p p p
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  cvff
+pair_style      lj/cut/coul/long 10.0 10.0
+
+# --- 1. Load Ramped State ---
+read_data       system_ramped.data
+
+# --- 2. Safety Settings ---
+# Keep these even in stage 3 to prevent random crashes
+neigh_modify    one 10000
+
+# --- 3. Define Potential ---
+pair_style      lj/cut/coul/long 10.0 10.0
+kspace_style    pppm 1.0e-4
+include         ../02_Chemistry/system.in.settings
+special_bonds   lj/coul 0.0 0.0 1.0
+
+# --- 4. Tight Minimization (Set 1 Logic) ---
+# High precision 1e-8/1e-10 tolerances
+min_style       cg
+minimize        1.0e-8 1.0e-10 10000000 100000000
+
+write_data      system_minimized_final.data
+
+# --- 5. Equilibration Loop (Set 1 Logic) ---
+reset_timestep  0
+variable        temp equal 300
+velocity        all create ${temp} 12345
+
+# NVT (1000 steps)
+fix             1 all nvt temp ${temp} ${temp} 100.0
+run             1000
+unfix           1
+write_data      after_nvt_real.data
+
+# NPT (1000 steps)
+fix             1 all npt temp ${temp} ${temp} 100.0 iso 1.0 1.0 1000.0
+run             1000
+unfix           1
+
+write_data      system_equilibrated.data
+print "All Minimization Stages Complete."

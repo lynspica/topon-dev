@@ -1,0 +1,855 @@
+# LAMMPS displacement file for nodes
+
+# Define scaling factors
+variable scale_x equal 4.339739
+variable scale_y equal 4.339739
+variable scale_z equal 4.339739
+
+# Displace nodes
+variable dx_1 equal v_scale_x*0.000000
+variable dy_1 equal v_scale_y*0.000000
+variable dz_1 equal v_scale_z*0.000000
+group current_atom id 1
+displace_atoms current_atom move v_dx_1 v_dy_1 v_dz_1
+group current_atom delete
+
+variable dx_2 equal v_scale_x*1.000000
+variable dy_2 equal v_scale_y*0.000000
+variable dz_2 equal v_scale_z*0.000000
+group current_atom id 2
+displace_atoms current_atom move v_dx_2 v_dy_2 v_dz_2
+group current_atom delete
+
+variable dx_3 equal v_scale_x*2.000000
+variable dy_3 equal v_scale_y*0.000000
+variable dz_3 equal v_scale_z*0.000000
+group current_atom id 3
+displace_atoms current_atom move v_dx_3 v_dy_3 v_dz_3
+group current_atom delete
+
+variable dx_4 equal v_scale_x*3.000000
+variable dy_4 equal v_scale_y*0.000000
+variable dz_4 equal v_scale_z*0.000000
+group current_atom id 4
+displace_atoms current_atom move v_dx_4 v_dy_4 v_dz_4
+group current_atom delete
+
+variable dx_5 equal v_scale_x*4.000000
+variable dy_5 equal v_scale_y*0.000000
+variable dz_5 equal v_scale_z*0.000000
+group current_atom id 5
+displace_atoms current_atom move v_dx_5 v_dy_5 v_dz_5
+group current_atom delete
+
+variable dx_6 equal v_scale_x*0.000000
+variable dy_6 equal v_scale_y*1.000000
+variable dz_6 equal v_scale_z*0.000000
+group current_atom id 6
+displace_atoms current_atom move v_dx_6 v_dy_6 v_dz_6
+group current_atom delete
+
+variable dx_7 equal v_scale_x*2.000000
+variable dy_7 equal v_scale_y*1.000000
+variable dz_7 equal v_scale_z*0.000000
+group current_atom id 7
+displace_atoms current_atom move v_dx_7 v_dy_7 v_dz_7
+group current_atom delete
+
+variable dx_8 equal v_scale_x*3.000000
+variable dy_8 equal v_scale_y*1.000000
+variable dz_8 equal v_scale_z*0.000000
+group current_atom id 8
+displace_atoms current_atom move v_dx_8 v_dy_8 v_dz_8
+group current_atom delete
+
+variable dx_9 equal v_scale_x*4.000000
+variable dy_9 equal v_scale_y*1.000000
+variable dz_9 equal v_scale_z*0.000000
+group current_atom id 9
+displace_atoms current_atom move v_dx_9 v_dy_9 v_dz_9
+group current_atom delete
+
+variable dx_10 equal v_scale_x*0.000000
+variable dy_10 equal v_scale_y*2.000000
+variable dz_10 equal v_scale_z*0.000000
+group current_atom id 10
+displace_atoms current_atom move v_dx_10 v_dy_10 v_dz_10
+group current_atom delete
+
+variable dx_11 equal v_scale_x*1.000000
+variable dy_11 equal v_scale_y*2.000000
+variable dz_11 equal v_scale_z*0.000000
+group current_atom id 11
+displace_atoms current_atom move v_dx_11 v_dy_11 v_dz_11
+group current_atom delete
+
+variable dx_12 equal v_scale_x*2.000000
+variable dy_12 equal v_scale_y*2.000000
+variable dz_12 equal v_scale_z*0.000000
+group current_atom id 12
+displace_atoms current_atom move v_dx_12 v_dy_12 v_dz_12
+group current_atom delete
+
+variable dx_13 equal v_scale_x*3.000000
+variable dy_13 equal v_scale_y*2.000000
+variable dz_13 equal v_scale_z*0.000000
+group current_atom id 13
+displace_atoms current_atom move v_dx_13 v_dy_13 v_dz_13
+group current_atom delete
+
+variable dx_14 equal v_scale_x*4.000000
+variable dy_14 equal v_scale_y*2.000000
+variable dz_14 equal v_scale_z*0.000000
+group current_atom id 14
+displace_atoms current_atom move v_dx_14 v_dy_14 v_dz_14
+group current_atom delete
+
+variable dx_15 equal v_scale_x*0.000000
+variable dy_15 equal v_scale_y*3.000000
+variable dz_15 equal v_scale_z*0.000000
+group current_atom id 15
+displace_atoms current_atom move v_dx_15 v_dy_15 v_dz_15
+group current_atom delete
+
+variable dx_16 equal v_scale_x*1.000000
+variable dy_16 equal v_scale_y*3.000000
+variable dz_16 equal v_scale_z*0.000000
+group current_atom id 16
+displace_atoms current_atom move v_dx_16 v_dy_16 v_dz_16
+group current_atom delete
+
+variable dx_17 equal v_scale_x*2.000000
+variable dy_17 equal v_scale_y*3.000000
+variable dz_17 equal v_scale_z*0.000000
+group current_atom id 17
+displace_atoms current_atom move v_dx_17 v_dy_17 v_dz_17
+group current_atom delete
+
+variable dx_21 equal v_scale_x*3.000000
+variable dy_21 equal v_scale_y*3.000000
+variable dz_21 equal v_scale_z*0.000000
+group current_atom id 21
+displace_atoms current_atom move v_dx_21 v_dy_21 v_dz_21
+group current_atom delete
+
+variable dx_22 equal v_scale_x*4.000000
+variable dy_22 equal v_scale_y*3.000000
+variable dz_22 equal v_scale_z*0.000000
+group current_atom id 22
+displace_atoms current_atom move v_dx_22 v_dy_22 v_dz_22
+group current_atom delete
+
+variable dx_23 equal v_scale_x*0.000000
+variable dy_23 equal v_scale_y*4.000000
+variable dz_23 equal v_scale_z*0.000000
+group current_atom id 23
+displace_atoms current_atom move v_dx_23 v_dy_23 v_dz_23
+group current_atom delete
+
+variable dx_24 equal v_scale_x*1.000000
+variable dy_24 equal v_scale_y*4.000000
+variable dz_24 equal v_scale_z*0.000000
+group current_atom id 24
+displace_atoms current_atom move v_dx_24 v_dy_24 v_dz_24
+group current_atom delete
+
+variable dx_25 equal v_scale_x*2.000000
+variable dy_25 equal v_scale_y*4.000000
+variable dz_25 equal v_scale_z*0.000000
+group current_atom id 25
+displace_atoms current_atom move v_dx_25 v_dy_25 v_dz_25
+group current_atom delete
+
+variable dx_26 equal v_scale_x*3.000000
+variable dy_26 equal v_scale_y*4.000000
+variable dz_26 equal v_scale_z*0.000000
+group current_atom id 26
+displace_atoms current_atom move v_dx_26 v_dy_26 v_dz_26
+group current_atom delete
+
+variable dx_27 equal v_scale_x*4.000000
+variable dy_27 equal v_scale_y*4.000000
+variable dz_27 equal v_scale_z*0.000000
+group current_atom id 27
+displace_atoms current_atom move v_dx_27 v_dy_27 v_dz_27
+group current_atom delete
+
+variable dx_28 equal v_scale_x*0.000000
+variable dy_28 equal v_scale_y*0.000000
+variable dz_28 equal v_scale_z*1.000000
+group current_atom id 28
+displace_atoms current_atom move v_dx_28 v_dy_28 v_dz_28
+group current_atom delete
+
+variable dx_29 equal v_scale_x*1.000000
+variable dy_29 equal v_scale_y*0.000000
+variable dz_29 equal v_scale_z*1.000000
+group current_atom id 29
+displace_atoms current_atom move v_dx_29 v_dy_29 v_dz_29
+group current_atom delete
+
+variable dx_30 equal v_scale_x*2.000000
+variable dy_30 equal v_scale_y*0.000000
+variable dz_30 equal v_scale_z*1.000000
+group current_atom id 30
+displace_atoms current_atom move v_dx_30 v_dy_30 v_dz_30
+group current_atom delete
+
+variable dx_31 equal v_scale_x*3.000000
+variable dy_31 equal v_scale_y*0.000000
+variable dz_31 equal v_scale_z*1.000000
+group current_atom id 31
+displace_atoms current_atom move v_dx_31 v_dy_31 v_dz_31
+group current_atom delete
+
+variable dx_32 equal v_scale_x*4.000000
+variable dy_32 equal v_scale_y*0.000000
+variable dz_32 equal v_scale_z*1.000000
+group current_atom id 32
+displace_atoms current_atom move v_dx_32 v_dy_32 v_dz_32
+group current_atom delete
+
+variable dx_33 equal v_scale_x*0.000000
+variable dy_33 equal v_scale_y*1.000000
+variable dz_33 equal v_scale_z*1.000000
+group current_atom id 33
+displace_atoms current_atom move v_dx_33 v_dy_33 v_dz_33
+group current_atom delete
+
+variable dx_34 equal v_scale_x*1.000000
+variable dy_34 equal v_scale_y*1.000000
+variable dz_34 equal v_scale_z*1.000000
+group current_atom id 34
+displace_atoms current_atom move v_dx_34 v_dy_34 v_dz_34
+group current_atom delete
+
+variable dx_35 equal v_scale_x*2.000000
+variable dy_35 equal v_scale_y*1.000000
+variable dz_35 equal v_scale_z*1.000000
+group current_atom id 35
+displace_atoms current_atom move v_dx_35 v_dy_35 v_dz_35
+group current_atom delete
+
+variable dx_36 equal v_scale_x*3.000000
+variable dy_36 equal v_scale_y*1.000000
+variable dz_36 equal v_scale_z*1.000000
+group current_atom id 36
+displace_atoms current_atom move v_dx_36 v_dy_36 v_dz_36
+group current_atom delete
+
+variable dx_37 equal v_scale_x*4.000000
+variable dy_37 equal v_scale_y*1.000000
+variable dz_37 equal v_scale_z*1.000000
+group current_atom id 37
+displace_atoms current_atom move v_dx_37 v_dy_37 v_dz_37
+group current_atom delete
+
+variable dx_38 equal v_scale_x*0.000000
+variable dy_38 equal v_scale_y*2.000000
+variable dz_38 equal v_scale_z*1.000000
+group current_atom id 38
+displace_atoms current_atom move v_dx_38 v_dy_38 v_dz_38
+group current_atom delete
+
+variable dx_39 equal v_scale_x*1.000000
+variable dy_39 equal v_scale_y*2.000000
+variable dz_39 equal v_scale_z*1.000000
+group current_atom id 39
+displace_atoms current_atom move v_dx_39 v_dy_39 v_dz_39
+group current_atom delete
+
+variable dx_40 equal v_scale_x*2.000000
+variable dy_40 equal v_scale_y*2.000000
+variable dz_40 equal v_scale_z*1.000000
+group current_atom id 40
+displace_atoms current_atom move v_dx_40 v_dy_40 v_dz_40
+group current_atom delete
+
+variable dx_41 equal v_scale_x*3.000000
+variable dy_41 equal v_scale_y*2.000000
+variable dz_41 equal v_scale_z*1.000000
+group current_atom id 41
+displace_atoms current_atom move v_dx_41 v_dy_41 v_dz_41
+group current_atom delete
+
+variable dx_42 equal v_scale_x*4.000000
+variable dy_42 equal v_scale_y*2.000000
+variable dz_42 equal v_scale_z*1.000000
+group current_atom id 42
+displace_atoms current_atom move v_dx_42 v_dy_42 v_dz_42
+group current_atom delete
+
+variable dx_43 equal v_scale_x*0.000000
+variable dy_43 equal v_scale_y*3.000000
+variable dz_43 equal v_scale_z*1.000000
+group current_atom id 43
+displace_atoms current_atom move v_dx_43 v_dy_43 v_dz_43
+group current_atom delete
+
+variable dx_44 equal v_scale_x*2.000000
+variable dy_44 equal v_scale_y*3.000000
+variable dz_44 equal v_scale_z*1.000000
+group current_atom id 44
+displace_atoms current_atom move v_dx_44 v_dy_44 v_dz_44
+group current_atom delete
+
+variable dx_45 equal v_scale_x*3.000000
+variable dy_45 equal v_scale_y*3.000000
+variable dz_45 equal v_scale_z*1.000000
+group current_atom id 45
+displace_atoms current_atom move v_dx_45 v_dy_45 v_dz_45
+group current_atom delete
+
+variable dx_46 equal v_scale_x*4.000000
+variable dy_46 equal v_scale_y*3.000000
+variable dz_46 equal v_scale_z*1.000000
+group current_atom id 46
+displace_atoms current_atom move v_dx_46 v_dy_46 v_dz_46
+group current_atom delete
+
+variable dx_47 equal v_scale_x*0.000000
+variable dy_47 equal v_scale_y*4.000000
+variable dz_47 equal v_scale_z*1.000000
+group current_atom id 47
+displace_atoms current_atom move v_dx_47 v_dy_47 v_dz_47
+group current_atom delete
+
+variable dx_48 equal v_scale_x*1.000000
+variable dy_48 equal v_scale_y*4.000000
+variable dz_48 equal v_scale_z*1.000000
+group current_atom id 48
+displace_atoms current_atom move v_dx_48 v_dy_48 v_dz_48
+group current_atom delete
+
+variable dx_49 equal v_scale_x*2.000000
+variable dy_49 equal v_scale_y*4.000000
+variable dz_49 equal v_scale_z*1.000000
+group current_atom id 49
+displace_atoms current_atom move v_dx_49 v_dy_49 v_dz_49
+group current_atom delete
+
+variable dx_53 equal v_scale_x*3.000000
+variable dy_53 equal v_scale_y*4.000000
+variable dz_53 equal v_scale_z*1.000000
+group current_atom id 53
+displace_atoms current_atom move v_dx_53 v_dy_53 v_dz_53
+group current_atom delete
+
+variable dx_54 equal v_scale_x*4.000000
+variable dy_54 equal v_scale_y*4.000000
+variable dz_54 equal v_scale_z*1.000000
+group current_atom id 54
+displace_atoms current_atom move v_dx_54 v_dy_54 v_dz_54
+group current_atom delete
+
+variable dx_55 equal v_scale_x*0.000000
+variable dy_55 equal v_scale_y*0.000000
+variable dz_55 equal v_scale_z*2.000000
+group current_atom id 55
+displace_atoms current_atom move v_dx_55 v_dy_55 v_dz_55
+group current_atom delete
+
+variable dx_59 equal v_scale_x*2.000000
+variable dy_59 equal v_scale_y*0.000000
+variable dz_59 equal v_scale_z*2.000000
+group current_atom id 59
+displace_atoms current_atom move v_dx_59 v_dy_59 v_dz_59
+group current_atom delete
+
+variable dx_60 equal v_scale_x*3.000000
+variable dy_60 equal v_scale_y*0.000000
+variable dz_60 equal v_scale_z*2.000000
+group current_atom id 60
+displace_atoms current_atom move v_dx_60 v_dy_60 v_dz_60
+group current_atom delete
+
+variable dx_61 equal v_scale_x*4.000000
+variable dy_61 equal v_scale_y*0.000000
+variable dz_61 equal v_scale_z*2.000000
+group current_atom id 61
+displace_atoms current_atom move v_dx_61 v_dy_61 v_dz_61
+group current_atom delete
+
+variable dx_62 equal v_scale_x*0.000000
+variable dy_62 equal v_scale_y*1.000000
+variable dz_62 equal v_scale_z*2.000000
+group current_atom id 62
+displace_atoms current_atom move v_dx_62 v_dy_62 v_dz_62
+group current_atom delete
+
+variable dx_63 equal v_scale_x*1.000000
+variable dy_63 equal v_scale_y*1.000000
+variable dz_63 equal v_scale_z*2.000000
+group current_atom id 63
+displace_atoms current_atom move v_dx_63 v_dy_63 v_dz_63
+group current_atom delete
+
+variable dx_64 equal v_scale_x*2.000000
+variable dy_64 equal v_scale_y*1.000000
+variable dz_64 equal v_scale_z*2.000000
+group current_atom id 64
+displace_atoms current_atom move v_dx_64 v_dy_64 v_dz_64
+group current_atom delete
+
+variable dx_65 equal v_scale_x*3.000000
+variable dy_65 equal v_scale_y*1.000000
+variable dz_65 equal v_scale_z*2.000000
+group current_atom id 65
+displace_atoms current_atom move v_dx_65 v_dy_65 v_dz_65
+group current_atom delete
+
+variable dx_66 equal v_scale_x*4.000000
+variable dy_66 equal v_scale_y*1.000000
+variable dz_66 equal v_scale_z*2.000000
+group current_atom id 66
+displace_atoms current_atom move v_dx_66 v_dy_66 v_dz_66
+group current_atom delete
+
+variable dx_67 equal v_scale_x*0.000000
+variable dy_67 equal v_scale_y*2.000000
+variable dz_67 equal v_scale_z*2.000000
+group current_atom id 67
+displace_atoms current_atom move v_dx_67 v_dy_67 v_dz_67
+group current_atom delete
+
+variable dx_68 equal v_scale_x*1.000000
+variable dy_68 equal v_scale_y*2.000000
+variable dz_68 equal v_scale_z*2.000000
+group current_atom id 68
+displace_atoms current_atom move v_dx_68 v_dy_68 v_dz_68
+group current_atom delete
+
+variable dx_69 equal v_scale_x*2.000000
+variable dy_69 equal v_scale_y*2.000000
+variable dz_69 equal v_scale_z*2.000000
+group current_atom id 69
+displace_atoms current_atom move v_dx_69 v_dy_69 v_dz_69
+group current_atom delete
+
+variable dx_70 equal v_scale_x*3.000000
+variable dy_70 equal v_scale_y*2.000000
+variable dz_70 equal v_scale_z*2.000000
+group current_atom id 70
+displace_atoms current_atom move v_dx_70 v_dy_70 v_dz_70
+group current_atom delete
+
+variable dx_71 equal v_scale_x*4.000000
+variable dy_71 equal v_scale_y*2.000000
+variable dz_71 equal v_scale_z*2.000000
+group current_atom id 71
+displace_atoms current_atom move v_dx_71 v_dy_71 v_dz_71
+group current_atom delete
+
+variable dx_72 equal v_scale_x*1.000000
+variable dy_72 equal v_scale_y*3.000000
+variable dz_72 equal v_scale_z*2.000000
+group current_atom id 72
+displace_atoms current_atom move v_dx_72 v_dy_72 v_dz_72
+group current_atom delete
+
+variable dx_73 equal v_scale_x*2.000000
+variable dy_73 equal v_scale_y*3.000000
+variable dz_73 equal v_scale_z*2.000000
+group current_atom id 73
+displace_atoms current_atom move v_dx_73 v_dy_73 v_dz_73
+group current_atom delete
+
+variable dx_74 equal v_scale_x*3.000000
+variable dy_74 equal v_scale_y*3.000000
+variable dz_74 equal v_scale_z*2.000000
+group current_atom id 74
+displace_atoms current_atom move v_dx_74 v_dy_74 v_dz_74
+group current_atom delete
+
+variable dx_75 equal v_scale_x*4.000000
+variable dy_75 equal v_scale_y*3.000000
+variable dz_75 equal v_scale_z*2.000000
+group current_atom id 75
+displace_atoms current_atom move v_dx_75 v_dy_75 v_dz_75
+group current_atom delete
+
+variable dx_76 equal v_scale_x*0.000000
+variable dy_76 equal v_scale_y*4.000000
+variable dz_76 equal v_scale_z*2.000000
+group current_atom id 76
+displace_atoms current_atom move v_dx_76 v_dy_76 v_dz_76
+group current_atom delete
+
+variable dx_77 equal v_scale_x*1.000000
+variable dy_77 equal v_scale_y*4.000000
+variable dz_77 equal v_scale_z*2.000000
+group current_atom id 77
+displace_atoms current_atom move v_dx_77 v_dy_77 v_dz_77
+group current_atom delete
+
+variable dx_78 equal v_scale_x*2.000000
+variable dy_78 equal v_scale_y*4.000000
+variable dz_78 equal v_scale_z*2.000000
+group current_atom id 78
+displace_atoms current_atom move v_dx_78 v_dy_78 v_dz_78
+group current_atom delete
+
+variable dx_82 equal v_scale_x*3.000000
+variable dy_82 equal v_scale_y*4.000000
+variable dz_82 equal v_scale_z*2.000000
+group current_atom id 82
+displace_atoms current_atom move v_dx_82 v_dy_82 v_dz_82
+group current_atom delete
+
+variable dx_83 equal v_scale_x*4.000000
+variable dy_83 equal v_scale_y*4.000000
+variable dz_83 equal v_scale_z*2.000000
+group current_atom id 83
+displace_atoms current_atom move v_dx_83 v_dy_83 v_dz_83
+group current_atom delete
+
+variable dx_84 equal v_scale_x*0.000000
+variable dy_84 equal v_scale_y*0.000000
+variable dz_84 equal v_scale_z*3.000000
+group current_atom id 84
+displace_atoms current_atom move v_dx_84 v_dy_84 v_dz_84
+group current_atom delete
+
+variable dx_88 equal v_scale_x*1.000000
+variable dy_88 equal v_scale_y*0.000000
+variable dz_88 equal v_scale_z*3.000000
+group current_atom id 88
+displace_atoms current_atom move v_dx_88 v_dy_88 v_dz_88
+group current_atom delete
+
+variable dx_89 equal v_scale_x*2.000000
+variable dy_89 equal v_scale_y*0.000000
+variable dz_89 equal v_scale_z*3.000000
+group current_atom id 89
+displace_atoms current_atom move v_dx_89 v_dy_89 v_dz_89
+group current_atom delete
+
+variable dx_90 equal v_scale_x*3.000000
+variable dy_90 equal v_scale_y*0.000000
+variable dz_90 equal v_scale_z*3.000000
+group current_atom id 90
+displace_atoms current_atom move v_dx_90 v_dy_90 v_dz_90
+group current_atom delete
+
+variable dx_91 equal v_scale_x*4.000000
+variable dy_91 equal v_scale_y*0.000000
+variable dz_91 equal v_scale_z*3.000000
+group current_atom id 91
+displace_atoms current_atom move v_dx_91 v_dy_91 v_dz_91
+group current_atom delete
+
+variable dx_92 equal v_scale_x*0.000000
+variable dy_92 equal v_scale_y*1.000000
+variable dz_92 equal v_scale_z*3.000000
+group current_atom id 92
+displace_atoms current_atom move v_dx_92 v_dy_92 v_dz_92
+group current_atom delete
+
+variable dx_93 equal v_scale_x*1.000000
+variable dy_93 equal v_scale_y*1.000000
+variable dz_93 equal v_scale_z*3.000000
+group current_atom id 93
+displace_atoms current_atom move v_dx_93 v_dy_93 v_dz_93
+group current_atom delete
+
+variable dx_94 equal v_scale_x*2.000000
+variable dy_94 equal v_scale_y*1.000000
+variable dz_94 equal v_scale_z*3.000000
+group current_atom id 94
+displace_atoms current_atom move v_dx_94 v_dy_94 v_dz_94
+group current_atom delete
+
+variable dx_95 equal v_scale_x*3.000000
+variable dy_95 equal v_scale_y*1.000000
+variable dz_95 equal v_scale_z*3.000000
+group current_atom id 95
+displace_atoms current_atom move v_dx_95 v_dy_95 v_dz_95
+group current_atom delete
+
+variable dx_96 equal v_scale_x*4.000000
+variable dy_96 equal v_scale_y*1.000000
+variable dz_96 equal v_scale_z*3.000000
+group current_atom id 96
+displace_atoms current_atom move v_dx_96 v_dy_96 v_dz_96
+group current_atom delete
+
+variable dx_97 equal v_scale_x*0.000000
+variable dy_97 equal v_scale_y*2.000000
+variable dz_97 equal v_scale_z*3.000000
+group current_atom id 97
+displace_atoms current_atom move v_dx_97 v_dy_97 v_dz_97
+group current_atom delete
+
+variable dx_98 equal v_scale_x*1.000000
+variable dy_98 equal v_scale_y*2.000000
+variable dz_98 equal v_scale_z*3.000000
+group current_atom id 98
+displace_atoms current_atom move v_dx_98 v_dy_98 v_dz_98
+group current_atom delete
+
+variable dx_99 equal v_scale_x*2.000000
+variable dy_99 equal v_scale_y*2.000000
+variable dz_99 equal v_scale_z*3.000000
+group current_atom id 99
+displace_atoms current_atom move v_dx_99 v_dy_99 v_dz_99
+group current_atom delete
+
+variable dx_100 equal v_scale_x*3.000000
+variable dy_100 equal v_scale_y*2.000000
+variable dz_100 equal v_scale_z*3.000000
+group current_atom id 100
+displace_atoms current_atom move v_dx_100 v_dy_100 v_dz_100
+group current_atom delete
+
+variable dx_101 equal v_scale_x*4.000000
+variable dy_101 equal v_scale_y*2.000000
+variable dz_101 equal v_scale_z*3.000000
+group current_atom id 101
+displace_atoms current_atom move v_dx_101 v_dy_101 v_dz_101
+group current_atom delete
+
+variable dx_102 equal v_scale_x*0.000000
+variable dy_102 equal v_scale_y*3.000000
+variable dz_102 equal v_scale_z*3.000000
+group current_atom id 102
+displace_atoms current_atom move v_dx_102 v_dy_102 v_dz_102
+group current_atom delete
+
+variable dx_103 equal v_scale_x*1.000000
+variable dy_103 equal v_scale_y*3.000000
+variable dz_103 equal v_scale_z*3.000000
+group current_atom id 103
+displace_atoms current_atom move v_dx_103 v_dy_103 v_dz_103
+group current_atom delete
+
+variable dx_104 equal v_scale_x*2.000000
+variable dy_104 equal v_scale_y*3.000000
+variable dz_104 equal v_scale_z*3.000000
+group current_atom id 104
+displace_atoms current_atom move v_dx_104 v_dy_104 v_dz_104
+group current_atom delete
+
+variable dx_105 equal v_scale_x*3.000000
+variable dy_105 equal v_scale_y*3.000000
+variable dz_105 equal v_scale_z*3.000000
+group current_atom id 105
+displace_atoms current_atom move v_dx_105 v_dy_105 v_dz_105
+group current_atom delete
+
+variable dx_106 equal v_scale_x*4.000000
+variable dy_106 equal v_scale_y*3.000000
+variable dz_106 equal v_scale_z*3.000000
+group current_atom id 106
+displace_atoms current_atom move v_dx_106 v_dy_106 v_dz_106
+group current_atom delete
+
+variable dx_107 equal v_scale_x*0.000000
+variable dy_107 equal v_scale_y*4.000000
+variable dz_107 equal v_scale_z*3.000000
+group current_atom id 107
+displace_atoms current_atom move v_dx_107 v_dy_107 v_dz_107
+group current_atom delete
+
+variable dx_108 equal v_scale_x*1.000000
+variable dy_108 equal v_scale_y*4.000000
+variable dz_108 equal v_scale_z*3.000000
+group current_atom id 108
+displace_atoms current_atom move v_dx_108 v_dy_108 v_dz_108
+group current_atom delete
+
+variable dx_109 equal v_scale_x*2.000000
+variable dy_109 equal v_scale_y*4.000000
+variable dz_109 equal v_scale_z*3.000000
+group current_atom id 109
+displace_atoms current_atom move v_dx_109 v_dy_109 v_dz_109
+group current_atom delete
+
+variable dx_110 equal v_scale_x*3.000000
+variable dy_110 equal v_scale_y*4.000000
+variable dz_110 equal v_scale_z*3.000000
+group current_atom id 110
+displace_atoms current_atom move v_dx_110 v_dy_110 v_dz_110
+group current_atom delete
+
+variable dx_111 equal v_scale_x*4.000000
+variable dy_111 equal v_scale_y*4.000000
+variable dz_111 equal v_scale_z*3.000000
+group current_atom id 111
+displace_atoms current_atom move v_dx_111 v_dy_111 v_dz_111
+group current_atom delete
+
+variable dx_112 equal v_scale_x*0.000000
+variable dy_112 equal v_scale_y*0.000000
+variable dz_112 equal v_scale_z*4.000000
+group current_atom id 112
+displace_atoms current_atom move v_dx_112 v_dy_112 v_dz_112
+group current_atom delete
+
+variable dx_113 equal v_scale_x*1.000000
+variable dy_113 equal v_scale_y*0.000000
+variable dz_113 equal v_scale_z*4.000000
+group current_atom id 113
+displace_atoms current_atom move v_dx_113 v_dy_113 v_dz_113
+group current_atom delete
+
+variable dx_114 equal v_scale_x*2.000000
+variable dy_114 equal v_scale_y*0.000000
+variable dz_114 equal v_scale_z*4.000000
+group current_atom id 114
+displace_atoms current_atom move v_dx_114 v_dy_114 v_dz_114
+group current_atom delete
+
+variable dx_115 equal v_scale_x*3.000000
+variable dy_115 equal v_scale_y*0.000000
+variable dz_115 equal v_scale_z*4.000000
+group current_atom id 115
+displace_atoms current_atom move v_dx_115 v_dy_115 v_dz_115
+group current_atom delete
+
+variable dx_116 equal v_scale_x*4.000000
+variable dy_116 equal v_scale_y*0.000000
+variable dz_116 equal v_scale_z*4.000000
+group current_atom id 116
+displace_atoms current_atom move v_dx_116 v_dy_116 v_dz_116
+group current_atom delete
+
+variable dx_117 equal v_scale_x*0.000000
+variable dy_117 equal v_scale_y*1.000000
+variable dz_117 equal v_scale_z*4.000000
+group current_atom id 117
+displace_atoms current_atom move v_dx_117 v_dy_117 v_dz_117
+group current_atom delete
+
+variable dx_118 equal v_scale_x*1.000000
+variable dy_118 equal v_scale_y*1.000000
+variable dz_118 equal v_scale_z*4.000000
+group current_atom id 118
+displace_atoms current_atom move v_dx_118 v_dy_118 v_dz_118
+group current_atom delete
+
+variable dx_119 equal v_scale_x*2.000000
+variable dy_119 equal v_scale_y*1.000000
+variable dz_119 equal v_scale_z*4.000000
+group current_atom id 119
+displace_atoms current_atom move v_dx_119 v_dy_119 v_dz_119
+group current_atom delete
+
+variable dx_120 equal v_scale_x*3.000000
+variable dy_120 equal v_scale_y*1.000000
+variable dz_120 equal v_scale_z*4.000000
+group current_atom id 120
+displace_atoms current_atom move v_dx_120 v_dy_120 v_dz_120
+group current_atom delete
+
+variable dx_121 equal v_scale_x*4.000000
+variable dy_121 equal v_scale_y*1.000000
+variable dz_121 equal v_scale_z*4.000000
+group current_atom id 121
+displace_atoms current_atom move v_dx_121 v_dy_121 v_dz_121
+group current_atom delete
+
+variable dx_122 equal v_scale_x*0.000000
+variable dy_122 equal v_scale_y*2.000000
+variable dz_122 equal v_scale_z*4.000000
+group current_atom id 122
+displace_atoms current_atom move v_dx_122 v_dy_122 v_dz_122
+group current_atom delete
+
+variable dx_123 equal v_scale_x*1.000000
+variable dy_123 equal v_scale_y*2.000000
+variable dz_123 equal v_scale_z*4.000000
+group current_atom id 123
+displace_atoms current_atom move v_dx_123 v_dy_123 v_dz_123
+group current_atom delete
+
+variable dx_124 equal v_scale_x*2.000000
+variable dy_124 equal v_scale_y*2.000000
+variable dz_124 equal v_scale_z*4.000000
+group current_atom id 124
+displace_atoms current_atom move v_dx_124 v_dy_124 v_dz_124
+group current_atom delete
+
+variable dx_125 equal v_scale_x*3.000000
+variable dy_125 equal v_scale_y*2.000000
+variable dz_125 equal v_scale_z*4.000000
+group current_atom id 125
+displace_atoms current_atom move v_dx_125 v_dy_125 v_dz_125
+group current_atom delete
+
+variable dx_126 equal v_scale_x*4.000000
+variable dy_126 equal v_scale_y*2.000000
+variable dz_126 equal v_scale_z*4.000000
+group current_atom id 126
+displace_atoms current_atom move v_dx_126 v_dy_126 v_dz_126
+group current_atom delete
+
+variable dx_127 equal v_scale_x*0.000000
+variable dy_127 equal v_scale_y*3.000000
+variable dz_127 equal v_scale_z*4.000000
+group current_atom id 127
+displace_atoms current_atom move v_dx_127 v_dy_127 v_dz_127
+group current_atom delete
+
+variable dx_131 equal v_scale_x*1.000000
+variable dy_131 equal v_scale_y*3.000000
+variable dz_131 equal v_scale_z*4.000000
+group current_atom id 131
+displace_atoms current_atom move v_dx_131 v_dy_131 v_dz_131
+group current_atom delete
+
+variable dx_132 equal v_scale_x*2.000000
+variable dy_132 equal v_scale_y*3.000000
+variable dz_132 equal v_scale_z*4.000000
+group current_atom id 132
+displace_atoms current_atom move v_dx_132 v_dy_132 v_dz_132
+group current_atom delete
+
+variable dx_133 equal v_scale_x*3.000000
+variable dy_133 equal v_scale_y*3.000000
+variable dz_133 equal v_scale_z*4.000000
+group current_atom id 133
+displace_atoms current_atom move v_dx_133 v_dy_133 v_dz_133
+group current_atom delete
+
+variable dx_134 equal v_scale_x*4.000000
+variable dy_134 equal v_scale_y*3.000000
+variable dz_134 equal v_scale_z*4.000000
+group current_atom id 134
+displace_atoms current_atom move v_dx_134 v_dy_134 v_dz_134
+group current_atom delete
+
+variable dx_135 equal v_scale_x*0.000000
+variable dy_135 equal v_scale_y*4.000000
+variable dz_135 equal v_scale_z*4.000000
+group current_atom id 135
+displace_atoms current_atom move v_dx_135 v_dy_135 v_dz_135
+group current_atom delete
+
+variable dx_136 equal v_scale_x*1.000000
+variable dy_136 equal v_scale_y*4.000000
+variable dz_136 equal v_scale_z*4.000000
+group current_atom id 136
+displace_atoms current_atom move v_dx_136 v_dy_136 v_dz_136
+group current_atom delete
+
+variable dx_137 equal v_scale_x*2.000000
+variable dy_137 equal v_scale_y*4.000000
+variable dz_137 equal v_scale_z*4.000000
+group current_atom id 137
+displace_atoms current_atom move v_dx_137 v_dy_137 v_dz_137
+group current_atom delete
+
+variable dx_138 equal v_scale_x*3.000000
+variable dy_138 equal v_scale_y*4.000000
+variable dz_138 equal v_scale_z*4.000000
+group current_atom id 138
+displace_atoms current_atom move v_dx_138 v_dy_138 v_dz_138
+group current_atom delete
+
+variable dx_139 equal v_scale_x*4.000000
+variable dy_139 equal v_scale_y*4.000000
+variable dz_139 equal v_scale_z*4.000000
+group current_atom id 139
+displace_atoms current_atom move v_dx_139 v_dy_139 v_dz_139
+group current_atom delete
+

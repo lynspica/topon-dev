@@ -1,0 +1,178 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+Reading data file ...
+  orthogonal box = (0 0 0) to (242.1 242.1 242.1)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  4032 atoms
+  reading velocities ...
+  4032 velocities
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  3 = max angles/atom
+  scanning dihedrals ...
+  6 = max dihedrals/atom
+  scanning impropers ...
+  1 = max impropers/atom
+  orthogonal box = (0 0 0) to (242.1 242.1 242.1)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  4321 bonds
+  reading angles ...
+  5160 angles
+  reading dihedrals ...
+  9432 dihedrals
+  reading impropers ...
+  1432 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     3 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+    18 = max # of 1-4 neighbors
+    13 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+  read_data CPU = 0.084 seconds
+4032 atoms in group protein
+2160 atoms in group bb
+1728 atoms in group sc
+144 atoms in group crosslink
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 10000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 60
+  binsize = 1.5, bins = 162 162 162
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 66.89 | 66.89 | 66.89 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   340.60927      0.00015861116  1179.0763      5271.7167      3.2135832    
+         1   340.60927      0.00016149992  1178.9656      5271.606       3.2136936    
+Loop time of 0.006072 on 1 procs for 1 steps with 4032 atoms
+
+0.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      1179.07649577645   1179.07649577645   1178.96576821039
+  Force two-norm initial, final = 456.31004 183.71727
+  Force max component initial, final = 244.58076 50.570722
+  Final line search alpha, max atom move = 1.2776966e-05 0.00064614037
+  Iterations, force evaluations = 1 8
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 7.6e-05    | 7.6e-05    | 7.6e-05    |   0.0 |  1.25
+Bond    | 0.005494   | 0.005494   | 0.005494   |   0.0 | 90.48
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000244   | 0.000244   | 0.000244   |   0.0 |  4.02
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.000258   |            |       |  4.25
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10870 ave       10870 max       10870 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:             75 ave          75 max          75 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 75
+Ave neighs/atom = 0.01860119
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 0
+Dangerous builds = 0
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 10000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 60
+  binsize = 7, bins = 35 35 35
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut/coul/cut, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : real
+  Current step  : 1
+  Time step     : 1
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 11.63 | 11.63 | 11.63 Mbytes
+   Step         PotEng         KinEng         TotEng         E_vdwl         E_coul         E_pair         E_bond        E_angle        E_dihed        E_impro         Press          Volume          Temp     
+         1   630065.05      4092.6402      634157.69      629015.96     -129.87536      628886.09      185.27482      1044.1389     -823.33611      772.88831      12162.258      14190064       340.60927    
+      1000   6066.1575      11247.701      17313.859      138.02808     -172.43644     -34.408365      3880.7904      1522.796      -789.31213      1486.2916     -2.3103742      14190064       936.08798    
+      2000   6027.6252      11304.841      17332.466      0.82198804    -241.82038     -240.99839      3763.2759      1663.1967     -775.46112      1617.6121     -5.0837978      14190064       940.84344    
+      3000   6158.8724      11205.448      17364.321      60.09224      -305.77655     -245.68431      3759.0679      1738.1405     -772.10208      1679.4504      1.5165105      14190064       932.57149    
+      4000   5933.8875      11445.737      17379.625     -66.642109     -350.32059     -416.96269      3670.4068      1810.6798     -784.41004      1654.1737      1.1918846      14190064       952.56948    
+      5000   5995.4602      11456.916      17452.376     -121.7515      -370.24672     -491.99822      3741.0045      1905.7282     -789.06014      1629.7858     -0.31473068     14190064       953.49984    
+      6000   5952.1993      11516.458      17468.657     -157.31376     -423.3886      -580.70236      3659.549       1937.9722     -829.04836      1764.4288      0.83623957     14190064       958.45523    
+      7000   6229.08        11232.262      17461.342     -241.98498     -411.85784     -653.84282      4008.9975      1901.639      -826.58994      1798.8763     -4.1867003      14190064       934.80307    
+      8000   5822.2724      11653.574      17475.847     -238.16941     -421.75039     -659.9198       3363.1382      2009.7301     -778.13247      1887.4564      5.4048384      14190064       969.86669    
+      9000   6278.9893      11211.71       17490.699     -292.29372     -446.48451     -738.77823      3899.3904      2044.6107     -789.04992      1862.8163      0.37225797     14190064       933.09262    
+     10000   6321.9473      11134.64       17456.588     -412.18373     -467.94741     -880.13114      3911.721       2178.1053     -766.15864      1878.4109     -0.076006143    14190064       926.67851    
+     11000   6087.2792      11345.042      17432.321     -485.08839     -493.43813     -978.52653      3763.9619      2119.6073     -750.81837      1933.055      -0.53603574     14190064       944.18916    
+     12000   6143.0074      11279.35       17422.358     -597.12188     -492.97254     -1090.0944      3770.3959      2226.1399     -767.4786       2004.0446     -1.7240668      14190064       938.72199    
+     13000   6275.8373      11139.566      17415.403     -719.19302     -497.73091     -1216.9239      4024.0944      2329.9853     -810.6016       1949.2831     -3.5950609      14190064       927.08845    
+     14000   5913.2699      11498.293      17411.563     -724.93209     -512.48755     -1237.4196      3748.7801      2229.4563     -755.75348      1928.2066      3.939811       14190064       956.94344    
+     15000   5974.6386      11396.002      17370.641     -950.05146     -498.67646     -1448.7279      3859.1861      2273.4233     -736.18346      2026.9406      1.3044716      14190064       948.43031    
+     16000   5837.3078      11450.543      17287.851     -1183.2898     -521.72332     -1705.0131      3825.2073      2364.6065     -738.89531      2091.4024     -2.6488743      14190064       952.96947    
+     17000   5842.2052      11418.031      17260.236     -1311.2131     -525.67645     -1836.8895      3829.0777      2472.7626     -682.87534      2060.1297      1.68744        14190064       950.26362    
+     18000   6097.3764      11088.044      17185.42      -1638.7788     -531.83981     -2170.6186      4267.4159      2583.7839     -742.95412      2159.7492     -4.1928771      14190064       922.80055    
+     19000   5767.3807      11350.181      17117.562     -1839.8968     -516.24023     -2356.1371      4047.5445      2529.0797     -686.68517      2233.5788     -2.8262945      14190064       944.61688    
+     20000   5336.5517      11708.938      17045.489     -2164.6337     -506.90515     -2671.5388      3992.3246      2574.39       -618.05601      2059.432       1.3519196      14190064       974.4743     
+     20001   5340.9247      11703.464      17044.389     -2165.2697     -506.90274     -2672.1724      3998.2942      2575.1278     -618.21001      2057.8851      1.2413525      14190064       974.01877    
+Loop time of 23.8675 on 1 procs for 20000 steps with 4032 atoms
+
+Performance: 72.400 ns/day, 0.331 hours/ns, 837.961 timesteps/s, 3.379 Matom-step/s
+98.5% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 6.7423     | 6.7423     | 6.7423     |   0.0 | 28.25
+Bond    | 13.125     | 13.125     | 13.125     |   0.0 | 54.99
+Neigh   | 2.3068     | 2.3068     | 2.3068     |   0.0 |  9.67
+Comm    | 0.69795    | 0.69795    | 0.69795    |   0.0 |  2.92
+Output  | 0.000774   | 0.000774   | 0.000774   |   0.0 |  0.00
+Modify  | 0.69724    | 0.69724    | 0.69724    |   0.0 |  2.92
+Other   |            | 0.2975     |            |       |  1.25
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10455 ave       10455 max       10455 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          40078 ave       40078 max       40078 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 40078
+Ave neighs/atom = 9.9399802
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 1027
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+System init for write_restart ...
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Stage 2 done -> system_ramped.data
+Total wall time: 0:00:24

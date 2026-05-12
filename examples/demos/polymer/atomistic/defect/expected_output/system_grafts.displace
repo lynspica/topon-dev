@@ -1,0 +1,8 @@
+# LAMMPS displacement file for grafts
+
+# Define scaling factors
+variable scale_x equal 13.497038
+variable scale_y equal 13.497038
+variable scale_z equal 13.497038
+
+# Displace grafts

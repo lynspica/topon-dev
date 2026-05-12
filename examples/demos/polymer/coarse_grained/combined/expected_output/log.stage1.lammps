@@ -1,0 +1,193 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+Reading data file ...
+  orthogonal box = (0 0 0) to (18.57318 18.57318 18.57318)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  5446 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  orthogonal box = (0 0 0) to (18.57318 18.57318 18.57318)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  5535 bonds
+  reading angles ...
+  6102 angles
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        1        1       
+  special bond factors coul:  0        0        0       
+     4 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+    12 = max # of 1-4 neighbors
+    16 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+  read_data CPU = 0.057 seconds
+121 atoms in group nodes
+5325 atoms in group beads
+5325 atoms in group beads
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 5
+  binsize = 1.5, bins = 13 13 13
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : lj
+  Current step  : 0
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 21.31 | 21.31 | 21.31 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              0              481.29664      481.29664      38.799456    
+         1   0              0              481.29664      481.29664      38.799456    
+Loop time of 0.004273 on 1 procs for 1 steps with 5446 atoms
+
+0.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = search direction is not downhill
+  Energy initial, next-to-last, final = 
+      481.296643323208   481.296643323208   481.296643323208
+  Force two-norm initial, final = 0 0
+  Force max component initial, final = 0 0
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 1 0
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.003859   | 0.003859   | 0.003859   |   0.0 | 90.31
+Bond    | 0.000273   | 0.000273   | 0.000273   |   0.0 |  6.39
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 4e-05      | 4e-05      | 4e-05      |   0.0 |  0.94
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 1.3e-05    | 1.3e-05    | 1.3e-05    |   0.0 |  0.30
+Other   |            | 8.8e-05    |            |       |  2.06
+
+Nlocal:           5446 ave        5446 max        5446 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          15577 ave       15577 max       15577 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         242070 ave      242070 max      242070 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 242070
+Ave neighs/atom = 44.449137
+Ave special neighs/atom = 6.7396254
+Neighbor list builds = 0
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : lj
+  Current step  : 1
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 21.31 | 21.31 | 21.31 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         1   0              0              481.29664      481.29664      38.799456    
+       137   0              0              371.23786      371.23786      43.57734     
+Loop time of 0.993071 on 1 procs for 136 steps with 5446 atoms
+
+97.6% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      481.296643323208   371.262901545321   371.237861959995
+  Force two-norm initial, final = 336248.98 55962.299
+  Force max component initial, final = 24044.16 12265.201
+  Final line search alpha, max atom move = 3.6334008e-06 0.044564391
+  Iterations, force evaluations = 136 272
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.87466    | 0.87466    | 0.87466    |   0.0 | 88.08
+Bond    | 0.066114   | 0.066114   | 0.066114   |   0.0 |  6.66
+Neigh   | 0.011723   | 0.011723   | 0.011723   |   0.0 |  1.18
+Comm    | 0.016397   | 0.016397   | 0.016397   |   0.0 |  1.65
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.001539   | 0.001539   | 0.001539   |   0.0 |  0.15
+Other   |            | 0.02264    |            |       |  2.28
+
+Nlocal:           5446 ave        5446 max        5446 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          15294 ave       15294 max       15294 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         247607 ave      247607 max      247607 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 247607
+Ave neighs/atom = 45.465846
+Ave special neighs/atom = 6.7396254
+Neighbor list builds = 2
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : lj
+  Current step  : 137
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 21.31 | 21.31 | 21.31 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+       137   0              0              371.23786      371.23786      43.57734     
+       139   0              0              371.03107      371.03107      43.576312    
+Loop time of 0.016991 on 1 procs for 2 steps with 5446 atoms
+
+92.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      371.237861959995    371.03118570752   371.031071120948
+  Force two-norm initial, final = 60891.999 63774.953
+  Force max component initial, final = 12265.201 26175.513
+  Final line search alpha, max atom move = 7.1032973e-06 0.18593245
+  Iterations, force evaluations = 2 4
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.014818   | 0.014818   | 0.014818   |   0.0 | 87.21
+Bond    | 0.001382   | 0.001382   | 0.001382   |   0.0 |  8.13
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000317   | 0.000317   | 0.000317   |   0.0 |  1.87
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.000474   |            |       |  2.79
+
+Nlocal:           5446 ave        5446 max        5446 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          15309 ave       15309 max       15309 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         247104 ave      247104 max      247104 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 247104
+Ave neighs/atom = 45.373485
+Ave special neighs/atom = 6.7396254
+Neighbor list builds = 0
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+System init for write_restart ...
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Total wall time: 0:00:01

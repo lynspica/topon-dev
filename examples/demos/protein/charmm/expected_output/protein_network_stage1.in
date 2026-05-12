@@ -1,0 +1,56 @@
+# Stage 1 — Serial Soft Minimisation (topro / CHARMM36/36m)
+# Resolves all atomic overlaps using pair_style soft.
+# Run from this relaxation/ directory.
+
+units           real
+atom_style      full
+boundary        p p p
+bond_style      harmonic
+angle_style     charmm
+dihedral_style  charmm
+improper_style  harmonic
+pair_style      lj/charmm/coul/long 10.0 12.0
+kspace_style    pppm 1.0e-4
+
+fix             cmap all cmap ../charmm36m.cmap
+fix_modify      cmap energy yes
+read_data       ../protein_network.data fix cmap crossterm CMAP
+include         ../protein_network.in.settings
+include         ../protein_network.in.groups
+
+special_bonds   charmm
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# ── Switch to soft potential (disable long-range electrostatics) ──────────────
+kspace_style    none
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+variable        prefactor equal ramp(0,60)
+
+thermo          100
+thermo_style    custom step pe ke etotal evdwl ecoul epair ebond eangle edihed eimp press vol
+
+# Stage A: ramped soft push
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+min_style       cg
+minimize        1.0e-4 1.0e-6 1000 10000
+unfix           soft_push
+write_data      min_stage_A.data
+
+# Stage B: nve/limit dynamics under soft potential
+reset_timestep  0
+timestep        1.0
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+fix             nve_limit all nve/limit 0.1
+run             1000
+unfix           nve_limit
+unfix           soft_push
+
+# Stage C: final soft minimisation
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 1000 10000
+unfix           soft_push
+
+write_data      system_after_soft.data
+write_restart   1.restart

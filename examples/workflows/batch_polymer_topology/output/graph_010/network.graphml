@@ -1,0 +1,3478 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d13" for="edge" attr.name="edge_type" attr.type="string" />
+  <key id="d12" for="node" attr.name="COMZ" attr.type="double" />
+  <key id="d11" for="node" attr.name="COMY" attr.type="double" />
+  <key id="d10" for="node" attr.name="COMX" attr.type="double" />
+  <key id="d9" for="node" attr.name="rg" attr.type="double" />
+  <key id="d8" for="node" attr.name="contour_length" attr.type="double" />
+  <key id="d7" for="node" attr.name="length" attr.type="long" />
+  <key id="d6" for="node" attr.name="type" attr.type="string" />
+  <key id="d5" for="graph" attr.name="zhi" attr.type="float" />
+  <key id="d4" for="graph" attr.name="zlo" attr.type="float" />
+  <key id="d3" for="graph" attr.name="yhi" attr.type="float" />
+  <key id="d2" for="graph" attr.name="ylo" attr.type="float" />
+  <key id="d1" for="graph" attr.name="xhi" attr.type="float" />
+  <key id="d0" for="graph" attr.name="xlo" attr.type="float" />
+  <graph edgedefault="undirected">
+    <node id="125">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="126">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="127">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="128">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="129">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="130">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="131">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="132">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="133">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="134">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="135">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="136">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="137">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="138">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="139">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="140">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="141">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="142">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="143">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="144">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="145">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="146">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="147">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="148">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="149">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="150">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="151">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="152">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="153">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="154">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="155">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="156">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="157">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="158">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="159">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="160">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="161">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="162">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="163">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="164">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="165">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="166">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="167">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="168">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="169">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="170">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="171">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="172">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="173">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="174">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="175">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="176">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="177">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="178">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="179">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="180">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="181">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="182">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="183">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="184">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="185">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="186">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="187">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="188">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="189">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="190">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="191">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="192">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="193">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="194">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="195">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="196">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="197">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="198">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="199">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="200">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="201">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="202">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="203">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="204">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="205">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="206">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="207">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="208">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="209">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="210">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="211">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="212">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="213">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="214">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="215">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="216">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="217">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="218">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="219">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="220">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="221">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="222">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="223">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="224">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="225">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="226">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="227">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="228">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="229">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="230">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="231">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="232">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="233">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="234">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="235">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="236">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="237">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="238">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="239">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="240">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="241">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="242">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="243">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="244">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="245">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="246">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="247">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="248">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="249">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="250">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="251">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="252">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="253">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="254">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="255">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="256">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="257">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="258">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="259">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="260">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="261">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="262">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="263">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="264">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="265">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="266">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="267">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="268">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="269">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="270">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="271">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="272">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="273">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="274">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="275">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="276">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="277">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="278">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="279">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="280">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="281">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="282">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="283">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="284">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="285">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="286">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="287">
+      <data key="d6">polymer</data>
+      <data key="d7">50</data>
+      <data key="d8">NaN</data>
+      <data key="d9">NaN</data>
+      <data key="d10">NaN</data>
+      <data key="d11">NaN</data>
+      <data key="d12">NaN</data>
+    </node>
+    <node id="0">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="2">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="3">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="4">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="5">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="6">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="7">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="8">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="9">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="10">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="11">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="12">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="13">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="14">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="15">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="16">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="17">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="18">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="19">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="20">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="21">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="22">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="23">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="24">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">0.0</data>
+    </node>
+    <node id="25">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="26">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="27">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="28">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="29">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="30">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="31">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="32">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="33">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="35">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="36">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="37">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="39">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="40">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="41">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="42">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="44">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="45">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="46">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="47">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="48">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="49">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">1.0</data>
+    </node>
+    <node id="51">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="52">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="53">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="54">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="55">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="56">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="58">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="59">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="60">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="61">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="62">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="63">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="66">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="67">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="68">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="69">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="70">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="71">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="72">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="73">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="74">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">2.0</data>
+    </node>
+    <node id="75">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="76">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="77">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="80">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="81">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="82">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="83">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="84">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="86">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="87">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="88">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="89">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="90">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="91">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="92">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="93">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="94">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="95">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="96">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="97">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="98">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="99">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">3.0</data>
+    </node>
+    <node id="100">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="101">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="102">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="103">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="104">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">0.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="105">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="106">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="107">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="108">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="109">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">1.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="110">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="111">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="112">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="114">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">2.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="115">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="117">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="118">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="119">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">3.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="120">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="121">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">1.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="122">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">2.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="123">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">3.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <node id="124">
+      <data key="d6">crosslinker</data>
+      <data key="d7">1</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">4.0</data>
+      <data key="d11">4.0</data>
+      <data key="d12">4.0</data>
+    </node>
+    <edge source="125" target="0">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="125" target="4">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="126" target="2">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="126" target="3">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="127" target="2">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="127" target="7">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="128" target="2">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="128" target="102">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="129" target="3">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="129" target="23">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="130" target="3">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="130" target="103">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="131" target="4">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="131" target="29">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="132" target="4">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="132" target="104">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="133" target="5">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="133" target="6">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="134" target="5">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="134" target="10">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="135" target="5">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="135" target="30">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="136" target="5">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="136" target="9">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="137" target="6">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="137" target="7">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="138" target="6">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="138" target="11">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="139" target="6">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="139" target="106">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="140" target="7">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="140" target="8">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="141" target="7">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="141" target="107">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="142" target="8">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="142" target="9">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="143" target="8">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="143" target="13">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="144" target="8">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="144" target="33">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="145" target="9">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="145" target="14">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="146" target="9">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="146" target="109">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="147" target="10">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="147" target="110">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="148" target="11">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="148" target="16">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="149" target="11">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="149" target="36">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="150" target="11">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="150" target="111">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="151" target="12">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="151" target="13">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="152" target="13">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="152" target="14">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="153" target="13">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="153" target="18">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="154" target="14">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="154" target="39">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="155" target="14">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="155" target="114">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="156" target="15">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="156" target="16">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="157" target="15">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="157" target="20">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="158" target="15">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="158" target="40">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="159" target="15">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="159" target="115">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="160" target="16">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="160" target="21">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="161" target="17">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="161" target="18">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="162" target="17">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="162" target="22">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="163" target="17">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="163" target="42">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="164" target="17">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="164" target="117">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="165" target="18">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="165" target="23">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="166" target="18">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="166" target="118">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="167" target="19">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="167" target="44">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="168" target="19">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="168" target="119">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="169" target="20">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="169" target="45">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="170" target="20">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="170" target="24">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="171" target="20">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="171" target="120">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="172" target="21">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="172" target="121">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="173" target="23">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="173" target="24">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="174" target="24">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="174" target="49">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="175" target="24">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="175" target="124">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="176" target="25">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="176" target="30">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="177" target="26">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="177" target="27">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="178" target="26">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="178" target="31">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="179" target="26">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="179" target="51">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="180" target="26">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="180" target="46">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="181" target="27">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="181" target="32">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="182" target="27">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="182" target="52">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="183" target="27">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="183" target="47">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="184" target="28">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="184" target="29">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="185" target="28">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="185" target="33">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="186" target="28">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="186" target="53">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="187" target="28">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="187" target="48">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="188" target="29">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="188" target="54">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="189" target="30">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="189" target="31">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="190" target="30">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="190" target="55">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="191" target="31">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="191" target="36">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="192" target="33">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="192" target="58">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="193" target="35">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="193" target="60">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="194" target="36">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="194" target="37">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="195" target="37">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="195" target="42">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="196" target="37">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="196" target="62">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="197" target="39">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="197" target="44">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="198" target="40">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="198" target="41">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="199" target="40">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="199" target="45">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="200" target="40">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="200" target="44">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="201" target="42">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="201" target="47">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="202" target="42">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="202" target="67">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="203" target="44">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="203" target="69">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="204" target="45">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="204" target="70">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="205" target="47">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="205" target="72">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="206" target="51">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="206" target="52">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="207" target="51">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="207" target="56">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="208" target="51">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="208" target="71">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="209" target="52">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="209" target="53">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="210" target="52">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="210" target="77">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="211" target="53">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="211" target="73">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="212" target="55">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="212" target="56">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="213" target="55">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="213" target="60">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="214" target="55">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="214" target="59">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="215" target="56">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="215" target="61">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="216" target="56">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="216" target="81">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="217" target="58">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="217" target="59">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="218" target="58">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="218" target="63">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="219" target="58">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="219" target="83">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="220" target="62">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="220" target="63">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="221" target="62">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="221" target="67">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="222" target="63">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="222" target="68">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="223" target="63">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="223" target="88">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="224" target="66">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="224" target="67">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="225" target="66">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="225" target="71">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="226" target="66">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="226" target="91">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="227" target="67">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="227" target="72">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="228" target="69">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="228" target="74">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="229" target="70">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="229" target="95">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="230" target="70">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="230" target="74">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="231" target="71">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="231" target="72">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="232" target="71">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="232" target="96">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="233" target="72">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="233" target="73">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="234" target="73">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="234" target="74">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="235" target="73">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="235" target="98">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="236" target="74">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="236" target="99">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="237" target="75">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="237" target="76">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="238" target="75">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="238" target="80">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="239" target="75">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="239" target="100">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="240" target="75">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="240" target="95">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="241" target="80">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="241" target="81">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="242" target="80">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="242" target="84">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="243" target="81">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="243" target="82">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="244" target="81">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="244" target="86">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="245" target="82">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="245" target="87">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="246" target="82">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="246" target="107">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="247" target="86">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="247" target="87">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="248" target="86">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="248" target="91">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="249" target="86">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="249" target="111">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="250" target="87">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="250" target="88">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="251" target="87">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="251" target="92">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="252" target="88">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="252" target="89">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="253" target="89">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="253" target="94">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="254" target="89">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="254" target="114">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="255" target="90">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="255" target="94">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="256" target="91">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="256" target="96">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="257" target="93">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="257" target="94">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="258" target="94">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="258" target="99">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="259" target="95">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="259" target="96">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="260" target="97">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="260" target="98">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="261" target="98">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="261" target="99">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="262" target="99">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="262" target="124">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="263" target="100">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="263" target="104">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="264" target="100">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="264" target="120">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="265" target="101">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="265" target="121">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="266" target="102">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="266" target="103">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="267" target="102">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="267" target="107">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="268" target="102">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="268" target="122">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="269" target="103">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="269" target="104">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="270" target="104">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="270" target="124">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="271" target="105">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="271" target="106">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="272" target="105">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="272" target="110">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="273" target="105">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="273" target="109">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="274" target="106">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="274" target="107">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="275" target="106">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="275" target="111">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="276" target="108">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="276" target="109">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="277" target="109">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="277" target="114">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="278" target="110">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="278" target="115">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="279" target="110">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="279" target="114">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="280" target="111">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="280" target="112">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="281" target="115">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="281" target="120">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="282" target="117">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="282" target="118">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="283" target="117">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="283" target="122">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="284" target="118">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="284" target="119">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="285" target="118">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="285" target="123">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="286" target="120">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="286" target="121">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="287" target="121">
+      <data key="d13">chemical</data>
+    </edge>
+    <edge source="287" target="122">
+      <data key="d13">chemical</data>
+    </edge>
+    <data key="d0">NaN</data>
+    <data key="d1">NaN</data>
+    <data key="d2">NaN</data>
+    <data key="d3">NaN</data>
+    <data key="d4">NaN</data>
+    <data key="d5">NaN</data>
+  </graph>
+</graphml>

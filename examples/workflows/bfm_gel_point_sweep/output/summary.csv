@@ -1,0 +1,10 @@
+label,n_chains,n_repeats,segs_per_block,min_intrachain_sep,equil_steps,snapshot_label,gel_conv,n_snapshots,wall_s
+baseline,8,8,2,2,10000,no_gel,0.1562,1,0.16
+more_chains_12,12,8,2,2,10000,no_gel,0.2292,1,0.19
+more_chains_16,16,8,2,2,10000,no_gel,0.2969,1,0.17
+longer_chains_12,8,12,2,2,10000,gel_point,0.1667,1,0.16
+longer_chains_16,8,16,2,2,10000,gel_point,0.1406,2,0.14
+segs_per_block_3,8,8,3,2,10000,no_gel,0.1875,1,0.14
+tight_intrachain_sep_1,8,8,2,1,10000,no_gel,0.1562,1,0.15
+loose_intrachain_sep_3,8,8,2,3,10000,no_gel,0.1562,1,0.17
+more_equilibration,8,8,2,2,50000,no_gel,0.125,1,0.66

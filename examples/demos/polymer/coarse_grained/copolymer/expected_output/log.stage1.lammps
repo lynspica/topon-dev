@@ -1,0 +1,239 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+# LAMMPS Stage 1: Serial Soft Minimization (CG)
+
+units           lj
+atom_style      full
+boundary        p p p
+comm_modify     mode single cutoff 5.0
+bond_style      harmonic
+angle_style     harmonic
+pair_style      lj/cut 2.5
+special_bonds   lj 0.0 1.0 1.0
+
+read_data       ../03_Conformation/system_relaxed.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (17.2183 17.2183 17.2183)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  4339 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  orthogonal box = (0 0 0) to (17.2183 17.2183 17.2183)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  4428 bonds
+  reading angles ...
+  4788 angles
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        1        1       
+  special bond factors coul:  0        0        0       
+     4 = max # of 1-2 neighbors
+     4 = max # of 1-3 neighbors
+     8 = max # of 1-4 neighbors
+    12 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.034 seconds
+include         ../02_Chemistry/system.in.settings
+# Force field settings (auto-generated stub)
+include         ../02_Chemistry/system.groups
+# LAMMPS group definitions
+group nodes id 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 53 54 55 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 82 83 84 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 131 132 133 134 135 136 137 138 139
+121 atoms in group nodes
+group beads subtract all nodes
+4218 atoms in group beads
+
+group           beads subtract all nodes
+4218 atoms in group beads
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Switch to Soft Potential ---
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+variable        prefactor equal ramp(0,30)
+
+# --- Stage A: Freeze All (Beads & Nodes) ---
+fix             freeze_beads beads setforce 0 0 0
+fix             freeze_nodes nodes setforce 0 0 0
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+min_style       cg
+minimize        1.0e-4 1.0e-6 1000 10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 5
+  binsize = 1.5, bins = 12 12 12
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+WARNING: Bond/angle/dihedral extent > half of periodic box length (src/domain.cpp:1174)
+Per MPI rank memory allocation (min/avg/max) = 20.19 | 20.19 | 20.19 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              0              561.61207      561.61207     -33.699753    
+         1   0              0              561.61207      561.61207     -33.699753    
+WARNING: Bond/angle/dihedral extent > half of periodic box length (src/domain.cpp:1174)
+Loop time of 0.002736 on 1 procs for 1 steps with 4339 atoms
+
+571.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = search direction is not downhill
+  Energy initial, next-to-last, final = 
+      561.612072613984   561.612072613984   561.612072613984
+  Force two-norm initial, final = 0 0
+  Force max component initial, final = 0 0
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 1 0
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.002476   | 0.002476   | 0.002476   |   0.0 | 90.50
+Bond    | 0.000183   | 0.000183   | 0.000183   |   0.0 |  6.69
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 2.4e-05    | 2.4e-05    | 2.4e-05    |   0.0 |  0.88
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 9e-06      | 9e-06      | 9e-06      |   0.0 |  0.33
+Other   |            | 4.4e-05    |            |       |  1.61
+
+Nlocal:           4339 ave        4339 max        4339 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          13160 ave       13160 max       13160 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         169201 ave      169201 max      169201 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 169201
+Ave neighs/atom = 38.995391
+Ave special neighs/atom = 6.6042867
+Neighbor list builds = 0
+Dangerous builds = 0
+unfix           soft_push
+unfix           freeze_beads
+write_data      min_stage_A.data
+System init for write_data ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+
+# --- Stage B: Relax Beads (Nodes Fixed) ---
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 1000 10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+WARNING: Bond/angle/dihedral extent > half of periodic box length (src/domain.cpp:1174)
+Per MPI rank memory allocation (min/avg/max) = 20.19 | 20.19 | 20.19 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         1   0              0              561.61207      561.61207     -33.699753    
+        90   0              0              405.01543      405.01543      33.642426    
+Loop time of 0.341498 on 1 procs for 89 steps with 4339 atoms
+
+96.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      561.612072613984   405.031739424269   405.015431124282
+  Force two-norm initial, final = 222952.37 23982.7
+  Force max component initial, final = 38687.398 7449.302
+  Final line search alpha, max atom move = 1.0853899e-05 0.080853972
+  Iterations, force evaluations = 89 127
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.28691    | 0.28691    | 0.28691    |   0.0 | 84.02
+Bond    | 0.017846   | 0.017846   | 0.017846   |   0.0 |  5.23
+Neigh   | 0.026621   | 0.026621   | 0.026621   |   0.0 |  7.80
+Comm    | 0.004261   | 0.004261   | 0.004261   |   0.0 |  1.25
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.000313   | 0.000313   | 0.000313   |   0.0 |  0.09
+Other   |            | 0.005544   |            |       |  1.62
+
+Nlocal:           4339 ave        4339 max        4339 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          13090 ave       13090 max       13090 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         166538 ave      166538 max      166538 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 166538
+Ave neighs/atom = 38.381655
+Ave special neighs/atom = 6.6042867
+Neighbor list builds = 8
+Dangerous builds = 0
+unfix           soft_push
+unfix           freeze_nodes
+write_data      min_stage_B.data
+System init for write_data ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+
+# --- Stage C: Relax All ---
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 10000 100000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 20.19 | 20.19 | 20.19 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+        90   0              0              405.01543      405.01543      33.642426    
+       150   0              0              392.6912       392.6912       37.724819    
+Loop time of 0.278435 on 1 procs for 60 steps with 4339 atoms
+
+101.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      405.015431124282   392.712203361159   392.691198195672
+  Force two-norm initial, final = 28490.499 21007.796
+  Force max component initial, final = 7449.302 5326.3419
+  Final line search alpha, max atom move = 3.4833019e-05 0.18553257
+  Iterations, force evaluations = 60 119
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.249      | 0.249      | 0.249      |   0.0 | 89.43
+Bond    | 0.016188   | 0.016188   | 0.016188   |   0.0 |  5.81
+Neigh   | 0.006469   | 0.006469   | 0.006469   |   0.0 |  2.32
+Comm    | 0.002872   | 0.002872   | 0.002872   |   0.0 |  1.03
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.003904   |            |       |  1.40
+
+Nlocal:           4339 ave        4339 max        4339 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          13076 ave       13076 max       13076 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         164632 ave      164632 max      164632 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 164632
+Ave neighs/atom = 37.942383
+Ave special neighs/atom = 6.6042867
+Neighbor list builds = 2
+Dangerous builds = 0
+unfix           soft_push
+write_data      system_after_soft.data
+System init for write_data ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+write_restart   1.restart
+System init for write_restart ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Total wall time: 0:00:00

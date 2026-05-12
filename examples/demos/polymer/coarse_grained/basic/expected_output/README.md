@@ -1,18 +1,18 @@
-# Expected output — cg-basic
+# Expected output — polymer/coarse_grained/basic
 
-Snapshot of running the sibling `config.json` (or its programmatic
-equivalent) through `Pipeline.run()` plus LAMMPS stage-1 minimize
-on the topon project's bundled `tests/sample_graphs/network_N5x5x5_trial3`.
+Generated 2026-05-10 by `_tmp_run_all_demos.py` (one-off runner).
+Topology source: `tests/sample_graphs/network_N5x5x5_trial3` (injected — the demo config doesn't ship its own topology).
 
-## Files
+## Stage status
 
-- `system.data` — Stage-4 chemistry output (LAMMPS data file)
-- `system.in.settings` — pair / bond / angle / dihedral coefficients
-- `system.groups` — group definitions (`nodes`, `beads`)
-- `minimize_1_serial.in` — Stage-6 LAMMPS input script
-- `log.lammps` — what LAMMPS prints during the stage-1 run (energies, etc.)
-- `system_after_soft.data` — system state after stage-1 minimize
+- **load_config_full**: ok
+- **topology**: injected sample 5x5x5
+- **Pipeline.run**: ok
+- **stage1**: ok in 0.7s
+- **stage2**: ok in 64.6s
+- **stage3**: ok in 20.4s
 
-Reproduce with `topon generate config.json` (when this demo
-ships a JSON config compatible with `Pipeline.run()`) or via
-`examples/run_via_api.py`. Generated 2026-05-10.
+## Files in this folder
+
+Whatever the pipeline + LAMMPS produced before any failure:
+`system.data`, `system.in.settings`, `system.groups`, minimize scripts, `log.*.lammps`, intermediate `system_*.data`.

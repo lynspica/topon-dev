@@ -1,0 +1,579 @@
+# CHARMM36/36m Force Field Coefficients (topro)
+
+# Pair Coeffs  epsilon [kcal/mol]  sigma [Å]
+pair_coeff 1 1 0.110000 3.563595 # C
+pair_coeff 2 2 0.070000 3.550053 # CA
+pair_coeff 3 3 0.070000 3.563595 # CC
+pair_coeff 4 4 0.070000 3.550053 # CG2R67
+pair_coeff 5 5 0.020000 4.053589 # CP1
+pair_coeff 6 6 0.055000 3.875409 # CP2
+pair_coeff 7 7 0.055000 3.875409 # CP3
+pair_coeff 8 8 0.032000 3.563595 # CT1
+pair_coeff 9 9 0.056000 3.581413 # CT2
+pair_coeff 10 10 0.056000 3.581413 # CT2A
+pair_coeff 11 11 0.078000 3.634867 # CT3
+pair_coeff 12 12 0.046000 0.400014 # H
+pair_coeff 13 13 0.034000 2.387609 # HA2
+pair_coeff 14 14 0.024000 2.387609 # HA3
+pair_coeff 15 15 0.022000 2.351973 # HB1
+pair_coeff 16 16 0.028000 2.387609 # HB2
+pair_coeff 17 17 0.046000 0.400014 # HC
+pair_coeff 18 18 0.030000 2.420037 # HP
+pair_coeff 19 19 0.200000 3.296325 # N
+pair_coeff 20 20 0.200000 3.296325 # NC2
+pair_coeff 21 21 0.200000 3.296325 # NH1
+pair_coeff 22 22 0.200000 3.296325 # NH2
+pair_coeff 23 23 0.200000 3.296325 # NH3
+pair_coeff 24 24 0.120000 3.029056 # O
+pair_coeff 25 25 0.120000 3.029056 # OC
+pair_coeff 26 26 0.152100 3.153781 # OH1
+
+# Bond Coeffs  K [kcal/mol/Å²]  r0 [Å]
+bond_coeff 1 250.0000 1.4900 # C-CP1
+bond_coeff 2 250.0000 1.4900 # C-CT1
+bond_coeff 3 250.0000 1.4900 # C-CT2
+bond_coeff 4 260.0000 1.3000 # C-N
+bond_coeff 5 450.0000 1.3650 # C-NC2
+bond_coeff 6 370.0000 1.3450 # C-NH1
+bond_coeff 7 620.0000 1.2300 # C-O
+bond_coeff 8 305.0000 1.3750 # CA-CA
+bond_coeff 9 305.0000 1.3750 # CA-CG2R67
+bond_coeff 10 230.0000 1.4900 # CA-CT2
+bond_coeff 11 340.0000 1.0800 # CA-HP
+bond_coeff 12 334.3000 1.4110 # CA-OH1
+bond_coeff 13 200.0000 1.5220 # CC-CT1
+bond_coeff 14 200.0000 1.5220 # CC-CT2
+bond_coeff 15 200.0000 1.5220 # CC-CT2A
+bond_coeff 16 430.0000 1.3600 # CC-NH2
+bond_coeff 17 650.0000 1.2300 # CC-O
+bond_coeff 18 525.0000 1.2600 # CC-OC
+bond_coeff 19 300.0000 1.4900 # CG2R67-CG2R67
+bond_coeff 20 222.5000 1.5270 # CP1-CP2
+bond_coeff 21 330.0000 1.0800 # CP1-HB1
+bond_coeff 22 320.0000 1.4340 # CP1-N
+bond_coeff 23 222.5000 1.5370 # CP2-CP2
+bond_coeff 24 222.5000 1.5370 # CP2-CP3
+bond_coeff 25 309.0000 1.1110 # CP2-HA2
+bond_coeff 26 309.0000 1.1110 # CP3-HA2
+bond_coeff 27 320.0000 1.4550 # CP3-N
+bond_coeff 28 222.5000 1.5380 # CT1-CT2
+bond_coeff 29 222.5000 1.5380 # CT1-CT2A
+bond_coeff 30 222.5000 1.5380 # CT1-CT3
+bond_coeff 31 330.0000 1.0800 # CT1-HB1
+bond_coeff 32 320.0000 1.4300 # CT1-NH1
+bond_coeff 33 222.5000 1.5300 # CT2-CT2
+bond_coeff 34 309.0000 1.1110 # CT2-HA2
+bond_coeff 35 330.0000 1.0800 # CT2-HB2
+bond_coeff 36 390.0000 1.4900 # CT2-NC2
+bond_coeff 37 320.0000 1.4300 # CT2-NH1
+bond_coeff 38 200.0000 1.4800 # CT2-NH3
+bond_coeff 39 428.0000 1.4200 # CT2-OH1
+bond_coeff 40 309.0000 1.1110 # CT2A-HA2
+bond_coeff 41 322.0000 1.1110 # CT3-HA3
+bond_coeff 42 440.0000 0.9970 # H-NH1
+bond_coeff 43 480.0000 1.0000 # H-NH2
+bond_coeff 44 545.0000 0.9600 # H-OH1
+bond_coeff 45 455.0000 1.0000 # HC-NC2
+bond_coeff 46 403.0000 1.0400 # HC-NH3
+
+# Angle Coeffs  Ktheta  theta0  Kub  S0  (charmm style)
+angle_coeff 1 52.0000 112.3000 0.0000 0.0000 # C-CP1-CP2
+angle_coeff 1 52.0000 112.3000 0.0000 0.0000 # CP2-CP1-C
+angle_coeff 2 50.0000 112.0000 0.0000 0.0000 # C-CP1-HB1
+angle_coeff 2 50.0000 112.0000 0.0000 0.0000 # HB1-CP1-C
+angle_coeff 3 50.0000 108.2000 0.0000 0.0000 # C-CP1-N
+angle_coeff 3 50.0000 108.2000 0.0000 0.0000 # N-CP1-C
+angle_coeff 4 52.0000 108.0000 0.0000 0.0000 # C-CT1-CT2
+angle_coeff 4 52.0000 108.0000 0.0000 0.0000 # CT2-CT1-C
+angle_coeff 5 52.0000 108.0000 0.0000 0.0000 # C-CT1-CT2A
+angle_coeff 5 52.0000 108.0000 0.0000 0.0000 # CT2A-CT1-C
+angle_coeff 6 52.0000 108.0000 0.0000 0.0000 # C-CT1-CT3
+angle_coeff 6 52.0000 108.0000 0.0000 0.0000 # CT3-CT1-C
+angle_coeff 7 50.0000 109.5000 0.0000 0.0000 # C-CT1-HB1
+angle_coeff 7 50.0000 109.5000 0.0000 0.0000 # HB1-CT1-C
+angle_coeff 8 50.0000 107.0000 0.0000 0.0000 # C-CT1-NH1
+angle_coeff 8 50.0000 107.0000 0.0000 0.0000 # NH1-CT1-C
+angle_coeff 9 50.0000 109.5000 0.0000 0.0000 # C-CT2-HB2
+angle_coeff 9 50.0000 109.5000 0.0000 0.0000 # HB2-CT2-C
+angle_coeff 10 50.0000 107.0000 0.0000 0.0000 # C-CT2-NH1
+angle_coeff 10 50.0000 107.0000 0.0000 0.0000 # NH1-CT2-C
+angle_coeff 11 43.7000 110.0000 0.0000 0.0000 # C-CT2-NH3
+angle_coeff 11 43.7000 110.0000 0.0000 0.0000 # NH3-CT2-C
+angle_coeff 12 60.0000 117.0000 0.0000 0.0000 # C-N-CP1
+angle_coeff 12 60.0000 117.0000 0.0000 0.0000 # CP1-N-C
+angle_coeff 13 60.0000 117.0000 0.0000 0.0000 # C-N-CP3
+angle_coeff 13 60.0000 117.0000 0.0000 0.0000 # CP3-N-C
+angle_coeff 14 62.3000 120.0000 0.0000 0.0000 # C-NC2-CT2
+angle_coeff 14 62.3000 120.0000 0.0000 0.0000 # CT2-NC2-C
+angle_coeff 15 49.0000 120.0000 0.0000 0.0000 # C-NC2-HC
+angle_coeff 15 49.0000 120.0000 0.0000 0.0000 # HC-NC2-C
+angle_coeff 16 50.0000 120.0000 0.0000 0.0000 # C-NH1-CT1
+angle_coeff 16 50.0000 120.0000 0.0000 0.0000 # CT1-NH1-C
+angle_coeff 17 50.0000 120.0000 0.0000 0.0000 # C-NH1-CT2
+angle_coeff 17 50.0000 120.0000 0.0000 0.0000 # CT2-NH1-C
+angle_coeff 18 34.0000 123.0000 0.0000 0.0000 # C-NH1-H
+angle_coeff 18 34.0000 123.0000 0.0000 0.0000 # H-NH1-C
+angle_coeff 19 40.0000 120.0000 35.0000 2.4162 # CA-CA-CA
+angle_coeff 20 40.0000 120.0000 0.0000 0.0000 # CA-CA-CG2R67
+angle_coeff 20 40.0000 120.0000 0.0000 0.0000 # CG2R67-CA-CA
+angle_coeff 21 45.8000 122.3000 0.0000 0.0000 # CA-CA-CT2
+angle_coeff 21 45.8000 122.3000 0.0000 0.0000 # CT2-CA-CA
+angle_coeff 22 30.0000 120.0000 22.0000 2.1525 # CA-CA-HP
+angle_coeff 22 30.0000 120.0000 22.0000 2.1525 # HP-CA-CA
+angle_coeff 23 45.2000 120.0000 0.0000 0.0000 # CA-CA-OH1
+angle_coeff 23 45.2000 120.0000 0.0000 0.0000 # OH1-CA-CA
+angle_coeff 24 40.0000 120.0000 0.0000 0.0000 # CA-CG2R67-CA
+angle_coeff 25 40.0000 120.0000 0.0000 0.0000 # CA-CG2R67-CG2R67
+angle_coeff 25 40.0000 120.0000 0.0000 0.0000 # CG2R67-CG2R67-CA
+angle_coeff 26 51.8000 107.5000 0.0000 0.0000 # CA-CT2-CT1
+angle_coeff 26 51.8000 107.5000 0.0000 0.0000 # CT1-CT2-CA
+angle_coeff 27 49.3000 107.5000 0.0000 0.0000 # CA-CT2-HA2
+angle_coeff 27 49.3000 107.5000 0.0000 0.0000 # HA2-CT2-CA
+angle_coeff 28 65.0000 108.0000 0.0000 0.0000 # CA-OH1-H
+angle_coeff 28 65.0000 108.0000 0.0000 0.0000 # H-OH1-CA
+angle_coeff 29 52.0000 108.0000 0.0000 0.0000 # CC-CT1-CT2
+angle_coeff 29 52.0000 108.0000 0.0000 0.0000 # CT2-CT1-CC
+angle_coeff 30 50.0000 109.5000 0.0000 0.0000 # CC-CT1-HB1
+angle_coeff 30 50.0000 109.5000 0.0000 0.0000 # HB1-CT1-CC
+angle_coeff 31 50.0000 107.0000 0.0000 0.0000 # CC-CT1-NH1
+angle_coeff 31 50.0000 107.0000 0.0000 0.0000 # NH1-CT1-CC
+angle_coeff 32 52.0000 108.0000 0.0000 0.0000 # CC-CT2-CT1
+angle_coeff 32 52.0000 108.0000 0.0000 0.0000 # CT1-CT2-CC
+angle_coeff 33 33.0000 109.5000 30.0000 2.1630 # CC-CT2-HA2
+angle_coeff 33 33.0000 109.5000 30.0000 2.1630 # HA2-CT2-CC
+angle_coeff 34 52.0000 108.0000 0.0000 0.0000 # CC-CT2A-CT1
+angle_coeff 34 52.0000 108.0000 0.0000 0.0000 # CT1-CT2A-CC
+angle_coeff 35 33.0000 109.5000 30.0000 2.1630 # CC-CT2A-HA2
+angle_coeff 35 33.0000 109.5000 30.0000 2.1630 # HA2-CT2A-CC
+angle_coeff 36 50.0000 120.0000 0.0000 0.0000 # CC-NH2-H
+angle_coeff 36 50.0000 120.0000 0.0000 0.0000 # H-NH2-CC
+angle_coeff 37 30.0000 120.0000 0.0000 0.0000 # CG2R67-CA-HP
+angle_coeff 37 30.0000 120.0000 0.0000 0.0000 # HP-CA-CG2R67
+angle_coeff 38 45.2000 120.0000 0.0000 0.0000 # CG2R67-CA-OH1
+angle_coeff 38 45.2000 120.0000 0.0000 0.0000 # OH1-CA-CG2R67
+angle_coeff 39 80.0000 116.5000 0.0000 0.0000 # CP1-C-NH1
+angle_coeff 39 80.0000 116.5000 0.0000 0.0000 # NH1-C-CP1
+angle_coeff 40 80.0000 118.0000 0.0000 0.0000 # CP1-C-O
+angle_coeff 40 80.0000 118.0000 0.0000 0.0000 # O-C-CP1
+angle_coeff 41 70.0000 108.5000 0.0000 0.0000 # CP1-CP2-CP2
+angle_coeff 41 70.0000 108.5000 0.0000 0.0000 # CP2-CP2-CP1
+angle_coeff 42 33.4300 110.1000 22.5300 2.1790 # CP1-CP2-HA2
+angle_coeff 42 33.4300 110.1000 22.5300 2.1790 # HA2-CP2-CP1
+angle_coeff 43 100.0000 114.2000 0.0000 0.0000 # CP1-N-CP3
+angle_coeff 43 100.0000 114.2000 0.0000 0.0000 # CP3-N-CP1
+angle_coeff 44 35.0000 118.0000 0.0000 0.0000 # CP2-CP1-HB1
+angle_coeff 44 35.0000 118.0000 0.0000 0.0000 # HB1-CP1-CP2
+angle_coeff 45 70.0000 110.8000 0.0000 0.0000 # CP2-CP1-N
+angle_coeff 45 70.0000 110.8000 0.0000 0.0000 # N-CP1-CP2
+angle_coeff 46 70.0000 108.5000 0.0000 0.0000 # CP2-CP2-CP3
+angle_coeff 46 70.0000 108.5000 0.0000 0.0000 # CP3-CP2-CP2
+angle_coeff 47 26.5000 110.1000 22.5300 2.1790 # CP2-CP2-HA2
+angle_coeff 47 26.5000 110.1000 22.5300 2.1790 # HA2-CP2-CP2
+angle_coeff 48 26.5000 110.1000 22.5300 2.1790 # CP2-CP3-HA2
+angle_coeff 48 26.5000 110.1000 22.5300 2.1790 # HA2-CP3-CP2
+angle_coeff 49 70.0000 110.5000 0.0000 0.0000 # CP2-CP3-N
+angle_coeff 49 70.0000 110.5000 0.0000 0.0000 # N-CP3-CP2
+angle_coeff 50 26.5000 110.1000 22.5300 2.1790 # CP3-CP2-HA2
+angle_coeff 50 26.5000 110.1000 22.5300 2.1790 # HA2-CP2-CP3
+angle_coeff 51 20.0000 112.5000 0.0000 0.0000 # CT1-C-N
+angle_coeff 51 20.0000 112.5000 0.0000 0.0000 # N-C-CT1
+angle_coeff 52 80.0000 116.5000 0.0000 0.0000 # CT1-C-NH1
+angle_coeff 52 80.0000 116.5000 0.0000 0.0000 # NH1-C-CT1
+angle_coeff 53 80.0000 121.0000 0.0000 0.0000 # CT1-C-O
+angle_coeff 53 80.0000 121.0000 0.0000 0.0000 # O-C-CT1
+angle_coeff 54 40.0000 118.0000 50.0000 2.3880 # CT1-CC-OC
+angle_coeff 54 40.0000 118.0000 50.0000 2.3880 # OC-CC-CT1
+angle_coeff 55 58.3500 113.5000 11.1600 2.5610 # CT1-CT2-CT2
+angle_coeff 55 58.3500 113.5000 11.1600 2.5610 # CT2-CT2-CT1
+angle_coeff 56 26.5000 110.1000 22.5300 2.1790 # CT1-CT2-HA2
+angle_coeff 56 26.5000 110.1000 22.5300 2.1790 # HA2-CT2-CT1
+angle_coeff 57 75.7000 110.1000 0.0000 0.0000 # CT1-CT2-OH1
+angle_coeff 57 75.7000 110.1000 0.0000 0.0000 # OH1-CT2-CT1
+angle_coeff 58 26.5000 110.1000 22.5300 2.1790 # CT1-CT2A-HA2
+angle_coeff 58 26.5000 110.1000 22.5300 2.1790 # HA2-CT2A-CT1
+angle_coeff 59 33.4300 110.1000 22.5300 2.1790 # CT1-CT3-HA3
+angle_coeff 59 33.4300 110.1000 22.5300 2.1790 # HA3-CT3-CT1
+angle_coeff 60 35.0000 117.0000 0.0000 0.0000 # CT1-NH1-H
+angle_coeff 60 35.0000 117.0000 0.0000 0.0000 # H-NH1-CT1
+angle_coeff 61 80.0000 116.5000 0.0000 0.0000 # CT2-C-NH1
+angle_coeff 61 80.0000 116.5000 0.0000 0.0000 # NH1-C-CT2
+angle_coeff 62 80.0000 121.0000 0.0000 0.0000 # CT2-C-O
+angle_coeff 62 80.0000 121.0000 0.0000 0.0000 # O-C-CT2
+angle_coeff 63 50.0000 116.5000 50.0000 2.4500 # CT2-CC-NH2
+angle_coeff 63 50.0000 116.5000 50.0000 2.4500 # NH2-CC-CT2
+angle_coeff 64 15.0000 121.0000 50.0000 2.4400 # CT2-CC-O
+angle_coeff 64 15.0000 121.0000 50.0000 2.4400 # O-CC-CT2
+angle_coeff 65 35.0000 111.0000 0.0000 0.0000 # CT2-CT1-HB1
+angle_coeff 65 35.0000 111.0000 0.0000 0.0000 # HB1-CT1-CT2
+angle_coeff 66 70.0000 113.5000 0.0000 0.0000 # CT2-CT1-NH1
+angle_coeff 66 70.0000 113.5000 0.0000 0.0000 # NH1-CT1-CT2
+angle_coeff 67 58.3500 113.6000 11.1600 2.5610 # CT2-CT2-CT2
+angle_coeff 68 26.5000 110.1000 22.5300 2.1790 # CT2-CT2-HA2
+angle_coeff 68 26.5000 110.1000 22.5300 2.1790 # HA2-CT2-CT2
+angle_coeff 69 67.7000 107.5000 0.0000 0.0000 # CT2-CT2-NC2
+angle_coeff 69 67.7000 107.5000 0.0000 0.0000 # NC2-CT2-CT2
+angle_coeff 70 40.4000 120.0000 0.0000 0.0000 # CT2-NC2-HC
+angle_coeff 70 40.4000 120.0000 0.0000 0.0000 # HC-NC2-CT2
+angle_coeff 71 35.0000 117.0000 0.0000 0.0000 # CT2-NH1-H
+angle_coeff 71 35.0000 117.0000 0.0000 0.0000 # H-NH1-CT2
+angle_coeff 72 30.0000 109.5000 20.0000 2.0740 # CT2-NH3-HC
+angle_coeff 72 30.0000 109.5000 20.0000 2.0740 # HC-NH3-CT2
+angle_coeff 73 57.5000 106.0000 0.0000 0.0000 # CT2-OH1-H
+angle_coeff 73 57.5000 106.0000 0.0000 0.0000 # H-OH1-CT2
+angle_coeff 74 40.0000 118.0000 50.0000 2.3880 # CT2A-CC-OC
+angle_coeff 74 40.0000 118.0000 50.0000 2.3880 # OC-CC-CT2A
+angle_coeff 75 35.0000 111.0000 0.0000 0.0000 # CT2A-CT1-HB1
+angle_coeff 75 35.0000 111.0000 0.0000 0.0000 # HB1-CT1-CT2A
+angle_coeff 76 70.0000 113.5000 0.0000 0.0000 # CT2A-CT1-NH1
+angle_coeff 76 70.0000 113.5000 0.0000 0.0000 # NH1-CT1-CT2A
+angle_coeff 77 35.0000 111.0000 0.0000 0.0000 # CT3-CT1-HB1
+angle_coeff 77 35.0000 111.0000 0.0000 0.0000 # HB1-CT1-CT3
+angle_coeff 78 70.0000 113.5000 0.0000 0.0000 # CT3-CT1-NH1
+angle_coeff 78 70.0000 113.5000 0.0000 0.0000 # NH1-CT1-CT3
+angle_coeff 79 23.0000 120.0000 0.0000 0.0000 # H-NH2-H
+angle_coeff 80 35.5000 109.0000 5.4000 1.8020 # HA2-CP2-HA2
+angle_coeff 81 35.5000 109.0000 5.4000 1.8020 # HA2-CP3-HA2
+angle_coeff 82 48.0000 108.0000 0.0000 0.0000 # HA2-CP3-N
+angle_coeff 82 48.0000 108.0000 0.0000 0.0000 # N-CP3-HA2
+angle_coeff 83 35.5000 109.0000 5.4000 1.8020 # HA2-CT2-HA2
+angle_coeff 84 56.5000 107.5000 0.0000 0.0000 # HA2-CT2-NC2
+angle_coeff 84 56.5000 107.5000 0.0000 0.0000 # NC2-CT2-HA2
+angle_coeff 85 45.9000 108.8900 0.0000 0.0000 # HA2-CT2-OH1
+angle_coeff 85 45.9000 108.8900 0.0000 0.0000 # OH1-CT2-HA2
+angle_coeff 86 35.5000 109.0000 5.4000 1.8020 # HA2-CT2A-HA2
+angle_coeff 87 35.5000 108.4000 5.4000 1.8020 # HA3-CT3-HA3
+angle_coeff 88 48.0000 112.0000 0.0000 0.0000 # HB1-CP1-N
+angle_coeff 88 48.0000 112.0000 0.0000 0.0000 # N-CP1-HB1
+angle_coeff 89 48.0000 108.0000 0.0000 0.0000 # HB1-CT1-NH1
+angle_coeff 89 48.0000 108.0000 0.0000 0.0000 # NH1-CT1-HB1
+angle_coeff 90 36.0000 115.0000 0.0000 0.0000 # HB2-CT2-HB2
+angle_coeff 91 48.0000 108.0000 0.0000 0.0000 # HB2-CT2-NH1
+angle_coeff 91 48.0000 108.0000 0.0000 0.0000 # NH1-CT2-HB2
+angle_coeff 92 51.5000 107.5000 0.0000 0.0000 # HB2-CT2-NH3
+angle_coeff 92 51.5000 107.5000 0.0000 0.0000 # NH3-CT2-HB2
+angle_coeff 93 25.0000 120.0000 0.0000 0.0000 # HC-NC2-HC
+angle_coeff 94 44.0000 109.5000 0.0000 0.0000 # HC-NH3-HC
+angle_coeff 95 80.0000 122.5000 0.0000 0.0000 # N-C-O
+angle_coeff 95 80.0000 122.5000 0.0000 0.0000 # O-C-N
+angle_coeff 96 40.0000 120.0000 70.0000 2.3100 # NC2-C-NC2
+angle_coeff 97 80.0000 122.5000 0.0000 0.0000 # NH1-C-O
+angle_coeff 97 80.0000 122.5000 0.0000 0.0000 # O-C-NH1
+angle_coeff 98 75.0000 122.5000 50.0000 2.3700 # NH2-CC-O
+angle_coeff 98 75.0000 122.5000 50.0000 2.3700 # O-CC-NH2
+angle_coeff 99 100.0000 124.0000 70.0000 2.2250 # OC-CC-OC
+
+# Dihedral Coeffs  K  n  d  weight  (charmm style)
+dihedral_coeff 1 0.0 1 0 0.0 # C-CP1-CP2-CP2 (DEFAULT)
+dihedral_coeff 1 0.0 1 0 0.0 # CP2-CP2-CP1-C (DEFAULT)
+dihedral_coeff 2 0.0 1 0 0.0 # C-CP1-CP2-HA2 (DEFAULT)
+dihedral_coeff 2 0.0 1 0 0.0 # HA2-CP2-CP1-C (DEFAULT)
+dihedral_coeff 3 0.8000 3 0 0.0 # C-CP1-N-C
+dihedral_coeff 3 0.8000 3 0 0.0 # C-N-CP1-C
+dihedral_coeff 4 0.1000 3 0 0.0 # C-CP1-N-CP3
+dihedral_coeff 4 0.1000 3 0 0.0 # CP3-N-CP1-C
+dihedral_coeff 5 1.2800 1 180 0.0 # C-CT1-CT2-CA
+dihedral_coeff 5 1.2800 1 180 0.0 # CA-CT2-CT1-C
+dihedral_coeff 6 1.4100 1 180 0.0 # C-CT1-CT2-CC
+dihedral_coeff 6 1.4100 1 180 0.0 # CC-CT2-CT1-C
+dihedral_coeff 7 0.3500 1 180 0.0 # C-CT1-CT2-CT2
+dihedral_coeff 7 0.3500 1 180 0.0 # CT2-CT2-CT1-C
+dihedral_coeff 8 0.2000 3 0 0.0 # C-CT1-CT2-HA2
+dihedral_coeff 8 0.2000 3 0 0.0 # HA2-CT2-CT1-C
+dihedral_coeff 9 0.6500 1 180 0.0 # C-CT1-CT2-OH1
+dihedral_coeff 9 0.6500 1 180 0.0 # OH1-CT2-CT1-C
+dihedral_coeff 10 1.6100 1 180 0.0 # C-CT1-CT2A-CC
+dihedral_coeff 10 1.6100 1 180 0.0 # CC-CT2A-CT1-C
+dihedral_coeff 11 0.2000 3 0 0.0 # C-CT1-CT2A-HA2
+dihedral_coeff 11 0.2000 3 0 0.0 # HA2-CT2A-CT1-C
+dihedral_coeff 12 0.0 1 0 0.0 # C-CT1-CT3-HA3 (DEFAULT)
+dihedral_coeff 12 0.0 1 0 0.0 # HA3-CT3-CT1-C (DEFAULT)
+dihedral_coeff 13 0.2000 1 180 0.0 # C-CT1-NH1-C
+dihedral_coeff 13 0.2000 1 180 0.0 # C-NH1-CT1-C
+dihedral_coeff 14 0.0000 1 0 0.0 # C-CT1-NH1-H
+dihedral_coeff 14 0.0000 1 0 0.0 # H-NH1-CT1-C
+dihedral_coeff 15 0.2000 1 180 0.0 # C-CT2-NH1-C
+dihedral_coeff 15 0.2000 1 180 0.0 # C-NH1-CT2-C
+dihedral_coeff 16 0.0000 1 0 0.0 # C-CT2-NH1-H
+dihedral_coeff 16 0.0000 1 0 0.0 # H-NH1-CT2-C
+dihedral_coeff 17 0.0 1 0 0.0 # C-CT2-NH3-HC (DEFAULT)
+dihedral_coeff 17 0.0 1 0 0.0 # HC-NH3-CT2-C (DEFAULT)
+dihedral_coeff 18 0.8000 3 0 0.0 # C-N-CP1-CP2
+dihedral_coeff 18 0.8000 3 0 0.0 # CP2-CP1-N-C
+dihedral_coeff 19 0.8000 3 0 0.0 # C-N-CP1-HB1
+dihedral_coeff 19 0.8000 3 0 0.0 # HB1-CP1-N-C
+dihedral_coeff 20 0.0000 3 180 0.0 # C-N-CP3-CP2
+dihedral_coeff 20 0.0000 3 180 0.0 # CP2-CP3-N-C
+dihedral_coeff 21 0.0000 3 180 0.0 # C-N-CP3-HA2
+dihedral_coeff 21 0.0000 3 180 0.0 # HA2-CP3-N-C
+dihedral_coeff 22 0.0000 6 180 0.0 # C-NC2-CT2-CT2
+dihedral_coeff 22 0.0000 6 180 0.0 # CT2-CT2-NC2-C
+dihedral_coeff 23 0.0000 6 180 0.0 # C-NC2-CT2-HA2
+dihedral_coeff 23 0.0000 6 180 0.0 # HA2-CT2-NC2-C
+dihedral_coeff 24 0.2000 1 180 0.0 # C-NH1-CT1-CC
+dihedral_coeff 24 0.2000 1 180 0.0 # CC-CT1-NH1-C
+dihedral_coeff 25 1.8000 1 0 0.0 # C-NH1-CT1-CT2
+dihedral_coeff 25 1.8000 1 0 0.0 # CT2-CT1-NH1-C
+dihedral_coeff 26 1.8000 1 0 0.0 # C-NH1-CT1-CT2A
+dihedral_coeff 26 1.8000 1 0 0.0 # CT2A-CT1-NH1-C
+dihedral_coeff 27 1.8000 1 0 0.0 # C-NH1-CT1-CT3
+dihedral_coeff 27 1.8000 1 0 0.0 # CT3-CT1-NH1-C
+dihedral_coeff 28 0.0000 1 0 0.0 # C-NH1-CT1-HB1
+dihedral_coeff 28 0.0000 1 0 0.0 # HB1-CT1-NH1-C
+dihedral_coeff 29 0.0000 1 0 0.0 # C-NH1-CT2-HB2
+dihedral_coeff 29 0.0000 1 0 0.0 # HB2-CT2-NH1-C
+dihedral_coeff 30 3.1000 2 180 0.0 # CA-CA-CA-CA
+dihedral_coeff 31 3.1000 2 180 0.0 # CA-CA-CA-CG2R67
+dihedral_coeff 31 3.1000 2 180 0.0 # CG2R67-CA-CA-CA
+dihedral_coeff 32 3.1000 2 180 0.0 # CA-CA-CA-CT2
+dihedral_coeff 32 3.1000 2 180 0.0 # CT2-CA-CA-CA
+dihedral_coeff 33 4.2000 2 180 0.0 # CA-CA-CA-HP
+dihedral_coeff 33 4.2000 2 180 0.0 # HP-CA-CA-CA
+dihedral_coeff 34 3.1000 2 180 0.0 # CA-CA-CA-OH1
+dihedral_coeff 34 3.1000 2 180 0.0 # OH1-CA-CA-CA
+dihedral_coeff 35 3.1000 2 180 0.0 # CA-CA-CG2R67-CA
+dihedral_coeff 35 3.1000 2 180 0.0 # CA-CG2R67-CA-CA
+dihedral_coeff 36 3.1000 2 180 0.0 # CA-CA-CG2R67-CG2R67
+dihedral_coeff 36 3.1000 2 180 0.0 # CG2R67-CG2R67-CA-CA
+dihedral_coeff 37 1.0700 1 0 0.0 # CA-CA-CT2-CT1
+dihedral_coeff 37 1.0700 1 0 0.0 # CT1-CT2-CA-CA
+dihedral_coeff 38 0.0000 6 0 0.0 # CA-CA-CT2-HA2
+dihedral_coeff 38 0.0000 6 0 0.0 # HA2-CT2-CA-CA
+dihedral_coeff 39 0.9900 2 180 0.0 # CA-CA-OH1-H
+dihedral_coeff 39 0.9900 2 180 0.0 # H-OH1-CA-CA
+dihedral_coeff 40 4.2000 2 180 0.0 # CA-CG2R67-CA-HP
+dihedral_coeff 40 4.2000 2 180 0.0 # HP-CA-CG2R67-CA
+dihedral_coeff 41 3.1000 2 180 0.0 # CA-CG2R67-CA-OH1
+dihedral_coeff 41 3.1000 2 180 0.0 # OH1-CA-CG2R67-CA
+dihedral_coeff 42 0.8900 2 180 0.0 # CA-CG2R67-CG2R67-CA
+dihedral_coeff 43 0.2000 3 0 0.0 # CA-CT2-CT1-HB1
+dihedral_coeff 43 0.2000 3 0 0.0 # HB1-CT1-CT2-CA
+dihedral_coeff 44 0.5200 1 180 0.0 # CA-CT2-CT1-NH1
+dihedral_coeff 44 0.5200 1 180 0.0 # NH1-CT1-CT2-CA
+dihedral_coeff 45 0.0 1 0 0.0 # CC-CT1-CT2-CC (DEFAULT)
+dihedral_coeff 45 0.0 1 0 0.0 # CC-CT2-CT1-CC (DEFAULT)
+dihedral_coeff 46 0.0 1 0 0.0 # CC-CT1-CT2-HA2 (DEFAULT)
+dihedral_coeff 46 0.0 1 0 0.0 # HA2-CT2-CT1-CC (DEFAULT)
+dihedral_coeff 47 0.0000 1 0 0.0 # CC-CT1-NH1-H
+dihedral_coeff 47 0.0000 1 0 0.0 # H-NH1-CT1-CC
+dihedral_coeff 48 0.2000 3 0 0.0 # CC-CT2-CT1-HB1
+dihedral_coeff 48 0.2000 3 0 0.0 # HB1-CT1-CT2-CC
+dihedral_coeff 49 0.2800 1 180 0.0 # CC-CT2-CT1-NH1
+dihedral_coeff 49 0.2800 1 180 0.0 # NH1-CT1-CT2-CC
+dihedral_coeff 50 0.2000 3 0 0.0 # CC-CT2A-CT1-HB1
+dihedral_coeff 50 0.2000 3 0 0.0 # HB1-CT1-CT2A-CC
+dihedral_coeff 51 0.6800 1 180 0.0 # CC-CT2A-CT1-NH1
+dihedral_coeff 51 0.6800 1 180 0.0 # NH1-CT1-CT2A-CC
+dihedral_coeff 52 3.1000 2 180 0.0 # CG2R67-CA-CA-CT2
+dihedral_coeff 52 3.1000 2 180 0.0 # CT2-CA-CA-CG2R67
+dihedral_coeff 53 4.2000 2 180 0.0 # CG2R67-CA-CA-HP
+dihedral_coeff 53 4.2000 2 180 0.0 # HP-CA-CA-CG2R67
+dihedral_coeff 54 0.9900 2 180 0.0 # CG2R67-CA-OH1-H
+dihedral_coeff 54 0.9900 2 180 0.0 # H-OH1-CA-CG2R67
+dihedral_coeff 55 4.2000 2 180 0.0 # CG2R67-CG2R67-CA-HP
+dihedral_coeff 55 4.2000 2 180 0.0 # HP-CA-CG2R67-CG2R67
+dihedral_coeff 56 1.0000 2 180 0.0 # CG2R67-CG2R67-CA-OH1
+dihedral_coeff 56 1.0000 2 180 0.0 # OH1-CA-CG2R67-CG2R67
+dihedral_coeff 57 1.6000 1 0 0.0 # CP1-C-NH1-CT1
+dihedral_coeff 57 1.6000 1 0 0.0 # CT1-NH1-C-CP1
+dihedral_coeff 58 1.6000 1 0 0.0 # CP1-C-NH1-CT2
+dihedral_coeff 58 1.6000 1 0 0.0 # CT2-NH1-C-CP1
+dihedral_coeff 59 2.5000 2 180 0.0 # CP1-C-NH1-H
+dihedral_coeff 59 2.5000 2 180 0.0 # H-NH1-C-CP1
+dihedral_coeff 60 0.0 1 0 0.0 # CP1-CP2-CP2-CP3 (DEFAULT)
+dihedral_coeff 60 0.0 1 0 0.0 # CP3-CP2-CP2-CP1 (DEFAULT)
+dihedral_coeff 61 0.0 1 0 0.0 # CP1-CP2-CP2-HA2 (DEFAULT)
+dihedral_coeff 61 0.0 1 0 0.0 # HA2-CP2-CP2-CP1 (DEFAULT)
+dihedral_coeff 62 2.7500 2 180 0.0 # CP1-N-C-CT1
+dihedral_coeff 62 2.7500 2 180 0.0 # CT1-C-N-CP1
+dihedral_coeff 63 2.7500 2 180 0.0 # CP1-N-C-O
+dihedral_coeff 63 2.7500 2 180 0.0 # O-C-N-CP1
+dihedral_coeff 64 0.1000 3 0 0.0 # CP1-N-CP3-CP2
+dihedral_coeff 64 0.1000 3 0 0.0 # CP2-CP3-N-CP1
+dihedral_coeff 65 0.1000 3 0 0.0 # CP1-N-CP3-HA2
+dihedral_coeff 65 0.1000 3 0 0.0 # HA2-CP3-N-CP1
+dihedral_coeff 66 0.4000 1 0 0.0 # CP2-CP1-C-NH1
+dihedral_coeff 66 0.4000 1 0 0.0 # NH1-C-CP1-CP2
+dihedral_coeff 67 0.4000 1 180 0.0 # CP2-CP1-C-O
+dihedral_coeff 67 0.4000 1 180 0.0 # O-C-CP1-CP2
+dihedral_coeff 68 0.1000 3 0 0.0 # CP2-CP1-N-CP3
+dihedral_coeff 68 0.1000 3 0 0.0 # CP3-N-CP1-CP2
+dihedral_coeff 69 0.0 1 0 0.0 # CP2-CP2-CP1-HB1 (DEFAULT)
+dihedral_coeff 69 0.0 1 0 0.0 # HB1-CP1-CP2-CP2 (DEFAULT)
+dihedral_coeff 70 0.0 1 0 0.0 # CP2-CP2-CP1-N (DEFAULT)
+dihedral_coeff 70 0.0 1 0 0.0 # N-CP1-CP2-CP2 (DEFAULT)
+dihedral_coeff 71 0.0 1 0 0.0 # CP2-CP2-CP3-HA2 (DEFAULT)
+dihedral_coeff 71 0.0 1 0 0.0 # HA2-CP3-CP2-CP2 (DEFAULT)
+dihedral_coeff 72 0.0 1 0 0.0 # CP2-CP2-CP3-N (DEFAULT)
+dihedral_coeff 72 0.0 1 0 0.0 # N-CP3-CP2-CP2 (DEFAULT)
+dihedral_coeff 73 0.0 1 0 0.0 # CP3-CP2-CP2-HA2 (DEFAULT)
+dihedral_coeff 73 0.0 1 0 0.0 # HA2-CP2-CP2-CP3 (DEFAULT)
+dihedral_coeff 74 2.7500 2 180 0.0 # CP3-N-C-CT1
+dihedral_coeff 74 2.7500 2 180 0.0 # CT1-C-N-CP3
+dihedral_coeff 75 2.7500 2 180 0.0 # CP3-N-C-O
+dihedral_coeff 75 2.7500 2 180 0.0 # O-C-N-CP3
+dihedral_coeff 76 0.1000 3 0 0.0 # CP3-N-CP1-HB1
+dihedral_coeff 76 0.1000 3 0 0.0 # HB1-CP1-N-CP3
+dihedral_coeff 77 1.6000 1 0 0.0 # CT1-C-NH1-CT1
+dihedral_coeff 77 1.6000 1 0 0.0 # CT1-NH1-C-CT1
+dihedral_coeff 78 1.6000 1 0 0.0 # CT1-C-NH1-CT2
+dihedral_coeff 78 1.6000 1 0 0.0 # CT2-NH1-C-CT1
+dihedral_coeff 79 2.5000 2 180 0.0 # CT1-C-NH1-H
+dihedral_coeff 79 2.5000 2 180 0.0 # H-NH1-C-CT1
+dihedral_coeff 80 0.6200 1 180 0.0 # CT1-CT2-CC-NH2
+dihedral_coeff 80 0.6200 1 180 0.0 # NH2-CC-CT2-CT1
+dihedral_coeff 81 0.4200 1 180 0.0 # CT1-CT2-CC-O
+dihedral_coeff 81 0.4200 1 180 0.0 # O-CC-CT2-CT1
+dihedral_coeff 82 0.6300 1 180 0.0 # CT1-CT2-CT2-CT2
+dihedral_coeff 82 0.6300 1 180 0.0 # CT2-CT2-CT2-CT1
+dihedral_coeff 83 0.1900 3 0 0.0 # CT1-CT2-CT2-HA2
+dihedral_coeff 83 0.1900 3 0 0.0 # HA2-CT2-CT2-CT1
+dihedral_coeff 84 0.0200 1 0 0.0 # CT1-CT2-OH1-H
+dihedral_coeff 84 0.0200 1 0 0.0 # H-OH1-CT2-CT1
+dihedral_coeff 85 0.8400 1 0 0.0 # CT1-CT2A-CC-OC
+dihedral_coeff 85 0.8400 1 0 0.0 # OC-CC-CT2A-CT1
+dihedral_coeff 86 1.6000 1 0 0.0 # CT1-NH1-C-CT2
+dihedral_coeff 86 1.6000 1 0 0.0 # CT2-C-NH1-CT1
+dihedral_coeff 87 2.5000 2 180 0.0 # CT1-NH1-C-O
+dihedral_coeff 87 2.5000 2 180 0.0 # O-C-NH1-CT1
+dihedral_coeff 88 1.6000 1 0 0.0 # CT2-C-NH1-CT2
+dihedral_coeff 88 1.6000 1 0 0.0 # CT2-NH1-C-CT2
+dihedral_coeff 89 2.5000 2 180 0.0 # CT2-C-NH1-H
+dihedral_coeff 89 2.5000 2 180 0.0 # H-NH1-C-CT2
+dihedral_coeff 90 4.2000 2 180 0.0 # CT2-CA-CA-HP
+dihedral_coeff 90 4.2000 2 180 0.0 # HP-CA-CA-CT2
+dihedral_coeff 91 1.4000 2 180 0.0 # CT2-CC-NH2-H
+dihedral_coeff 91 1.4000 2 180 0.0 # H-NH2-CC-CT2
+dihedral_coeff 92 0.0000 1 0 0.0 # CT2-CT1-C-N
+dihedral_coeff 92 0.0000 1 0 0.0 # N-C-CT1-CT2
+dihedral_coeff 93 0.0000 1 0 0.0 # CT2-CT1-C-NH1
+dihedral_coeff 93 0.0000 1 0 0.0 # NH1-C-CT1-CT2
+dihedral_coeff 94 1.4000 1 0 0.0 # CT2-CT1-C-O
+dihedral_coeff 94 1.4000 1 0 0.0 # O-C-CT1-CT2
+dihedral_coeff 95 0.0 1 0 0.0 # CT2-CT1-CC-OC (DEFAULT)
+dihedral_coeff 95 0.0 1 0 0.0 # OC-CC-CT1-CT2 (DEFAULT)
+dihedral_coeff 96 0.0000 1 0 0.0 # CT2-CT1-NH1-H
+dihedral_coeff 96 0.0000 1 0 0.0 # H-NH1-CT1-CT2
+dihedral_coeff 97 0.2000 3 0 0.0 # CT2-CT2-CT1-HB1
+dihedral_coeff 97 0.2000 3 0 0.0 # HB1-CT1-CT2-CT2
+dihedral_coeff 98 0.8800 1 180 0.0 # CT2-CT2-CT1-NH1
+dihedral_coeff 98 0.8800 1 180 0.0 # NH1-CT1-CT2-CT2
+dihedral_coeff 99 0.1900 3 0 0.0 # CT2-CT2-CT2-HA2
+dihedral_coeff 99 0.1900 3 0 0.0 # HA2-CT2-CT2-CT2
+dihedral_coeff 100 0.1900 3 0 0.0 # CT2-CT2-CT2-NC2
+dihedral_coeff 100 0.1900 3 0 0.0 # NC2-CT2-CT2-CT2
+dihedral_coeff 101 0.0000 6 180 0.0 # CT2-CT2-NC2-HC
+dihedral_coeff 101 0.0000 6 180 0.0 # HC-NC2-CT2-CT2
+dihedral_coeff 102 2.2500 2 180 0.0 # CT2-NC2-C-NC2
+dihedral_coeff 102 2.2500 2 180 0.0 # NC2-C-NC2-CT2
+dihedral_coeff 103 2.5000 2 180 0.0 # CT2-NH1-C-O
+dihedral_coeff 103 2.5000 2 180 0.0 # O-C-NH1-CT2
+dihedral_coeff 104 0.0000 1 0 0.0 # CT2A-CT1-C-NH1
+dihedral_coeff 104 0.0000 1 0 0.0 # NH1-C-CT1-CT2A
+dihedral_coeff 105 1.4000 1 0 0.0 # CT2A-CT1-C-O
+dihedral_coeff 105 1.4000 1 0 0.0 # O-C-CT1-CT2A
+dihedral_coeff 106 0.0000 1 0 0.0 # CT2A-CT1-NH1-H
+dihedral_coeff 106 0.0000 1 0 0.0 # H-NH1-CT1-CT2A
+dihedral_coeff 107 0.0000 1 0 0.0 # CT3-CT1-C-N
+dihedral_coeff 107 0.0000 1 0 0.0 # N-C-CT1-CT3
+dihedral_coeff 108 1.4000 1 0 0.0 # CT3-CT1-C-O
+dihedral_coeff 108 1.4000 1 0 0.0 # O-C-CT1-CT3
+dihedral_coeff 109 0.0000 1 0 0.0 # CT3-CT1-NH1-H
+dihedral_coeff 109 0.0000 1 0 0.0 # H-NH1-CT1-CT3
+dihedral_coeff 110 2.5000 2 180 0.0 # H-NH1-C-O
+dihedral_coeff 110 2.5000 2 180 0.0 # O-C-NH1-H
+dihedral_coeff 111 0.0000 1 0 0.0 # H-NH1-CT1-HB1
+dihedral_coeff 111 0.0000 1 0 0.0 # HB1-CT1-NH1-H
+dihedral_coeff 112 0.0000 1 0 0.0 # H-NH1-CT2-HB2
+dihedral_coeff 112 0.0000 1 0 0.0 # HB2-CT2-NH1-H
+dihedral_coeff 113 1.4000 2 180 0.0 # H-NH2-CC-O
+dihedral_coeff 113 1.4000 2 180 0.0 # O-CC-NH2-H
+dihedral_coeff 114 0.1400 3 0 0.0 # H-OH1-CT2-HA2
+dihedral_coeff 114 0.1400 3 0 0.0 # HA2-CT2-OH1-H
+dihedral_coeff 115 0.0 1 0 0.0 # HA2-CP2-CP1-HB1 (DEFAULT)
+dihedral_coeff 115 0.0 1 0 0.0 # HB1-CP1-CP2-HA2 (DEFAULT)
+dihedral_coeff 116 0.0 1 0 0.0 # HA2-CP2-CP1-N (DEFAULT)
+dihedral_coeff 116 0.0 1 0 0.0 # N-CP1-CP2-HA2 (DEFAULT)
+dihedral_coeff 117 0.0 1 0 0.0 # HA2-CP2-CP2-HA2 (DEFAULT)
+dihedral_coeff 118 0.0 1 0 0.0 # HA2-CP2-CP3-HA2 (DEFAULT)
+dihedral_coeff 118 0.0 1 0 0.0 # HA2-CP3-CP2-HA2 (DEFAULT)
+dihedral_coeff 119 0.0 1 0 0.0 # HA2-CP2-CP3-N (DEFAULT)
+dihedral_coeff 119 0.0 1 0 0.0 # N-CP3-CP2-HA2 (DEFAULT)
+dihedral_coeff 120 0.0000 3 180 0.0 # HA2-CT2-CC-NH2
+dihedral_coeff 120 0.0000 3 180 0.0 # NH2-CC-CT2-HA2
+dihedral_coeff 121 0.0000 3 180 0.0 # HA2-CT2-CC-O
+dihedral_coeff 121 0.0000 3 180 0.0 # O-CC-CT2-HA2
+dihedral_coeff 122 0.2000 3 0 0.0 # HA2-CT2-CT1-HB1
+dihedral_coeff 122 0.2000 3 0 0.0 # HB1-CT1-CT2-HA2
+dihedral_coeff 123 0.2000 3 0 0.0 # HA2-CT2-CT1-NH1
+dihedral_coeff 123 0.2000 3 0 0.0 # NH1-CT1-CT2-HA2
+dihedral_coeff 124 0.1900 3 0 0.0 # HA2-CT2-CT2-HA2
+dihedral_coeff 125 0.1900 3 0 0.0 # HA2-CT2-CT2-NC2
+dihedral_coeff 125 0.1900 3 0 0.0 # NC2-CT2-CT2-HA2
+dihedral_coeff 126 0.0000 6 180 0.0 # HA2-CT2-NC2-HC
+dihedral_coeff 126 0.0000 6 180 0.0 # HC-NC2-CT2-HA2
+dihedral_coeff 127 0.0500 6 180 0.0 # HA2-CT2A-CC-OC
+dihedral_coeff 127 0.0500 6 180 0.0 # OC-CC-CT2A-HA2
+dihedral_coeff 128 0.2000 3 0 0.0 # HA2-CT2A-CT1-HB1
+dihedral_coeff 128 0.2000 3 0 0.0 # HB1-CT1-CT2A-HA2
+dihedral_coeff 129 0.2000 3 0 0.0 # HA2-CT2A-CT1-NH1
+dihedral_coeff 129 0.2000 3 0 0.0 # NH1-CT1-CT2A-HA2
+dihedral_coeff 130 0.0 1 0 0.0 # HA3-CT3-CT1-HB1 (DEFAULT)
+dihedral_coeff 130 0.0 1 0 0.0 # HB1-CT1-CT3-HA3 (DEFAULT)
+dihedral_coeff 131 0.0 1 0 0.0 # HA3-CT3-CT1-NH1 (DEFAULT)
+dihedral_coeff 131 0.0 1 0 0.0 # NH1-CT1-CT3-HA3 (DEFAULT)
+dihedral_coeff 132 0.4000 1 180 0.0 # HB1-CP1-C-NH1
+dihedral_coeff 132 0.4000 1 180 0.0 # NH1-C-CP1-HB1
+dihedral_coeff 133 0.4000 1 0 0.0 # HB1-CP1-C-O
+dihedral_coeff 133 0.4000 1 0 0.0 # O-C-CP1-HB1
+dihedral_coeff 134 0.0000 1 0 0.0 # HB1-CT1-C-N
+dihedral_coeff 134 0.0000 1 0 0.0 # N-C-CT1-HB1
+dihedral_coeff 135 0.0000 1 0 0.0 # HB1-CT1-C-NH1
+dihedral_coeff 135 0.0000 1 0 0.0 # NH1-C-CT1-HB1
+dihedral_coeff 136 0.0000 1 0 0.0 # HB1-CT1-C-O
+dihedral_coeff 136 0.0000 1 0 0.0 # O-C-CT1-HB1
+dihedral_coeff 137 0.0 1 0 0.0 # HB1-CT1-CC-OC (DEFAULT)
+dihedral_coeff 137 0.0 1 0 0.0 # OC-CC-CT1-HB1 (DEFAULT)
+dihedral_coeff 138 0.2000 3 0 0.0 # HB1-CT1-CT2-OH1
+dihedral_coeff 138 0.2000 3 0 0.0 # OH1-CT2-CT1-HB1
+dihedral_coeff 139 0.0000 1 0 0.0 # HB2-CT2-C-NH1
+dihedral_coeff 139 0.0000 1 0 0.0 # NH1-C-CT2-HB2
+dihedral_coeff 140 0.0000 1 0 0.0 # HB2-CT2-C-O
+dihedral_coeff 140 0.0000 1 0 0.0 # O-C-CT2-HB2
+dihedral_coeff 141 0.0 1 0 0.0 # HB2-CT2-NH3-HC (DEFAULT)
+dihedral_coeff 141 0.0 1 0 0.0 # HC-NH3-CT2-HB2 (DEFAULT)
+dihedral_coeff 142 2.2500 2 180 0.0 # HC-NC2-C-NC2
+dihedral_coeff 142 2.2500 2 180 0.0 # NC2-C-NC2-HC
+dihedral_coeff 143 2.4000 2 180 0.0 # HP-CA-CA-HP
+dihedral_coeff 144 4.2000 2 180 0.0 # HP-CA-CA-OH1
+dihedral_coeff 144 4.2000 2 180 0.0 # OH1-CA-CA-HP
+dihedral_coeff 145 0.4000 1 0 0.0 # N-C-CT1-NH1
+dihedral_coeff 145 0.4000 1 0 0.0 # NH1-CT1-C-N
+dihedral_coeff 146 0.3000 1 0 0.0 # N-CP1-C-NH1
+dihedral_coeff 146 0.3000 1 0 0.0 # NH1-C-CP1-N
+dihedral_coeff 147 -0.3000 4 0 0.0 # N-CP1-C-O
+dihedral_coeff 147 -0.3000 4 0 0.0 # O-C-CP1-N
+dihedral_coeff 148 0.6000 1 0 0.0 # NH1-C-CT1-NH1
+dihedral_coeff 148 0.6000 1 0 0.0 # NH1-CT1-C-NH1
+dihedral_coeff 149 0.6000 1 0 0.0 # NH1-C-CT2-NH1
+dihedral_coeff 149 0.6000 1 0 0.0 # NH1-CT2-C-NH1
+dihedral_coeff 150 1.0000 1 0 0.0 # NH1-C-CT2-NH3
+dihedral_coeff 150 1.0000 1 0 0.0 # NH3-CT2-C-NH1
+dihedral_coeff 151 0.0000 1 0 0.0 # NH1-CT1-C-O
+dihedral_coeff 151 0.0000 1 0 0.0 # O-C-CT1-NH1
+dihedral_coeff 152 0.0 1 0 0.0 # NH1-CT1-CC-OC (DEFAULT)
+dihedral_coeff 152 0.0 1 0 0.0 # OC-CC-CT1-NH1 (DEFAULT)
+dihedral_coeff 153 0.1800 1 180 0.0 # NH1-CT1-CT2-OH1
+dihedral_coeff 153 0.1800 1 180 0.0 # OH1-CT2-CT1-NH1
+dihedral_coeff 154 0.0000 1 0 0.0 # NH1-CT2-C-O
+dihedral_coeff 154 0.0000 1 0 0.0 # O-C-CT2-NH1
+dihedral_coeff 155 0.0000 1 0 0.0 # NH3-CT2-C-O
+dihedral_coeff 155 0.0000 1 0 0.0 # O-C-CT2-NH3
+
+# Improper Coeffs  K  chi0  (harmonic)
+improper_coeff 1 20.0 0 # C-NC2-NC2-NC2 (DEFAULT)
+improper_coeff 2 96.0000 0 # CC-CT1-OC-OC
+improper_coeff 3 96.0000 0 # CC-CT2-NH2-O
+improper_coeff 4 20.0 0 # CC-CT2A-OC-OC (DEFAULT)
+improper_coeff 5 96.0000 0 # CC-NH2-CT2-O
+improper_coeff 6 45.0000 0 # NC2-HC-HC-C
+improper_coeff 7 4.0000 0 # NH2-CC-H-H

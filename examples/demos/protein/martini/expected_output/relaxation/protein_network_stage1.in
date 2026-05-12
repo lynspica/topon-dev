@@ -1,0 +1,71 @@
+# Stage 1 -- Hierarchical soft-push (topon.protein_network, MARTINI 3).
+# Mirrors core topon's progressive freeze/unfreeze pattern from
+# topon/writers/lammps_inputs.py:write_serial_soft_minimization, adapted so
+# the dityrosine crosslink atoms (TN6, initially at r=0 with their partner)
+# can separate before LJ engagement in stage 2.
+# Run from this relaxation/ directory.
+
+units           real
+boundary        p p p
+atom_style      full
+bond_style      harmonic
+angle_style     cosine/squared
+dihedral_style  charmm
+improper_style  harmonic
+
+pair_style      lj/cut/coul/cut 12.0
+pair_modify     shift yes
+special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+dielectric      15.0
+
+read_data       ../protein_network.data
+include         ../protein_network.in.settings
+include         ../protein_network.in.groups
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes one 10000
+comm_modify     mode single cutoff 60.0
+
+# Switch to soft potential
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+variable        prefactor equal ramp(0,60)
+
+thermo          100
+thermo_style    custom step pe ke etotal evdwl epair ebond eangle press vol
+
+# === Stage A: freeze backbone; sc + crosslink (+ water if present) relax ===
+# Backbone frozen so the BFM-derived chain skeleton is preserved while
+# sidechains and dityrosine crosslink atoms (initially overlapping) find space.
+fix             freeze_bb bb setforce 0 0 0
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+min_style       cg
+minimize        1.0e-4 1.0e-6 5000 50000
+unfix           soft_push
+unfix           freeze_bb
+write_data      min_stage_A.data
+
+# === Stage B: full soft minimisation (everything free) ===
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 5000 50000
+unfix           soft_push
+
+# === Stage C: nve/limit dynamics + final min ===
+# CG minimize gets stuck at the r=0 saddle of the soft potential (gradient=0
+# at the cosine peak); brief NVE/limit dynamics nudges atoms off it. This is
+# the same pattern core topon uses for atomistic relaxation
+# (lammps_inputs.py:141-145).
+reset_timestep  0
+timestep        1.0
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+fix             nve_limit all nve/limit 0.1
+run             1000
+unfix           nve_limit
+unfix           soft_push
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 5000 50000
+unfix           soft_push
+
+write_data      system_after_soft.data
+write_restart   1.restart
+print           "Stage 1 (hierarchical) done -> system_after_soft.data"

@@ -1,0 +1,171 @@
+# pair_coeff: explicit MARTINI 3 nonbond_params (LAMMPS units real).
+pair_coeff 1 1 1.541587 4.700000  # Q5-Q5
+pair_coeff 1 2 1.101577 4.300000  # Q5-SP1
+pair_coeff 1 3 1.292543 4.700000  # Q5-P2
+pair_coeff 1 4 0.349665 4.730000  # Q5-SC3
+pair_coeff 1 5 1.278681 4.375000  # Q5-SQ3p
+pair_coeff 1 6 1.157983 4.300000  # Q5-SP2a
+pair_coeff 1 7 0.962476 3.950000  # Q5-TP1
+pair_coeff 1 8 1.438815 4.375000  # Q5-SQ5n
+pair_coeff 1 9 0.245220 4.040000  # Q5-TC4
+pair_coeff 1 10 0.290631 4.010000  # Q5-TC5
+pair_coeff 1 11 0.961042 3.950000  # Q5-TN6
+pair_coeff 1 12 1.157983 4.300000  # Q5-SP2
+pair_coeff 1 13 0.196463 4.650000  # Q5-TC3
+pair_coeff 1 14 1.233509 4.300000  # Q5-SP5
+pair_coeff 1 15 1.515296 4.650000  # Q5-W
+pair_coeff 2 2 0.733748 4.100000  # SP1-SP1
+pair_coeff 2 3 0.858031 4.300000  # SP1-P2
+pair_coeff 2 4 0.418260 4.100000  # SP1-SC3
+pair_coeff 2 5 1.344646 4.100000  # SP1-SQ3p
+pair_coeff 2 6 0.733748 4.100000  # SP1-SP2a
+pair_coeff 2 7 0.614245 3.650000  # SP1-TP1
+pair_coeff 2 8 1.499044 4.100000  # SP1-SQ5n
+pair_coeff 2 9 0.346558 3.780000  # SP1-TC4
+pair_coeff 2 10 0.382409 3.660000  # SP1-TC5
+pair_coeff 2 11 0.614245 3.650000  # SP1-TN6
+pair_coeff 2 12 0.733748 4.100000  # SP1-SP2
+pair_coeff 2 13 0.308317 3.940000  # SP1-TC3
+pair_coeff 2 14 0.733748 4.100000  # SP1-SP5
+pair_coeff 2 15 0.915392 4.250000  # SP1-W
+pair_coeff 3 3 0.970363 4.700000  # P2-P2
+pair_coeff 3 4 0.516252 4.300000  # P2-SC3
+pair_coeff 3 5 1.532027 4.300000  # P2-SQ3p
+pair_coeff 3 6 0.901052 4.300000  # P2-SP2a
+pair_coeff 3 7 0.702677 3.950000  # P2-TP1
+pair_coeff 3 8 1.711042 4.300000  # P2-SQ5n
+pair_coeff 3 9 0.399140 3.950000  # P2-TC4
+pair_coeff 3 10 0.442161 3.950000  # P2-TC5
+pair_coeff 3 11 0.702677 3.950000  # P2-TN6
+pair_coeff 3 12 0.901052 4.300000  # P2-SP2
+pair_coeff 3 13 0.346558 3.980000  # P2-TC3
+pair_coeff 3 14 0.901052 4.300000  # P2-SP5
+pair_coeff 3 15 1.034895 4.650000  # P2-W
+pair_coeff 4 4 0.561663 4.100000  # SC3-SC3
+pair_coeff 4 5 0.776769 4.100000  # SC3-SQ3p
+pair_coeff 4 6 0.418260 4.100000  # SC3-SP2a
+pair_coeff 4 7 0.308317 3.940000  # SC3-TP1
+pair_coeff 4 8 0.496654 4.530000  # SC3-SQ5n
+pair_coeff 4 9 0.456501 3.650000  # SC3-TC4
+pair_coeff 4 10 0.418260 3.650000  # SC3-TC5
+pair_coeff 4 11 0.346558 3.780000  # SC3-TN6
+pair_coeff 4 12 0.418260 4.100000  # SC3-SP2
+pair_coeff 4 13 0.456501 3.650000  # SC3-TC3
+pair_coeff 4 14 0.372849 4.140000  # SC3-SP5
+pair_coeff 4 15 0.430210 4.250000  # SC3-W
+pair_coeff 5 5 0.791109 4.100000  # SQ3p-SQ3p
+pair_coeff 5 6 1.523662 4.100000  # SQ3p-SP2a
+pair_coeff 5 7 1.177820 3.650000  # SQ3p-TP1
+pair_coeff 5 8 0.920172 4.100000  # SQ3p-SQ5n
+pair_coeff 5 9 0.748327 3.660000  # SQ3p-TC4
+pair_coeff 5 10 0.817639 3.650000  # SQ3p-TC5
+pair_coeff 5 11 1.173518 3.650000  # SQ3p-TN6
+pair_coeff 5 12 1.406549 4.100000  # SQ3p-SP2
+pair_coeff 5 13 0.648901 3.780000  # SQ3p-TC3
+pair_coeff 5 14 1.497371 4.100000  # SQ3p-SP5
+pair_coeff 5 15 1.761472 4.250000  # SQ3p-W
+pair_coeff 6 6 0.733748 4.100000  # SP2a-SP2a
+pair_coeff 6 7 0.614245 3.650000  # SP2a-TP1
+pair_coeff 6 8 1.453394 4.100000  # SP2a-SQ5n
+pair_coeff 6 9 0.346558 3.780000  # SP2a-TC4
+pair_coeff 6 10 0.382409 3.660000  # SP2a-TC5
+pair_coeff 6 11 0.614245 3.650000  # SP2a-TN6
+pair_coeff 6 12 0.791109 4.100000  # SP2a-SP2
+pair_coeff 6 13 0.308317 3.940000  # SP2a-TC3
+pair_coeff 6 14 0.791109 4.100000  # SP2a-SP5
+pair_coeff 6 15 0.915392 4.250000  # SP2a-W
+pair_coeff 7 7 0.544933 3.400000  # TP1-TP1
+pair_coeff 7 8 1.338193 3.650000  # TP1-SQ5n
+pair_coeff 7 9 0.223470 3.660000  # TP1-TC4
+pair_coeff 7 10 0.250956 3.520000  # TP1-TC5
+pair_coeff 7 11 0.544933 3.400000  # TP1-TN6
+pair_coeff 7 12 0.614245 3.650000  # TP1-SP2
+pair_coeff 7 13 0.204350 3.850000  # TP1-TC3
+pair_coeff 7 14 0.614245 3.650000  # TP1-SP5
+pair_coeff 7 15 0.817400 3.850000  # TP1-W
+pair_coeff 8 8 0.975143 4.100000  # SQ5n-SQ5n
+pair_coeff 8 9 0.460803 4.230000  # SQ5n-TC4
+pair_coeff 8 10 0.534895 4.090000  # SQ5n-TC5
+pair_coeff 8 11 1.330306 3.650000  # SQ5n-TN6
+pair_coeff 8 12 1.565727 4.100000  # SQ5n-SP2
+pair_coeff 8 13 0.351099 4.840000  # SQ5n-TC3
+pair_coeff 8 14 1.671367 4.100000  # SQ5n-SP5
+pair_coeff 8 15 1.895315 4.250000  # SQ5n-W
+pair_coeff 9 9 0.360899 3.400000  # TC4-TC4
+pair_coeff 9 10 0.360899 3.400000  # TC4-TC5
+pair_coeff 9 11 0.250956 3.520000  # TC4-TN6
+pair_coeff 9 12 0.346558 3.780000  # TC4-SP2
+pair_coeff 9 13 0.360899 3.400000  # TC4-TC3
+pair_coeff 9 14 0.308317 3.940000  # TC4-SP5
+pair_coeff 9 15 0.267686 3.930000  # TC4-W
+pair_coeff 10 10 0.360899 3.400000  # TC5-TC5
+pair_coeff 10 11 0.293977 3.400000  # TC5-TN6
+pair_coeff 10 12 0.382409 3.660000  # TC5-SP2
+pair_coeff 10 13 0.293977 3.400000  # TC5-TC3
+pair_coeff 10 14 0.346558 3.780000  # TC5-SP5
+pair_coeff 10 15 0.325048 3.870000  # TC5-W
+pair_coeff 11 11 0.544933 3.400000  # TN6-TN6
+pair_coeff 11 12 0.614245 3.650000  # TN6-SP2
+pair_coeff 11 13 0.223470 3.660000  # TN6-TC3
+pair_coeff 11 14 0.559273 3.650000  # TN6-SP5
+pair_coeff 11 15 0.817400 3.850000  # TN6-W
+pair_coeff 12 12 0.791109 4.100000  # SP2-SP2
+pair_coeff 12 13 0.308317 3.940000  # SP2-TC3
+pair_coeff 12 14 0.791109 4.100000  # SP2-SP5
+pair_coeff 12 15 0.963193 4.250000  # SP2-W
+pair_coeff 13 13 0.360899 3.400000  # TC3-TC3
+pair_coeff 13 14 0.270076 4.040000  # TC3-SP5
+pair_coeff 13 15 0.267686 3.930000  # TC3-W
+pair_coeff 14 14 0.913002 4.100000  # SP5-SP5
+pair_coeff 14 15 1.082696 4.250000  # SP5-W
+pair_coeff 15 15 1.111377 4.700000  # W-W
+
+# bond_coeff: harmonic for real bonds + constraint bonds (ULTRA stiff).
+bond_coeff 1 9.560229 3.600000  # funct 1 K=8000.0 kJ/mol/nm^2 r0=0.36 nm
+bond_coeff 2 11.950287 3.600000  # funct 1 K=10000.0 kJ/mol/nm^2 r0=0.36 nm
+bond_coeff 3 11.950287 3.050000  # funct 1 K=10000.0 kJ/mol/nm^2 r0=0.305 nm
+bond_coeff 4 5.975143 3.300000  # funct 1 K=5000.0 kJ/mol/nm^2 r0=0.33 nm
+bond_coeff 5 5.975143 3.800000  # funct 1 K=5000.0 kJ/mol/nm^2 r0=0.38 nm
+bond_coeff 6 8.962715 3.300000  # funct 1 K=7500.0 kJ/mol/nm^2 r0=0.33 nm
+bond_coeff 7 8.962715 2.870000  # funct 1 K=7500.0 kJ/mol/nm^2 r0=0.287 nm
+bond_coeff 8 8.962715 3.520000  # funct 1 K=7500.0 kJ/mol/nm^2 r0=0.352 nm
+bond_coeff 9 5.975143 3.250000  # funct 1 K=5000.0 kJ/mol/nm^2 r0=0.325 nm
+bond_coeff 10 5.975143 3.520000  # funct 1 K=5000.0 kJ/mol/nm^2 r0=0.352 nm
+bond_coeff 11 9.560229 2.700000  # dityrosine crosslink
+bond_coeff 12 11.950287 3.000000  # constraint (rigid-stiff)
+bond_coeff 13 11.950287 2.850000  # constraint (rigid-stiff)
+bond_coeff 14 11.950287 2.700000  # constraint (rigid-stiff)
+
+# angle_coeff: cosine/squared (covers funct 2 and approximates funct 10).
+angle_coeff 1 2.987572 137.0000  # funct 10
+angle_coeff 2 1.792543 90.0000  # funct 10
+angle_coeff 3 11.950287 85.0000  # funct 10
+angle_coeff 4 1.792543 110.0000  # funct 10
+angle_coeff 5 1.792543 100.0000  # funct 10
+angle_coeff 6 3.585086 120.0000  # funct 10
+angle_coeff 7 1.792543 70.0000  # funct 10
+angle_coeff 8 1.792543 75.0000  # funct 10
+angle_coeff 9 2.987572 180.0000  # funct 2
+angle_coeff 10 7.170172 120.0000  # funct 2
+
+# dihedral_coeff: charmm style for funct 9 (proper, multi-term).
+dihedral_coeff 1 0.669216 1 60 0.0  # funct 9
+dihedral_coeff 2 -0.143403 1 150 0.0  # funct 9
+dihedral_coeff 3 -0.286807 2 130 0.0  # funct 9
+dihedral_coeff 4 0.191205 1 160 0.0  # funct 9
+dihedral_coeff 5 0.191205 1 -160 0.0  # funct 9
+dihedral_coeff 6 0.286807 2 0 0.0  # funct 9
+dihedral_coeff 7 0.191205 2 -80 0.0  # funct 9
+dihedral_coeff 8 0.478011 1 60 0.0  # funct 9
+dihedral_coeff 9 0.191205 1 -100 0.0  # funct 9
+dihedral_coeff 10 0.764818 1 -10 0.0  # funct 9
+dihedral_coeff 11 -0.310707 2 15 0.0  # funct 9
+dihedral_coeff 12 0.191205 1 -120 0.0  # funct 9
+dihedral_coeff 13 -0.334608 1 -130 0.0  # funct 9
+dihedral_coeff 14 -0.334608 2 100 0.0  # funct 9
+
+# improper_coeff: harmonic (funct 2 -- TYR ring planarity, etc.).
+improper_coeff 1 5.975143 180.0000  # funct 2
+improper_coeff 2 3.585086 -20.0000  # funct 2
+improper_coeff 3 9.560229 -10.0000  # funct 2
+improper_coeff 4 3.585086 -25.0000  # funct 2

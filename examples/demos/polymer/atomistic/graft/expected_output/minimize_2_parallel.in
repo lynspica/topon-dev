@@ -1,0 +1,51 @@
+# LAMMPS Stage 2: Parallel Ramp
+# METHODOLOGY: Set 1 (Slow 200k Step Ramp + Extended Cutoffs)
+
+units           real
+atom_style      full
+boundary        p p p
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  cvff
+pair_style      soft 1.0
+
+# --- 1. Load Soft State ---
+read_data       system_after_soft.data
+
+# --- 2. CRITICAL SAFETY (From Set 1) ---
+# Prevents "Bond atoms missing" and "Neighbor list overflow"
+neigh_modify    one 10000
+comm_modify     mode single cutoff 12.0
+
+# --- 3. Soft Pre-Minimization ---
+pair_style      soft 1.0
+pair_coeff      * * 1.0
+min_style       cg
+minimize        1.0e-4 1.0e-6 1000 10000
+
+# --- 4. Switch to Real Potential ---
+pair_style      lj/cut/coul/long 10.0 10.0
+kspace_style    pppm 1.0e-4
+include         ../02_Chemistry/system.in.settings
+
+# Enforce Set 1 Special Bonds
+special_bonds   lj/coul 0.0 0.0 1.0
+
+# --- 5. The Ramp (Set 1 Logic) ---
+# Linearly scale epsilon/charges from 0.001 to 1.0
+variable        scale equal "ramp(0.001, 1.0)"
+timestep        1.0
+
+fix             1 all adapt 1 pair lj/cut/coul/long epsilon * * v_scale
+fix             fxnve all nve/limit 0.1
+thermo          1000
+
+# RUNTIME: 10000 steps
+run             10000
+
+unfix           fxnve
+unfix           1
+kspace_modify   compute yes
+
+write_data      system_ramped.data

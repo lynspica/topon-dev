@@ -1,0 +1,29 @@
+{
+    "comment": "Small CHARMM atomistic demo (8 chains x 8 repeats, dry + 35 wt% water). Not driven by topon.pipeline — use run.py or the CLI commands in README.md. This file is for documentation + reproducibility only.",
+
+    "topology": {
+        "n_chains": 8,
+        "n_repeats": 8,
+        "segs_per_block": 2,
+        "equil_steps": 10000,
+        "n_extra_snapshots": 2,
+        "snapshot_delta_conv": 0.05,
+        "seed": 42
+    },
+    "chemistry": {
+        "block_seq": "GGRPSDSYGAPGGGN",
+        "water_contents": [0, 35],
+        "salt_conc_M": 0.15,
+        "target_density_g_cm3": 0.85,
+        "snapshot": 0,
+        "charmm_prm": "topon/protein_network/charmm/data/par_all36m_prot_C2L.prm",
+        "charmm_rtf": "topon/protein_network/charmm/data/top_all36m_prot_C2L.rtf",
+        "charmm_cmap": "topon/protein_network/charmm/data/charmm36m.cmap"
+    },
+    "expected_output": {
+        "w0_atoms": 11086,
+        "w35_atoms": 18738,
+        "stage1_runtime_s": 5,
+        "stage2_runtime_s": 180
+    }
+}

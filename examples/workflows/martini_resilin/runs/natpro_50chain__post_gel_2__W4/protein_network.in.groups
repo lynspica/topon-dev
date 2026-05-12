@@ -1,0 +1,9 @@
+group protein molecule 1:50
+group water molecule 51:361419
+# 50 protein chains, 361369 W water beads
+
+# Hierarchical-relaxation per-class groups (used by stage 1)
+group bb type 1 2 3 6 12
+group sc type 4 5 7 8 9 10 13 14
+group crosslink type 11
+group wbeads type 15

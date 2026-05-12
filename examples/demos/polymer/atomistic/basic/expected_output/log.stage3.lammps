@@ -1,0 +1,242 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+Reading data file ...
+  orthogonal box = (0 0 0) to (53.91416 53.91416 53.91416)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  10949 atoms
+  reading velocities ...
+  10949 velocities
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  30 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (53.91416 53.91416 53.91416)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  11038 bonds
+  reading angles ...
+  20994 angles
+  reading dihedrals ...
+  26622 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     4 = max # of 1-2 neighbors
+    10 = max # of 1-3 neighbors
+    22 = max # of 1-4 neighbors
+    24 = max # of special neighbors
+  special bonds CPU = 0.005 seconds
+  read_data CPU = 0.195 seconds
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+    10 = max # of 1-3 neighbors
+    24 = max # of special neighbors
+  special bonds CPU = 0.002 seconds
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.2073403
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.034478748
+  estimated relative force accuracy = 0.00010383172
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 10000, page size: 100000
+  master list distance cutoff = 12
+  ghost atom cutoff = 12
+  binsize = 6, bins = 9 9 9
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 54.45 | 54.45 | 54.45 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   667.5218      -38886.983      50014.513      32911.375     -35529.859    
+       827   667.5218      -34609.32       11903.822     -921.65193      5018.5192    
+Loop time of 48.5931 on 1 procs for 827 steps with 10949 atoms
+
+98.3% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = linesearch alpha is zero
+  Energy initial, next-to-last, final = 
+      11127.5300188317  -22705.4971904718  -22705.4971904718
+  Force two-norm initial, final = 5511.1901 19.066348
+  Force max component initial, final = 179.66809 4.7759811
+  Final line search alpha, max atom move = 2.9515032e-11 1.4096323e-10
+  Iterations, force evaluations = 827 1705
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 42.959     | 42.959     | 42.959     |   0.0 | 88.40
+Bond    | 1.8516     | 1.8516     | 1.8516     |   0.0 |  3.81
+Kspace  | 2.4382     | 2.4382     | 2.4382     |   0.0 |  5.02
+Neigh   | 1.0957     | 1.0957     | 1.0957     |   0.0 |  2.25
+Comm    | 0.080538   | 0.080538   | 0.080538   |   0.0 |  0.17
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.1686     |            |       |  0.35
+
+Nlocal:          10949 ave       10949 max       10949 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          21105 ave       21105 max       21105 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:    2.86045e+06 ave 2.86045e+06 max 2.86045e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2860454
+Ave neighs/atom = 261.25253
+Ave special neighs/atom = 5.851128
+Neighbor list builds = 24
+Dangerous builds = 0
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.2073403
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.034478748
+  estimated relative force accuracy = 0.00010383172
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.2073403
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.034478748
+  estimated relative force accuracy = 0.00010383172
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up Verlet run ...
+  Unit style    : real
+  Current step  : 0
+  Time step     : 1
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 52.2 | 52.2 | 52.2 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   300           -34609.32       11903.822     -12915.325      1520.0624    
+      1000   302.96748     -33762.055      21582.777     -2292.265      -581.00293    
+Loop time of 20.5287 on 1 procs for 1000 steps with 10949 atoms
+
+Performance: 4.209 ns/day, 5.702 hours/ns, 48.712 timesteps/s, 533.351 katom-step/s
+97.4% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 16.658     | 16.658     | 16.658     |   0.0 | 81.14
+Bond    | 0.88966    | 0.88966    | 0.88966    |   0.0 |  4.33
+Kspace  | 1.4206     | 1.4206     | 1.4206     |   0.0 |  6.92
+Neigh   | 1.4071     | 1.4071     | 1.4071     |   0.0 |  6.85
+Comm    | 0.047945   | 0.047945   | 0.047945   |   0.0 |  0.23
+Output  | 2.9e-05    | 2.9e-05    | 2.9e-05    |   0.0 |  0.00
+Modify  | 0.077707   | 0.077707   | 0.077707   |   0.0 |  0.38
+Other   |            | 0.02771    |            |       |  0.13
+
+Nlocal:          10949 ave       10949 max       10949 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          21061 ave       21061 max       21061 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:     2.8374e+06 ave  2.8374e+06 max  2.8374e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2837397
+Ave neighs/atom = 259.14668
+Ave special neighs/atom = 5.851128
+Neighbor list builds = 31
+Dangerous builds = 0
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.2073403
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.034478748
+  estimated relative force accuracy = 0.00010383172
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.2073403
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.034478748
+  estimated relative force accuracy = 0.00010383172
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up Verlet run ...
+  Unit style    : real
+  Current step  : 1000
+  Time step     : 1
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 52.2 | 52.2 | 52.2 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press          Volume    
+      1000   302.96748     -33762.055      21582.777     -2292.265      -581.00293      156714.26    
+      2000   302.26437     -33666.842      20709.21      -3093.5638      87.14879       150885.39    
+Loop time of 22.1819 on 1 procs for 1000 steps with 10949 atoms
+
+Performance: 3.895 ns/day, 6.162 hours/ns, 45.082 timesteps/s, 493.600 katom-step/s
+97.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 16.897     | 16.897     | 16.897     |   0.0 | 76.17
+Bond    | 1.214      | 1.214      | 1.214      |   0.0 |  5.47
+Kspace  | 1.4317     | 1.4317     | 1.4317     |   0.0 |  6.45
+Neigh   | 1.6968     | 1.6968     | 1.6968     |   0.0 |  7.65
+Comm    | 0.055764   | 0.055764   | 0.055764   |   0.0 |  0.25
+Output  | 2.8e-05    | 2.8e-05    | 2.8e-05    |   0.0 |  0.00
+Modify  | 0.8564     | 0.8564     | 0.8564     |   0.0 |  3.86
+Other   |            | 0.03056    |            |       |  0.14
+
+Nlocal:          10949 ave       10949 max       10949 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          21829 ave       21829 max       21829 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:     2.9196e+06 ave  2.9196e+06 max  2.9196e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2919599
+Ave neighs/atom = 266.6544
+Ave special neighs/atom = 5.851128
+Neighbor list builds = 37
+Dangerous builds = 0
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.20854924
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.033415349
+  estimated relative force accuracy = 0.00010062933
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8000 3375
+Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule
+All Minimization Stages Complete.
+Total wall time: 0:01:31

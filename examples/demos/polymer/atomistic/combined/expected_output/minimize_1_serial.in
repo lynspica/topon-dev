@@ -1,0 +1,69 @@
+# LAMMPS Stage 1: Serial Soft Minimization (ATOMISTIC)
+
+units           real
+atom_style      full
+boundary        p p p
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  cvff
+special_bonds   dreiding
+pair_style      lj/cut/coul/long 12.0
+kspace_style    pppm 1.0e-4
+
+read_data       ../03_Conformation/system_relaxed.data
+include         ../02_Chemistry/system.in.settings
+include         ../02_Chemistry/system.groups
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Switch to Soft Potential ---
+kspace_style    none
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+variable        prefactor equal ramp(0,30)
+
+# --- Freeze All Groups ---
+if "$(is_defined(group,si_atoms))" then "fix freeze_si si_atoms setforce 0 0 0"
+if "$(is_defined(group,c_atoms))"  then "fix freeze_c  c_atoms  setforce 0 0 0"
+if "$(is_defined(group,o_atoms))"  then "fix freeze_o  o_atoms  setforce 0 0 0"
+if "$(is_defined(group,h_atoms))"  then "fix freeze_h  h_atoms  setforce 0 0 0"
+if "$(is_defined(group,nodes))"    then "fix freeze_nodes nodes setforce 0 0 0"
+
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+min_style cg
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix soft_push
+
+if "$(is_defined(fix,freeze_h))" then "unfix freeze_h"
+if "$(is_defined(fix,freeze_c))" then "unfix freeze_c"
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix soft_push
+
+if "$(is_defined(fix,freeze_o))" then "unfix freeze_o"
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix soft_push
+
+if "$(is_defined(fix,freeze_si))" then "unfix freeze_si"
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix soft_push
+
+if "$(is_defined(fix,freeze_nodes))" then "unfix freeze_nodes"
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix soft_push
+
+reset_timestep 0
+timestep 1.0
+fix soft_push all adapt 1 pair soft a * * v_prefactor
+fix nve_limit all nve/limit 0.1
+run 1000
+unfix nve_limit
+unfix soft_push
+minimize 1.0e-4 1.0e-6 1000 10000
+write_data system_after_soft.data
+write_restart 1.restart

@@ -1,0 +1,252 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+Reading data file ...
+  orthogonal box = (0 0 0) to (242.1 242.1 242.1)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  4032 atoms
+  scanning bonds ...
+  2 = max bonds/atom
+  scanning angles ...
+  3 = max angles/atom
+  scanning dihedrals ...
+  6 = max dihedrals/atom
+  scanning impropers ...
+  1 = max impropers/atom
+  orthogonal box = (0 0 0) to (242.1 242.1 242.1)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  4321 bonds
+  reading angles ...
+  5160 angles
+  reading dihedrals ...
+  9432 dihedrals
+  reading impropers ...
+  1432 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     3 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+    18 = max # of 1-4 neighbors
+    13 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.080 seconds
+4032 atoms in group protein
+2160 atoms in group bb
+1728 atoms in group sc
+144 atoms in group crosslink
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 10000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 60
+  binsize = 1.5, bins = 162 162 162
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 66.9 | 66.9 | 66.9 Mbytes
+   Step         PotEng         KinEng         TotEng         E_vdwl         E_pair         E_bond        E_angle         Press          Volume    
+         0   83527.616      0              83527.616      0              0              49174.163      8205.0654     -162.47917      14190064     
+       100   32126.582      0              32126.582      0              0              9947.3148      6619.4145     -72.559716      14190064     
+       200   25905.225      0              25905.225      0              0              9824.8062      4380.3172     -66.957083      14190064     
+       300   22403.472      0              22403.472      0              0              9782.0832      2581.1809     -64.598717      14190064     
+       335   21709.759      0              21709.759      0              0              9761.9539      2185.1064     -64.619525      14190064     
+Loop time of 0.387433 on 1 procs for 335 steps with 4032 atoms
+
+92.8% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      83527.6159541413   21710.4041680546   21709.7585554255
+  Force two-norm initial, final = 1970.136 98.874995
+  Force max component initial, final = 251.45396 55.43224
+  Final line search alpha, max atom move = 0.00013779432 0.007638248
+  Iterations, force evaluations = 335 347
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.003385   | 0.003385   | 0.003385   |   0.0 |  0.87
+Bond    | 0.21498    | 0.21498    | 0.21498    |   0.0 | 55.49
+Neigh   | 0.12772    | 0.12772    | 0.12772    |   0.0 | 32.96
+Comm    | 0.013886   | 0.013886   | 0.013886   |   0.0 |  3.58
+Output  | 0.000192   | 0.000192   | 0.000192   |   0.0 |  0.05
+Modify  | 0.002901   | 0.002901   | 0.002901   |   0.0 |  0.75
+Other   |            | 0.02438    |            |       |  6.29
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10946 ave       10946 max       10946 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:            141 ave         141 max         141 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 141
+Ave neighs/atom = 0.034970238
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 20
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 335
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 66.9 | 66.9 | 66.9 Mbytes
+   Step         PotEng         KinEng         TotEng         E_vdwl         E_pair         E_bond        E_angle         Press          Volume    
+       335   21709.759      0              21709.759      0              0              9761.9539      2185.1064     -64.619525      14190064     
+       400   7725.541       0              7725.541       0              0              5027.2086      1952.2577     -51.635078      14190064     
+       490   4419.8931      0              4419.8931      0              0              2404.2793      1590.1899     -34.92132       14190064     
+Loop time of 0.341254 on 1 procs for 155 steps with 4032 atoms
+
+100.7% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      21709.7585554255   4420.04131770114   4419.89307163359
+  Force two-norm initial, final = 5288.4596 356.96761
+  Force max component initial, final = 1317.4385 36.235573
+  Final line search alpha, max atom move = 7.8792405e-05 0.0028550879
+  Iterations, force evaluations = 155 421
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.003039   | 0.003039   | 0.003039   |   0.0 |  0.89
+Bond    | 0.25212    | 0.25212    | 0.25212    |   0.0 | 73.88
+Neigh   | 0.05601    | 0.05601    | 0.05601    |   0.0 | 16.41
+Comm    | 0.013133   | 0.013133   | 0.013133   |   0.0 |  3.85
+Output  | 6.3e-05    | 6.3e-05    | 6.3e-05    |   0.0 |  0.02
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.01689    |            |       |  4.95
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10933 ave       10933 max       10933 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:            120 ave         120 max         120 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 120
+Ave neighs/atom = 0.029761905
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 9
+Dangerous builds = 0
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Setting up Verlet run ...
+  Unit style    : real
+  Current step  : 0
+  Time step     : 1
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 65.77 | 65.77 | 65.77 Mbytes
+   Step         PotEng         KinEng         TotEng         E_vdwl         E_pair         E_bond        E_angle         Press          Volume    
+         0   4419.8931      0              4419.8931      0              0              2404.2793      1590.1899     -34.92132       14190064     
+       100   4218.498       504.82491      4723.3229      0.77307818     0.77307818     2214.374       1544.3855     -32.360422      14190064     
+       200   3799.4097      1281.811       5081.2207      0.024386705    0.024386705    1907.8808      1440.7571     -28.535362      14190064     
+       300   3121.8672      1969.6583      5091.5254      0              0              1472.9753      1301.1246     -23.345682      14190064     
+       400   2430.2504      2685.4815      5115.7319      0              0              1006.9213      1157.2449     -16.83308       14190064     
+       500   2597.6562      3658.5781      6256.2344      2.4728297      2.4728297      1263.6611      1086.7801     -14.019188      14190064     
+       600   2081.8829      4183.1618      6265.0448      0              0              806.32951      1040.1324     -8.4441604      14190064     
+       700   2560.5428      3773.1395      6333.6823      0              0              1321.2742      1026.0581     -9.0876106      14190064     
+       800   1872.4155      4466.6321      6339.0477      0              0              666.21929      1024.3078     -2.5786233      14190064     
+       900   2245.4847      4094.2929      6339.7776      0              0              1042.5621      1085.8939     -6.3531032      14190064     
+      1000   2255.5066      4092.6402      6348.1468      0              0              1010.1379      1129.0689     -7.1506934      14190064     
+Loop time of 1.04778 on 1 procs for 1000 steps with 4032 atoms
+
+Performance: 82.460 ns/day, 0.291 hours/ns, 954.397 timesteps/s, 3.848 Matom-step/s
+96.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.032606   | 0.032606   | 0.032606   |   0.0 |  3.11
+Bond    | 0.65769    | 0.65769    | 0.65769    |   0.0 | 62.77
+Neigh   | 0.28432    | 0.28432    | 0.28432    |   0.0 | 27.14
+Comm    | 0.03467    | 0.03467    | 0.03467    |   0.0 |  3.31
+Output  | 0.000401   | 0.000401   | 0.000401   |   0.0 |  0.04
+Modify  | 0.023896   | 0.023896   | 0.023896   |   0.0 |  2.28
+Other   |            | 0.0142     |            |       |  1.35
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10868 ave       10868 max       10868 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:             74 ave          74 max          74 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 74
+Ave neighs/atom = 0.018353175
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 46
+Dangerous builds = 0
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 1000
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 66.9 | 66.9 | 66.9 Mbytes
+   Step         PotEng         KinEng         TotEng         E_vdwl         E_pair         E_bond        E_angle         Press          Volume    
+      1000   2255.5066      4092.6402      6348.1468      0              0              1010.1379      1129.0689     -7.1506934      14190064     
+      1073   1179.0862      4092.6402      5271.7263      0.0095166694   0.0095166694   185.29035      1044.1453      3.2188725      14190064     
+Loop time of 0.249816 on 1 procs for 73 steps with 4032 atoms
+
+100.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      2255.50662760233   1179.14813868331   1179.08615565271
+  Force two-norm initial, final = 469.43126 456.284
+  Force max component initial, final = 173.51191 244.58077
+  Final line search alpha, max atom move = 1.1683445e-06 0.00028575461
+  Iterations, force evaluations = 73 358
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.002107   | 0.002107   | 0.002107   |   0.0 |  0.84
+Bond    | 0.21067    | 0.21067    | 0.21067    |   0.0 | 84.33
+Neigh   | 0.01621    | 0.01621    | 0.01621    |   0.0 |  6.49
+Comm    | 0.009948   | 0.009948   | 0.009948   |   0.0 |  3.98
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.01088    |            |       |  4.35
+
+Nlocal:           4032 ave        4032 max        4032 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          10870 ave       10870 max       10870 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:             74 ave          74 max          74 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 74
+Ave neighs/atom = 0.018353175
+Ave special neighs/atom = 8.0887897
+Neighbor list builds = 3
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+System init for write_restart ...
+Generated 0 of 91 mixed pair_coeff terms from geometric mixing rule
+Stage 1 (hierarchical) done -> system_after_soft.data
+Total wall time: 0:00:02

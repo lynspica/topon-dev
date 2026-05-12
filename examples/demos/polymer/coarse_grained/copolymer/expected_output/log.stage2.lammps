@@ -1,0 +1,184 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+# LAMMPS Stage 2: CG Harmonic Ramp (Reference Logic)
+
+read_restart    1.restart
+Reading restart file ...
+  restart file = 2 Apr 2025, LAMMPS = 2 Apr 2025
+  restoring atom style full from restart
+  orthogonal box = (0 0 0) to (17.2183 17.2183 17.2183)
+  1 by 1 by 1 MPI processor grid
+  restoring pair style soft from restart
+  restoring bond style harmonic from restart
+  restoring angle style harmonic from restart
+  4339 atoms
+  4428 bonds
+  4788 angles
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        1        1       
+  special bond factors coul:  0        0        0       
+     4 = max # of 1-2 neighbors
+     4 = max # of 1-3 neighbors
+     8 = max # of 1-4 neighbors
+    12 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_restart CPU = 0.003 seconds
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     mode single cutoff 5.0
+
+# SWITCH TO HARMONIC for Robust Minimization
+bond_style      harmonic
+bond_coeff      1 466.1 0.97
+angle_style     harmonic
+angle_coeff     1 466.1 180.0
+
+# Soft to Real Potential Ramp
+pair_style      soft 1.0
+pair_coeff      * * 1.0
+min_style       cg
+minimize        1e-4 1e-6 1000 10000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 5
+  binsize = 1.5, bins = 12 12 12
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 20.18 | 20.18 | 20.18 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+       150   0              3.6249883      392.6912       396.31619      39.81287     
+       152   0              3.6230399      392.59801      396.22105      39.822324    
+Loop time of 0.010814 on 1 procs for 2 steps with 4339 atoms
+
+144.5% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      396.316186532787   396.229420567897   396.221054383408
+  Force two-norm initial, final = 21054.412 16718.691
+  Force max component initial, final = 5330.6754 4308.4633
+  Final line search alpha, max atom move = 3.1836717e-05 0.13716732
+  Iterations, force evaluations = 2 4
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.009857   | 0.009857   | 0.009857   |   0.0 | 91.15
+Bond    | 0.000687   | 0.000687   | 0.000687   |   0.0 |  6.35
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00011    | 0.00011    | 0.00011    |   0.0 |  1.02
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.00016    |            |       |  1.48
+
+Nlocal:           4339 ave        4339 max        4339 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          13076 ave       13076 max       13076 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         165321 ave      165321 max      165321 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 165321
+Ave neighs/atom = 38.101175
+Ave special neighs/atom = 6.6042867
+Neighbor list builds = 0
+Dangerous builds = 0
+
+pair_style      lj/cut 2.5
+pair_coeff      * * 1.0 1.0 2.5
+variable        scale equal "ramp(0.001, 1.0)"
+fix             1 all adapt 1 pair lj/cut epsilon * * v_scale
+fix             fxnve all nve/limit 0.1
+thermo          1000
+run             20000
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 4.5
+  ghost atom cutoff = 5
+  binsize = 2.25, bins = 8 8 8
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 20.45 | 20.45 | 20.45 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+       152   0              7509.7739      392.59801      7902.372       25577.97     
+      1000   30.047944      3.701754       186.26809      235.03137      25.256562    
+      2000   25.47332       3.9176292      174.6921       216.81091      25.093232    
+      3000   23.412948      4.0861293      170.04457      209.24202      27.234493    
+      4000   22.150182      3.8206029      168.20258      205.2408       26.709699    
+      5000   21.549959      3.4987123      166.63848      202.45468      27.911754    
+      6000   21.155796      3.3483612      165.6852       200.75995      28.799361    
+      7000   20.518904      3.2606643      164.9473       198.97923      29.798669    
+      8000   20.009674      3.0980156      164.64553      197.75114      30.357176    
+      9000   19.709692      3.0093737      164.41437      196.98147      30.113411    
+     10000   19.284646      2.9566768      164.4442       196.32118      31.87937     
+     11000   19.24002       2.8290222      163.67978      195.36219      32.685519    
+     12000   19.476427      2.4878035      163.0083       194.70401      32.529254    
+     13000   19.185695      2.2997356      163.04496      194.11661      32.251903    
+     14000   18.908432      2.2746209      163.00739      193.63812      33.140609    
+     15000   18.980247      2.1717304      162.66183      193.29737      35.025177    
+     16000   18.633135      1.8905758      163.28269      193.11653      33.274134    
+     17000   18.68871       1.5888138      163.11615      192.73157      33.474489    
+     18000   18.486318      1.4835917      163.09412      192.3008       34.525028    
+     19000   18.468315      1.1317304      163.02113      191.84894      34.027056    
+     20000   18.236852      1.3093057      162.63153      191.28981      35.56649     
+     20152   18.340094      1.2208936      162.49835      191.22305      35.126862    
+Loop time of 63.3525 on 1 procs for 20000 steps with 4339 atoms
+
+Performance: 136379.704 tau/day, 315.694 timesteps/s, 1.370 Matom-step/s
+97.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 44.878     | 44.878     | 44.878     |   0.0 | 70.84
+Bond    | 3.2283     | 3.2283     | 3.2283     |   0.0 |  5.10
+Neigh   | 14.07      | 14.07      | 14.07      |   0.0 | 22.21
+Comm    | 0.57578    | 0.57578    | 0.57578    |   0.0 |  0.91
+Output  | 0.000333   | 0.000333   | 0.000333   |   0.0 |  0.00
+Modify  | 0.39307    | 0.39307    | 0.39307    |   0.0 |  0.62
+Other   |            | 0.2071     |            |       |  0.33
+
+Nlocal:           4339 ave        4339 max        4339 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12918 ave       12918 max       12918 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         698374 ave      698374 max      698374 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 698374
+Ave neighs/atom = 160.95275
+Ave special neighs/atom = 6.6042867
+Neighbor list builds = 1112
+Dangerous builds = 0
+unfix           fxnve
+unfix           1
+
+write_restart   2.restart
+System init for write_restart ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+write_data      system_ramped.data
+System init for write_data ...
+Generated 0 of 1 mixed pair_coeff terms from geometric mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+Total wall time: 0:01:03

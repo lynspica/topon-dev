@@ -17,9 +17,8 @@
         "target_density": 1.1,
         "degree_of_polymerization": 10,
         "node_type_map": {
-            "end":  { "molecule": "[Si](C)(C)C", "is_end_cap": true },
-            "A":    { "molecule": "Si",          "is_end_cap": false },
-            "POSS": { "molecule": "POSS_AM0270", "is_end_cap": false }
+            "POSS": { "molecule": "POSS_AM0270", "is_end_cap": true },
+            "A":    { "molecule": "Si",          "is_end_cap": false }
         },
         "edge_type_map": {
             "A": { "monomer": "PDMS" }
@@ -29,7 +28,8 @@
         "node_types": {
             "method": "degree",
             "degree": {
-                "mapping": { "1": "end", "2": "A", "3": "A", "4": "POSS" }
+                "comment": "POSS at degree-1 chain caps (the documented + working pattern). Degree-4 junctions stay bare Si — putting POSS at internal junctions hits P1-H in INTERNAL.md.",
+                "mapping": { "1": "POSS", "2": "A", "3": "A", "4": "A" }
             }
         },
         "edge_types": {

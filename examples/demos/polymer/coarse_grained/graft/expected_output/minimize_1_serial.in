@@ -1,0 +1,48 @@
+# LAMMPS Stage 1: Serial Soft Minimization (CG)
+
+units           lj
+atom_style      full
+boundary        p p p
+comm_modify     mode single cutoff 5.0
+bond_style      harmonic
+angle_style     harmonic
+pair_style      lj/cut 2.5
+special_bonds   lj 0.0 1.0 1.0
+
+read_data       ../03_Conformation/system_relaxed.data
+include         ../02_Chemistry/system.in.settings
+include         ../02_Chemistry/system.groups
+
+group           beads subtract all nodes
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Switch to Soft Potential ---
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+variable        prefactor equal ramp(0,30)
+
+# --- Stage A: Freeze All (Beads & Nodes) ---
+fix             freeze_beads beads setforce 0 0 0
+fix             freeze_nodes nodes setforce 0 0 0
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+min_style       cg
+minimize        1.0e-4 1.0e-6 1000 10000
+unfix           soft_push
+unfix           freeze_beads
+write_data      min_stage_A.data
+
+# --- Stage B: Relax Beads (Nodes Fixed) ---
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 1000 10000
+unfix           soft_push
+unfix           freeze_nodes
+write_data      min_stage_B.data
+
+# --- Stage C: Relax All ---
+fix             soft_push all adapt 1 pair soft a * * v_prefactor
+minimize        1.0e-4 1.0e-6 10000 100000
+unfix           soft_push
+write_data      system_after_soft.data
+write_restart   1.restart

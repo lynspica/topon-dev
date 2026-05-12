@@ -1,0 +1,376 @@
+LAMMPS (2 Apr 2025)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:99)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\ahmet\AppData\Local\LAMMPS 64-bit 2Apr2025\plugins
+Reading data file ...
+  orthogonal box = (0 0 0) to (67.48519 67.48519 67.48519)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  21944 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  30 = max dihedrals/atom
+  orthogonal box = (0 0 0) to (67.48519 67.48519 67.48519)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  22038 bonds
+  reading angles ...
+  41899 angles
+  reading dihedrals ...
+  53052 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+    10 = max # of 1-3 neighbors
+    14 = max # of special neighbors
+  special bonds CPU = 0.008 seconds
+  read_data CPU = 0.650 seconds
+121 atoms in group nodes
+21823 atoms in group beads
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 3
+  ghost atom cutoff = 3
+  binsize = 1.5, bins = 45 45 45
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair soft, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 0
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              0              8963164.8      8963164.8      418396.32    
+         1   0              0              8962479.8      8962479.8      418396.99    
+Loop time of 0.179967 on 1 procs for 1 steps with 21944 atoms
+
+95.5% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      8963164.82952553   8963164.82952553   8962479.77951672
+  Force two-norm initial, final = 4390095.5 2343536.3
+  Force max component initial, final = 1870822.1 784639.24
+  Final line search alpha, max atom move = 3.3407773e-09 0.002621305
+  Iterations, force evaluations = 1 6
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.1358     | 0.1358     | 0.1358     |   0.0 | 75.46
+Bond    | 0.041489   | 0.041489   | 0.041489   |   0.0 | 23.05
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000509   | 0.000509   | 0.000509   |   0.0 |  0.28
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.000138   | 0.000138   | 0.000138   |   0.0 |  0.08
+Other   |            | 0.002033   |            |       |  1.13
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12250 ave       12250 max       12250 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         599070 ave      599070 max      599070 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 599070
+Ave neighs/atom = 27.299945
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 0
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 1
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         1   0              0              8962479.8      8962479.8      418396.99    
+         2   0              0              8962109.7      8962109.7      418399.44    
+Loop time of 0.19906 on 1 procs for 1 steps with 21944 atoms
+
+102.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      8962479.77951671   8962479.77951671   8962109.69076571
+  Force two-norm initial, final = 2343536.3 2626889.3
+  Force max component initial, final = 784639.24 1527302.8
+  Final line search alpha, max atom move = 3.982722e-09 0.0060828224
+  Iterations, force evaluations = 1 7
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.1472     | 0.1472     | 0.1472     |   0.0 | 73.95
+Bond    | 0.048858   | 0.048858   | 0.048858   |   0.0 | 24.54
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000551   | 0.000551   | 0.000551   |   0.0 |  0.28
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.000168   | 0.000168   | 0.000168   |   0.0 |  0.08
+Other   |            | 0.002283   |            |       |  1.15
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12250 ave       12250 max       12250 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         599072 ave      599072 max      599072 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 599072
+Ave neighs/atom = 27.300036
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 0
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 2
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         2   0              0              8962109.7      8962109.7      418399.44    
+         3   0              0              8961314.9      8961314.9      418400.28    
+Loop time of 0.155225 on 1 procs for 1 steps with 21944 atoms
+
+100.7% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+       8962109.6907657    8962109.6907657   8961314.93476334
+  Force two-norm initial, final = 2626889.3 1266194.1
+  Force max component initial, final = 1527302.8 332487.38
+  Final line search alpha, max atom move = 8.1843627e-09 0.0027211973
+  Iterations, force evaluations = 1 5
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.1122     | 0.1122     | 0.1122     |   0.0 | 72.28
+Bond    | 0.040894   | 0.040894   | 0.040894   |   0.0 | 26.34
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000382   | 0.000382   | 0.000382   |   0.0 |  0.25
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.000121   | 0.000121   | 0.000121   |   0.0 |  0.08
+Other   |            | 0.001628   |            |       |  1.05
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12250 ave       12250 max       12250 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         599072 ave      599072 max      599072 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 599072
+Ave neighs/atom = 27.300036
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 0
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 3
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         3   0              0              8961314.9      8961314.9      418400.28    
+         4   0              0              8961050.1      8961050.1      418404.59    
+Loop time of 0.181439 on 1 procs for 1 steps with 21944 atoms
+
+86.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      8961314.93476334   8961314.93476334    8961050.1214613
+  Force two-norm initial, final = 1266194.1 1243443
+  Force max component initial, final = 332487.38 375016.51
+  Final line search alpha, max atom move = 9.3988529e-09 0.003524725
+  Iterations, force evaluations = 1 7
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.13681    | 0.13681    | 0.13681    |   0.0 | 75.40
+Bond    | 0.041607   | 0.041607   | 0.041607   |   0.0 | 22.93
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.000475   | 0.000475   | 0.000475   |   0.0 |  0.26
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.000127   | 0.000127   | 0.000127   |   0.0 |  0.07
+Other   |            | 0.002424   |            |       |  1.34
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          12250 ave       12250 max       12250 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         599074 ave      599074 max      599074 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 599074
+Ave neighs/atom = 27.300128
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 0
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 4
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         4   0              0              8961050.1      8961050.1      418404.59    
+       636   0              0              87032.065      87032.065      7.8022221    
+Loop time of 12.8231 on 1 procs for 632 steps with 21944 atoms
+
+98.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+       8961050.1214613   87040.5044516318   87032.0652324031
+  Force two-norm initial, final = 1250110 104.42521
+  Force max component initial, final = 375016.51 13.227005
+  Final line search alpha, max atom move = 0.0050135906 0.066314785
+  Iterations, force evaluations = 632 840
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 4.3737     | 4.3737     | 4.3737     |   0.0 | 34.11
+Bond    | 6.7512     | 6.7512     | 6.7512     |   0.0 | 52.65
+Neigh   | 1.0515     | 1.0515     | 1.0515     |   0.0 |  8.20
+Comm    | 0.10529    | 0.10529    | 0.10529    |   0.0 |  0.82
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.5416     |            |       |  4.22
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          11999 ave       11999 max       11999 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         234005 ave      234005 max      234005 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 234005
+Ave neighs/atom = 10.663735
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 34
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up Verlet run ...
+  Unit style    : real
+  Current step  : 0
+  Time step     : 1
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 58.97 | 58.97 | 58.97 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              0              87032.065      87032.065      7.8022221    
+      1000   172.34152      547.62076      78720.122      90540.242      151.31947    
+Loop time of 13.9538 on 1 procs for 1000 steps with 21944 atoms
+
+Performance: 6.192 ns/day, 3.876 hours/ns, 71.665 timesteps/s, 1.573 Matom-step/s
+99.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 2.1546     | 2.1546     | 2.1546     |   0.0 | 15.44
+Bond    | 9.1395     | 9.1395     | 9.1395     |   0.0 | 65.50
+Neigh   | 2.1117     | 2.1117     | 2.1117     |   0.0 | 15.13
+Comm    | 0.14003    | 0.14003    | 0.14003    |   0.0 |  1.00
+Output  | 0.000125   | 0.000125   | 0.000125   |   0.0 |  0.00
+Modify  | 0.26856    | 0.26856    | 0.26856    |   0.0 |  1.92
+Other   |            | 0.1394     |            |       |  1.00
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          11274 ave       11274 max       11274 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         181991 ave      181991 max      181991 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 181991
+Ave neighs/atom = 8.2934287
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 72
+Dangerous builds = 0
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+Setting up cg style minimization ...
+  Unit style    : real
+  Current step  : 1000
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Inconsistent image flags
+For more information see https://docs.lammps.org/err0027 (src/domain.cpp:1052)
+Per MPI rank memory allocation (min/avg/max) = 62.34 | 62.34 | 62.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+      1000   172.34152      547.62076      78720.645      90540.765      151.31947    
+      1126   172.34152      79.843375      67742.298      79094.641      1683.3118    
+Loop time of 2.40438 on 1 procs for 126 steps with 21944 atoms
+
+100.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      79268.2653400236   67828.8558026046   67822.1417933274
+  Force two-norm initial, final = 3210.2927 98.506267
+  Force max component initial, final = 192.59302 24.755687
+  Final line search alpha, max atom move = 0.0050821877 0.12581305
+  Iterations, force evaluations = 126 212
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.38852    | 0.38852    | 0.38852    |   0.0 | 16.16
+Bond    | 1.7161     | 1.7161     | 1.7161     |   0.0 | 71.37
+Neigh   | 0.16414    | 0.16414    | 0.16414    |   0.0 |  6.83
+Comm    | 0.022352   | 0.022352   | 0.022352   |   0.0 |  0.93
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.1133     |            |       |  4.71
+
+Nlocal:          21944 ave       21944 max       21944 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          11330 ave       11330 max       11330 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:         184428 ave      184428 max      184428 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 184428
+Ave neighs/atom = 8.4044841
+Ave special neighs/atom = 5.8272876
+Neighbor list builds = 6
+Dangerous builds = 0
+System init for write_data ...
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+System init for write_restart ...
+Generated 0 of 6 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 3 is shorter than a bond length based estimate of 5.81825. This may lead to errors. (src/comm.cpp:744)
+Total wall time: 0:00:31
