@@ -148,7 +148,17 @@ class AssignmentManager:
         if self.config.defects.primary_loops.enabled:
             target = self.config.defects.primary_loops.target
             target_type = self.config.defects.primary_loops.target_type
-            defects.inject_primary_loops(self.G, target, target_type)
+            # max_degree=4 keeps Si junctions chemically valid. RDKit
+            # sanitization rejects degree-5/6 Si and Gasteiger then emits
+            # NaN on the over-valent atom and its neighbours, leaving a
+            # net charge that PPPM can't tune. The defects module already
+            # supports this guard (see defects.py:62-72) — Pipeline just
+            # wasn't wiring it. Hard-coded at 4 for now; if non-Si
+            # junctions become common we should derive it from
+            # config.chemistry.node_type_map.
+            defects.inject_primary_loops(
+                self.G, target, target_type, max_degree=4
+            )
     
     def _select_entanglements(self) -> None:
         """Select entanglement pairs."""

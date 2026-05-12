@@ -31,6 +31,69 @@ import numpy as np
 from topon.config.schema import ToponConfig
 
 
+def _local_perp_unit(backbone_xyz, k: int, fallback_unit, rand_vec) -> np.ndarray:
+    """Return a unit vector for a graft to stick out perpendicular to the
+    backbone at index ``k``, biased *outward* on kinked sections.
+
+    Algorithm:
+      1. Tangent T = central difference (P[k+1] - P[k-1]); endpoint cases
+         use one-sided differences. Falls back to the per-edge chord unit
+         when the backbone has fewer than 2 atoms.
+      2. Curvature direction K = P[k+1] - 2*P[k] + P[k-1] (points *into*
+         the bend, i.e. toward the centre of curvature).
+      3. If K is large enough (the chain is genuinely curving — entangled
+         kinks always trip this), the graft direction is the **outward**
+         normal -K, projected to be perpendicular to T. This places grafts
+         on the convex side of the bend so they never dive into the chain.
+      4. If K is tiny (a straight backbone), fall back to the per-edge
+         random ``rand_vec`` projected perpendicular to T (same answer as
+         the pre-2026-05-11 chord-perpendicular behaviour on straight
+         chains).
+    """
+    n = len(backbone_xyz)
+    if n < 2:
+        local_unit = fallback_unit
+        curv = None
+    else:
+        if k <= 0:
+            tangent = np.asarray(backbone_xyz[1]) - np.asarray(backbone_xyz[0])
+            curv = None  # no second-derivative at endpoint
+        elif k >= n - 1:
+            tangent = np.asarray(backbone_xyz[-1]) - np.asarray(backbone_xyz[-2])
+            curv = None
+        else:
+            tangent = np.asarray(backbone_xyz[k + 1]) - np.asarray(backbone_xyz[k - 1])
+            curv = (
+                np.asarray(backbone_xyz[k + 1])
+                - 2.0 * np.asarray(backbone_xyz[k])
+                + np.asarray(backbone_xyz[k - 1])
+            )
+        tn = float(np.linalg.norm(tangent))
+        local_unit = tangent / tn if tn > 1e-9 else fallback_unit
+
+    # Outward normal from curvature, if the chain bends enough at this point.
+    if curv is not None:
+        cn = float(np.linalg.norm(curv))
+        if cn > 1e-3:
+            outward = -curv / cn
+            # Project out the tangent component so the graft is strictly perp.
+            outward = outward - np.dot(outward, local_unit) * local_unit
+            on = float(np.linalg.norm(outward))
+            if on > 1e-6:
+                return outward / on
+
+    # Straight (or near-straight) backbone: random perp from rand_vec.
+    perp = np.cross(local_unit, rand_vec)
+    pn = float(np.linalg.norm(perp))
+    if pn < 1e-6:
+        perp = np.cross(local_unit, np.array([1.0, 0.0, 0.0]))
+        pn = float(np.linalg.norm(perp))
+        if pn < 1e-6:
+            perp = np.cross(local_unit, np.array([0.0, 1.0, 0.0]))
+            pn = float(np.linalg.norm(perp))
+    return perp / (pn + 1e-12)
+
+
 class Pipeline:
     """
     Main pipeline for polymer network generation.
@@ -194,6 +257,10 @@ class Pipeline:
         from topon.chemistry.builder import ChemistryBuilder
         from topon.writers import CGWriter, DreidingWriter
         from topon.utils import write_lammps_displacement_file
+        from topon.utils.network_helpers import (
+            calculate_entangled_kink,
+            generate_approximate_side_chain_coords,
+        )
 
         self._builder = ChemistryBuilder(
             self.graph, self.dims, self.config.chemistry
@@ -205,19 +272,110 @@ class Pipeline:
         data_path = str(chem_dir / "system.data")
 
         model = self.config.chemistry.model_type
+        density = self.config.chemistry.target_density
+
         if model == "coarse_grained":
             writer = CGWriter(self.chemical_space, data_path)
             writer.write()
+            # Count-based volume for CG (matches v21 cg_network reference).
+            n_atoms = self.chemical_space.GetNumAtoms()
+            vol = n_atoms / density
         else:
-            writer = DreidingWriter(self.chemical_space, data_path)
+            # Atomistic: mirror topon.workflows.atomistic_network's tail —
+            # the canonical path that produces healthy LAMMPS stage 2/3
+            # output (v21/v43 reference). ChemistryBuilder.build() returns
+            # a heavy-atom-only RWMol; we Sanitize -> AddHs -> Gasteiger so
+            # the data file (a) has H_ atom-type rows DREIDING needs, and
+            # (b) is charge-neutral so PPPM auto-gewald doesn't crash. AddHs
+            # preserves heavy-atom indices, so _builder.node_map and
+            # edge_atom_map remain valid. Sanitize can fail on demos that
+            # produce over-valent atoms (e.g. defect demo's degree-6 Si);
+            # fall back to writing the heavy-atom mol uncharged in that
+            # case — system.data is then DREIDING-incomplete (no H_) but
+            # the chemistry stage still completes for inspection.
+            from rdkit import Chem
+            from rdkit.Chem import AllChem
+            try:
+                try:
+                    Chem.SanitizeMol(self.chemical_space)
+                except Chem.AtomValenceException:
+                    # Defect demos can produce degree-6 Si junctions that
+                    # exceed RDKit's permitted valence (max 6 by table, but
+                    # the strict check trips on Si@6 with no charge). Skip
+                    # just the valence-property check; the rest of sanitize
+                    # (kekulize, ring-find, etc.) still runs. AddHs then
+                    # assigns 0 implicit H to those Si atoms.
+                    Chem.SanitizeMol(
+                        self.chemical_space,
+                        sanitizeOps=(
+                            Chem.SanitizeFlags.SANITIZE_ALL
+                            ^ Chem.SanitizeFlags.SANITIZE_PROPERTIES
+                        ),
+                    )
+                mol_h = Chem.AddHs(self.chemical_space)
+                AllChem.ComputeGasteigerCharges(mol_h)
+                # Over-valent atoms (defect's degree-6 Si) make Gasteiger
+                # emit NaN for those atoms and their neighbours. Scrub to
+                # 0 so the LAMMPS data file is numeric; the residual net
+                # charge logged below is usually within PPPM's tolerance.
+                import math
+                nan_count = 0
+                for atom in mol_h.GetAtoms():
+                    if atom.HasProp("_GasteigerCharge"):
+                        q = atom.GetDoubleProp("_GasteigerCharge")
+                        if math.isnan(q) or math.isinf(q):
+                            atom.SetDoubleProp("_GasteigerCharge", 0.0)
+                            nan_count += 1
+                if nan_count:
+                    print(f"  [WARN] Gasteiger NaN/Inf on {nan_count} atoms "
+                          f"(over-valent neighbours); zeroed.")
+
+                # Background charge neutralization: redistribute residual net
+                # charge uniformly across all atoms with a valid Gasteiger
+                # value. Two things make this load-bearing:
+                #   (1) The defect demo has over-valent Si (degree 5-6 from
+                #       parallel-edge defects). NaN-zeroing those atoms can
+                #       leave several e residual; PPPM then prints "System
+                #       is not charge neutral" and runs slowly.
+                #   (2) Gasteiger output itself has a tiny non-zero residual
+                #       (~1e-12 e) from finite-precision iteration on every
+                #       molecule. Cheap to scrub here.
+                valid_atoms = [
+                    a for a in mol_h.GetAtoms() if a.HasProp("_GasteigerCharge")
+                ]
+                total_q = sum(
+                    a.GetDoubleProp("_GasteigerCharge") for a in valid_atoms
+                )
+                if valid_atoms and abs(total_q) > 1e-6:
+                    delta = -total_q / len(valid_atoms)
+                    for a in valid_atoms:
+                        a.SetDoubleProp(
+                            "_GasteigerCharge",
+                            a.GetDoubleProp("_GasteigerCharge") + delta,
+                        )
+                    print(f"  Charge-neutralized: spread {-total_q:+.4f} e "
+                          f"across {len(valid_atoms)} atoms "
+                          f"(delta = {delta:+.2e} e/atom)")
+
+                self.chemical_space = mol_h
+                # Mass-based volume (matches canonical workflow at v43).
+                mass = sum(a.GetMass() for a in mol_h.GetAtoms())
+                vol = (mass / density) * 1.66054  # A^3 / Da at g/cm^3
+                writer = DreidingWriter(mol_h, data_path, use_charges=True)
+            except Exception as exc:
+                print(f"  [WARN] AddHs/Gasteiger skipped ({exc}); "
+                      f"writing heavy-atom data file uncharged.")
+                mol_h = self.chemical_space
+                n_atoms = mol_h.GetNumAtoms()
+                vol = n_atoms / density
+                writer = DreidingWriter(mol_h, data_path, use_charges=False)
             writer.write()
 
-        # Displacement files for conformation stage
-        n_atoms = self.chemical_space.GetNumAtoms()
-        density = self.config.chemistry.target_density
-        vol = n_atoms / density
         scale = (vol / float(np.prod(self.dims))) ** (1.0 / 3.0)
+        sx = sy = sz = scale
 
+        # Nodes displacement (both CG and atomistic). POSS node_map values
+        # can be lists (cage); preserve the isinstance branch.
         node_coords: dict[int, tuple] = {}
         for node, atom_ref in self._builder.node_map.items():
             pos = self.graph.nodes[node].get("pos", (0.0, 0.0, 0.0))
@@ -225,29 +383,228 @@ class Pipeline:
             node_coords[primary_idx] = tuple(pos)
 
         write_lammps_displacement_file(
-            node_coords, scale, scale, scale,
+            node_coords, sx, sy, sz,
             str(chem_dir / "system_nodes.displace"), "nodes"
         )
 
-        # edge_atom_map keys are (u, v, key) tuples from the MultiGraph
-        # (see chemistry/builder.py::_build_chains). Iterate via dict keys
-        # rather than treating them as sequential int indices into the
-        # graph.edges() list.
-        chain_coords: dict[int, tuple] = {}
-        for (u, v, _key), atom_indices in self._builder.edge_atom_map.items():
-            pos_u = np.array(self.graph.nodes[u].get("pos", (0.0, 0.0, 0.0)))
-            pos_v = np.array(self.graph.nodes[v].get("pos", (0.0, 0.0, 0.0)))
-            vec = pos_v - pos_u
-            mic = vec - self.dims * np.round(vec / self.dims)
-            for j, atom_idx in enumerate(atom_indices):
-                frac = (j + 1) / (len(atom_indices) + 1)
-                chain_coords[atom_idx] = tuple(pos_u + frac * mic)
+        if model == "coarse_grained":
+            # CG: same backbone + grafts loop as atomistic (entanglement-aware
+            # kink for backbone, perpendicular placement with 3-way length
+            # cap for grafts). CG doesn't have pendant/H passes — graft beads
+            # come directly from `_builder.graft_atom_map`.
+            backbone_coords: dict[int, tuple] = {}
+            graft_coords: dict[int, tuple] = {}
+            graft_atom_map = getattr(self._builder, "graft_atom_map", {}) or {}
+            ext_factor = 0.5
 
-        write_lammps_displacement_file(
-            chain_coords, scale, scale, scale,
-            str(chem_dir / "system_beads.displace"), "beads"
-        )
+            for (u, v, key), atoms in self._builder.edge_atom_map.items():
+                data = self.graph[u][v][key]
+                pos_u = np.array(self.graph.nodes[u].get("pos", (0.0, 0.0, 0.0)))
+                pos_v = np.array(self.graph.nodes[v].get("pos", (0.0, 0.0, 0.0)))
+                vec = pos_v - pos_u
+                mic = vec - self.dims * np.round(vec / self.dims)
+                edge_len = float(np.linalg.norm(mic))
+                unit_vec = mic / (edge_len + 1e-9)
+                rand_vec = np.random.randn(3)
+                perp = np.cross(unit_vec, rand_vec)
+                if np.linalg.norm(perp) < 1e-6:
+                    perp = np.cross(unit_vec, np.array([1.0, 0.0, 0.0]))
+                perp_unit = perp / (np.linalg.norm(perp) + 1e-9)
 
+                entangled_partner_key = data.get("entangled_with")
+                backbone_xyz = []
+
+                if entangled_partner_key is not None:
+                    p_u = entangled_partner_key[0]
+                    p_v = entangled_partner_key[1]
+                    p_pos_u = np.array(self.graph.nodes[p_u].get("pos", (0.0, 0.0, 0.0)))
+                    p_pos_v = np.array(self.graph.nodes[p_v].get("pos", (0.0, 0.0, 0.0)))
+                    p_vec = p_pos_v - p_pos_u
+                    p_mic = p_vec - self.dims * np.round(p_vec / self.dims)
+                    my_mid = pos_u + 0.5 * mic
+                    p_mid = p_pos_u + 0.5 * p_mic
+                    delta = p_mid - my_mid
+                    delta -= self.dims * np.round(delta / self.dims)
+                    p_mid_wrapped = my_mid + delta
+                    orient_vec = p_mid_wrapped - my_mid
+                    if np.linalg.norm(orient_vec) < 0.01:
+                        orient_vec = perp_unit
+                    kink_dict = calculate_entangled_kink(
+                        start_pos=np.zeros(3),
+                        end_pos=mic,
+                        num_atoms=len(atoms) + 2,
+                        orientation_vec=orient_vec,
+                        z_phase=1.0,
+                    )
+                    full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
+                    backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
+                else:
+                    for j in range(len(atoms)):
+                        frac = (j + 1) / (len(atoms) + 1)
+                        backbone_xyz.append(pos_u + frac * mic)
+
+                for j, a_idx in enumerate(atoms):
+                    backbone_coords[a_idx] = tuple(backbone_xyz[j])
+
+                # Grafts (CG): perp to the local backbone *tangent* at the
+                # anchor (kinked backbones twist; chord-perp grafts would
+                # otherwise dive back into the chain on entangled edges).
+                edge_grafts = graft_atom_map.get((u, v, key))
+                if edge_grafts:
+                    lattice_spacing = (
+                        float(min(self.dims)) if self.dims is not None else edge_len
+                    )
+                    for frac, g_atoms in edge_grafts:
+                        k_float = frac * (len(atoms) + 1) - 1
+                        k = max(0, min(int(round(k_float)), len(backbone_xyz) - 1))
+                        anchor_pos = backbone_xyz[k]
+                        local_perp = _local_perp_unit(
+                            backbone_xyz, k, unit_vec, rand_vec
+                        )
+                        graft_dp_eff = max(len(g_atoms), 1)
+                        backbone_dp = max(len(atoms), 1)
+                        eff_factor = min(
+                            ext_factor,
+                            graft_dp_eff / backbone_dp,
+                            0.5 * lattice_spacing / max(edge_len, 1e-9),
+                        )
+                        graft_vec = local_perp * (edge_len * eff_factor)
+                        for m, g_idx in enumerate(g_atoms):
+                            g_frac = (m + 1) / len(g_atoms)
+                            graft_coords[g_idx] = tuple(anchor_pos + g_frac * graft_vec)
+
+            write_lammps_displacement_file(
+                backbone_coords, sx, sy, sz,
+                str(chem_dir / "system_backbone.displace"), "backbone"
+            )
+            write_lammps_displacement_file(
+                graft_coords, sx, sy, sz,
+                str(chem_dir / "system_grafts.displace"), "grafts"
+            )
+        else:
+            # Atomistic: backbone + grafts + pendant + hydrogens. Backbone
+            # path consults `entangled_with` on the (u, v, key) edge data
+            # for kinked-chain placement (v21.1 N+2 fix). graft_atom_map is
+            # currently only populated by ChemistryBuilder._build_chain_cg
+            # — for atomistic it's empty, so system_grafts.displace will be
+            # empty and graft side-chain atoms instead get coords from the
+            # pendant pass (neighbor propagation through mol_h).
+            backbone_coords: dict[int, tuple] = {}
+            graft_coords: dict[int, tuple] = {}
+            graft_atom_map = getattr(self._builder, "graft_atom_map", {}) or {}
+            ext_factor = 0.5  # canonical workflow default
+
+            for (u, v, key), atoms in self._builder.edge_atom_map.items():
+                data = self.graph[u][v][key]
+                pos_u = np.array(self.graph.nodes[u].get("pos", (0.0, 0.0, 0.0)))
+                pos_v = np.array(self.graph.nodes[v].get("pos", (0.0, 0.0, 0.0)))
+                vec = pos_v - pos_u
+                mic = vec - self.dims * np.round(vec / self.dims)
+                edge_len = float(np.linalg.norm(mic))
+                unit_vec = mic / (edge_len + 1e-9)
+                rand_vec = np.random.randn(3)
+                perp = np.cross(unit_vec, rand_vec)
+                if np.linalg.norm(perp) < 1e-6:
+                    perp = np.cross(unit_vec, np.array([1.0, 0.0, 0.0]))
+                perp_unit = perp / (np.linalg.norm(perp) + 1e-9)
+
+                entangled_partner_key = data.get("entangled_with")
+                backbone_xyz = []
+
+                if entangled_partner_key is not None:
+                    p_u = entangled_partner_key[0]
+                    p_v = entangled_partner_key[1]
+                    p_pos_u = np.array(self.graph.nodes[p_u].get("pos", (0.0, 0.0, 0.0)))
+                    p_pos_v = np.array(self.graph.nodes[p_v].get("pos", (0.0, 0.0, 0.0)))
+                    p_vec = p_pos_v - p_pos_u
+                    p_mic = p_vec - self.dims * np.round(p_vec / self.dims)
+
+                    my_mid = pos_u + 0.5 * mic
+                    p_mid = p_pos_u + 0.5 * p_mic
+                    delta = p_mid - my_mid
+                    delta -= self.dims * np.round(delta / self.dims)
+                    p_mid_wrapped = my_mid + delta
+
+                    orient_vec = p_mid_wrapped - my_mid
+                    if np.linalg.norm(orient_vec) < 0.01:
+                        orient_vec = perp_unit
+
+                    kink_dict = calculate_entangled_kink(
+                        start_pos=np.zeros(3),
+                        end_pos=mic,
+                        num_atoms=len(atoms) + 2,  # N+2 fix (v21.1)
+                        orientation_vec=orient_vec,
+                        z_phase=1.0,
+                    )
+                    full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
+                    backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
+                else:
+                    for j in range(len(atoms)):
+                        frac = (j + 1) / (len(atoms) + 1)
+                        backbone_xyz.append(pos_u + frac * mic)
+
+                for j, a_idx in enumerate(atoms):
+                    backbone_coords[a_idx] = tuple(backbone_xyz[j])
+
+                # Grafts: place perpendicular to the local backbone *tangent*
+                # at the anchor (per-anchor finite difference, not per-edge
+                # chord). On a kinked entangled chain the local tangent
+                # curves away from the chord, so chord-perp grafts would
+                # otherwise dive back into the chain. Length is the minimum
+                # of three competing constraints:
+                #   (a) extension_factor (default 0.5) — half the edge len
+                #   (b) graft_dp / backbone_dp           — chain-length scaling
+                #   (c) 0.5 * lattice_spacing / edge_len — never past half
+                #       a lattice cell into neighbouring cells
+                edge_grafts = graft_atom_map.get((u, v, key))
+                if edge_grafts:
+                    lattice_spacing = float(min(self.dims)) if self.dims is not None else edge_len
+                    for frac, g_atoms in edge_grafts:
+                        k_float = frac * (len(atoms) + 1) - 1
+                        k = max(0, min(int(round(k_float)), len(backbone_xyz) - 1))
+                        anchor_pos = backbone_xyz[k]
+                        local_perp = _local_perp_unit(
+                            backbone_xyz, k, unit_vec, rand_vec
+                        )
+                        graft_dp_eff = max(len(g_atoms), 1)
+                        backbone_dp = max(len(atoms), 1)
+                        eff_factor = min(
+                            ext_factor,
+                            graft_dp_eff / backbone_dp,
+                            0.5 * lattice_spacing / max(edge_len, 1e-9),
+                        )
+                        graft_vec = local_perp * (edge_len * eff_factor)
+                        for m, g_idx in enumerate(g_atoms):
+                            g_frac = (m + 1) / len(g_atoms)
+                            graft_coords[g_idx] = tuple(anchor_pos + g_frac * graft_vec)
+
+            write_lammps_displacement_file(
+                backbone_coords, sx, sy, sz,
+                str(chem_dir / "system_backbone.displace"), "backbone"
+            )
+            write_lammps_displacement_file(
+                graft_coords, sx, sy, sz,
+                str(chem_dir / "system_grafts.displace"), "grafts"
+            )
+
+            # Pendant heavy + hydrogens via neighbor propagation through mol_h.
+            known = {**node_coords, **backbone_coords, **graft_coords}
+            side_coords = generate_approximate_side_chain_coords(mol_h, known)
+            h_coords = {k: v for k, v in side_coords.items()
+                        if mol_h.GetAtomWithIdx(k).GetSymbol() == "H"}
+            p_coords = {k: v for k, v in side_coords.items()
+                        if mol_h.GetAtomWithIdx(k).GetSymbol() != "H"}
+
+            write_lammps_displacement_file(
+                p_coords, sx, sy, sz,
+                str(chem_dir / "system_pendant.displace"), "pendant"
+            )
+            write_lammps_displacement_file(
+                h_coords, sx, sy, sz,
+                str(chem_dir / "system_hydrogens.displace"), "hydrogens"
+            )
+
+        # Groups: nodes (junction atoms) vs beads (everything else).
         node_atom_ids = []
         for atom_ref in self._builder.node_map.values():
             if isinstance(atom_ref, (list, tuple)):

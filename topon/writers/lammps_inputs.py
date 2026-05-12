@@ -203,15 +203,15 @@ class LammpsInputGenerator:
             f.write("pair_style      lj/cut/coul/long 10.0 10.0\n")
             f.write("kspace_style    pppm 1.0e-4\n")
             f.write(f"include         {settings_path}\n\n")
-            
+
             f.write("# Enforce Set 1 Special Bonds\n")
             f.write("special_bonds   lj/coul 0.0 0.0 1.0\n\n")
-            
+
             f.write("# --- 5. The Ramp (Set 1 Logic) ---\n")
             f.write("# Linearly scale epsilon/charges from 0.001 to 1.0\n")
             f.write("variable        scale equal \"ramp(0.001, 1.0)\"\n")
             f.write("timestep        1.0\n\n")
-            
+
             f.write("fix             1 all adapt 1 pair lj/cut/coul/long epsilon * * v_scale\n")
             f.write("fix             fxnve all nve/limit 0.1\n")
             f.write("thermo          1000\n\n")
@@ -224,7 +224,7 @@ class LammpsInputGenerator:
             f.write("unfix           fxnve\n")
             f.write("unfix           1\n")
             f.write("kspace_modify   compute yes\n\n")
-            
+
             f.write("write_data      system_ramped.data\n")
 
     def _write_stage3_equilibration(self, settings_file, model_type):
