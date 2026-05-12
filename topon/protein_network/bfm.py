@@ -450,6 +450,7 @@ def apply_crosslinks_distance_based(
     n_extra_snapshots: int = 4,
     snapshot_delta_conv: float = 0.05,
     min_intrachain_sep: int = 2,
+    pre_gel_conversions: list[float] | None = None,
     rng=None,
 ) -> list[dict]:
     """Distance-based crosslink discovery + percolation tracking (v39 path).
@@ -490,6 +491,10 @@ def apply_crosslinks_distance_based(
     next_snap_conv = 0.0
     chains_work = [list(c) for c in chains]
 
+    # Pre-gel snapshot targets (sorted, consumed in order as conv crosses each).
+    pre_gel_targets = sorted(pre_gel_conversions) if pre_gel_conversions else []
+    pre_gel_idx = 0
+
     for (a, b, dist) in candidates:
         ci1, ni1 = a; ci2, ni2 = b
         if (ci1, ni1) in reacted_y or (ci2, ni2) in reacted_y:
@@ -501,6 +506,18 @@ def apply_crosslinks_distance_based(
         if ci1 != ci2:
             uf.union(ci1, ci2)
         conv = len(reacted_y) / total_y
+
+        # Pre-gel: emit a snapshot the first time conv crosses each target.
+        while (pre_gel_idx < len(pre_gel_targets)
+               and conv >= pre_gel_targets[pre_gel_idx]
+               and not gel_found):
+            target = pre_gel_targets[pre_gel_idx]
+            label = f"pre_gel_conv{int(round(target*1000)):04d}"  # e.g. pre_gel_conv0250
+            snapshots.append(_make_snapshot(
+                label, conv, chains_work, y_positions, reactions,
+                Nx, Ny, Nz, reaction_distances, None,
+            ))
+            pre_gel_idx += 1
 
         if not gel_found and uf.n_components() == 1:
             gel_found = True
@@ -625,12 +642,19 @@ def generate_topology(
     lattice_scale_ang: float | None = None,
     max_crosslink_distance_ang: float | None = None,
     crosslink_method: str = "adjacent",
+    pre_gel_conversions: list[float] | None = None,
 ) -> dict:
     """Generate a 6-neighbour cubic-lattice crosslinked network topology.
 
     Returns a dict ``{"config": {...}, "snapshots": [...]}`` whose JSON form is
     interchangeable with topro's `topo_*.json` topology files (preserves all
     snapshot keys and the snapshot label strings).
+
+    ``pre_gel_conversions``: optional list of conversion fractions in [0,1)
+    at which to also emit a snapshot *before* the gel point (only the
+    distance-based crosslink method currently honours this). Useful when
+    studying sub-percolated networks at controlled conversion. Snapshots
+    are labelled ``pre_gel_conv{0250,0500,...}`` (1000x the value).
     """
     rng = np.random.default_rng(seed)
 
@@ -696,6 +720,7 @@ def generate_topology(
             n_extra_snapshots=n_extra_snapshots,
             snapshot_delta_conv=snapshot_delta_conv,
             min_intrachain_sep=min_intrachain_sep,
+            pre_gel_conversions=pre_gel_conversions,
             rng=rng,
         )
     else:

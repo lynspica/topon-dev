@@ -31,6 +31,9 @@ def run_protein_network(
     snapshot_delta_conv: float = 0.05,
     min_intrachain_sep: int = 2,
     lattice_scale_ang: float | None = None,
+    crosslink_method: str = "adjacent",
+    max_crosslink_distance_ang: float | None = None,
+    pre_gel_conversions: list[float] | None = None,
     sc_jitter_ang: float = 1.5,
     water_density_w_per_nm3: float = 0.0,
     water_exclusion_ang: float = 4.0,
@@ -103,6 +106,10 @@ def run_protein_network(
         min_intrachain_sep=min_intrachain_sep,
         seed=seed,
         verbose=verbose,
+        lattice_scale_ang=lattice_scale_ang,
+        max_crosslink_distance_ang=max_crosslink_distance_ang,
+        crosslink_method=crosslink_method,
+        pre_gel_conversions=pre_gel_conversions,
     )
 
     artifacts: dict[str, Path] = {}
