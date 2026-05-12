@@ -7,16 +7,19 @@ This demo emits *just* the topology JSON snapshot — no chemistry, no LAMMPS fi
 ## Run
 
 ```bash
-python -m topon.protein_network topology \
-    --n-chains 16 --n-repeats 6 \
-    --segs-per-block 2 \
-    --target-packing 0.45 \
-    --equil-steps 5000 \
-    --seed 42 \
-    --output bfm_topology.json
+python examples/demos/topology/bfm/run.py
 ```
 
-Output is a single JSON file containing snapshots at multiple convergence points (`gel_point`, `post_gel_1`, …). The format is byte-compatible with the legacy topro `topo_*.json`.
+Reproduces the V41/V42 reference recipe (8 chains × 18 repeats × segs_per_block=2, packing=0.45, equil=20k, adjacent crosslinks, seed=42). Output lands at `output/bfm_topology.json` and includes three snapshots: `gel_point` (conv=0.125), `post_gel_1` (conv=0.181), `post_gel_2` (conv=0.236).
+
+Tweak parameters inline at the top of `run.py`, or invoke the CLI directly for a one-off:
+
+```bash
+topon> topro topology --n-chains 16 --n-repeats 6 --segs-per-block 2 \
+        --target-packing 0.45 --equil-steps 5000 --seed 42 --output bfm_topology.json
+```
+
+The JSON format is byte-compatible with the legacy topro `topo_*.json`.
 
 ## Inspecting
 

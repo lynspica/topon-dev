@@ -9,7 +9,8 @@
 A modular Python package for generating polymer-network and protein-network structures for LAMMPS molecular dynamics. Topology is decided as a graph first, then mapped to chemistry and 3D coordinates. Three sub-systems share the same package:
 
 - **core topon** — polymer networks, atomistic (DREIDING) or coarse-grained (Kremer-Grest)
-- **topro** — `topon.protein_network`, MARTINI 3 protein networks (V36)
+- **topro / MARTINI 3** — `topon.protein_network`, coarse-grained protein networks (V36)
+- **topro / CHARMM36m** — `topon.protein_network.charmm`, atomistic protein networks (added 2026-05-10; legacy topro CHARMM-side files migrated verbatim, BFM stage shared with the MARTINI port)
 - **simbox** — independent molecule packer for crosslinking studies
 
 History, methodology, and design rationale live in the docs in §3.
@@ -27,14 +28,18 @@ topon/
 ├── .gitignore                   gitignored locations
 ├── topon/                       the package itself
 │   ├── pipeline.py              the 6-stage Pipeline orchestrator
-│   ├── cli.py                   `topon` CLI dispatch
+│   ├── cli.py                   `topon` CLI dispatch (init/doctor/validate/generate/inspect/recipes/topro/...)
+│   ├── diagnostics/             rule registry behind `topon doctor`
+│   ├── utils/errors.py          friendly Pydantic + JSON error formatting
+│   ├── analysis/run_summary.py  post-run inspection behind `topon inspect`
 │   ├── topology/                stage 1
 │   ├── analysis/                stage 2 helper (also CLI `topon analyze`)
 │   ├── assignment/              stage 3
 │   ├── chemistry/               stage 4 (builder.py is the real work)
 │   ├── conformation/            stage 5 (manager.py is the real work)
 │   ├── writers/                 stage 6
-│   ├── protein_network/         topro (parallel pipeline, V36)
+│   ├── protein_network/         topro MARTINI 3 (parallel pipeline, V36)
+│   │   └── charmm/              topro CHARMM36m atomistic (added 2026-05-10)
 │   ├── simbox/                  independent molecule packer
 │   ├── singlechain/             single-chain solubility utility
 │   ├── config/                  Pydantic schemas + load_config

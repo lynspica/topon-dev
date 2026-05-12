@@ -14,6 +14,182 @@ Newest first.
 
 ---
 
+## 2026-05-11 (later 2) — CG end-cap collapse to single bead (P0 placement bug)
+
+**Change** [topon/chemistry/builder.py:`_place_end_cap`](topon/chemistry/builder.py)
+- In CG mode, `_place_end_cap` now always falls back to `_place_simple_atom` (one bead per node), regardless of the SMILES on `NodeMoleculeConfig.molecule`.
+- Atomistic mode unchanged — it instantiates the full SMILES (e.g. trimethylsilyl `[Si](C)(C)C`) and the existing pendant-coordinate pass propagates positions for the methyl Cs through bond neighbours.
+
+**Why (root cause)**
+User flagged that the CG combined demo's `system_conformed.data` had bonds running into atoms parked at (0, 0, 0). Investigation traced 18 phantom Carbon atoms with no `bead_type` property, none of them in `node_map` / `edge_atom_map` / `graft_atom_map`. They came from the default `node_type_map["end"]` entry in [topon/config/schema.py](topon/config/schema.py): `NodeMoleculeConfig(molecule="[Si](C)(C)C", is_end_cap=True)`. `_place_end_cap` instantiated the trimethylsilyl SMILES, adding 1 Si + 3 methyl Cs to `chemical_space`, but only the Si was registered in `node_map`. In atomistic mode the pendant pass picks up the orphan methyls; in CG mode there's no pendant pass so they stayed at the origin for the entire run, dragging spurious bonds through the box.
+
+The 6 degree-1 "end" nodes × 3 methyls = 18 phantom atoms. Matches the user observation exactly.
+
+**Verification**
+Before fix:
+```
+Total atoms: 5519; phantom (C, no bead_type): 18
+Conformed at (0,0,0): 19  (1 real node-0 + 18 phantoms)
+```
+After fix:
+```
+Total atoms: 5336; phantom: 0
+Conformed at (0,0,0): 1  (the legitimate node-0)
+```
+21/21 unit + smoke tests still pass.
+
+**Follow-up**
+Combined demos refreshing again in background to update their `expected_output/` artifacts with both the curvature-normal graft placement AND the end-cap single-bead fix.
+
+---
+
+## 2026-05-11 (later) — Grafts on entangled chains now placed along the outward curve normal
+
+**Change** [topon/pipeline.py:`_local_perp_unit`](topon/pipeline.py)
+- New helper `_local_perp_unit(backbone_xyz, k, fallback_unit, rand_vec)` computes the graft direction **per anchor** instead of once-per-edge:
+  - Central-difference tangent at backbone index `k`.
+  - Central-difference curvature `P[k+1] - 2P[k] + P[k-1]`; the outward Frenet normal is `-curvature / |curvature|`, projected perpendicular to the tangent.
+  - When the chain genuinely bends (entangled kinks always do), the graft sticks out along the outward normal — the convex side of the bend. Cannot dive back into the chain.
+  - When curvature is tiny (straight backbone), falls back to a random perpendicular from the per-edge `rand_vec` — same answer as the pre-2026-05-11 chord-perp behaviour.
+- Both atomistic and CG branches of `_run_chemistry_stage` now call the helper inside the graft loop.
+
+**Why**
+User flagged that on `polymer/.../combined` (entanglement + graft together), grafts on the entangled chains appeared to dive back into the backbone. Suggested using the local-tangent / normal vector. Verified the symptom and implemented the fix.
+
+**Verification (CG combined, A/B/C on 8 entangled + 196 non-entangled grafts)**
+The diagnostic is `tip-to-nearest-backbone / graft-length`. A value of 1.0 means the graft sticks straight out by exactly its own length; smaller means the tip dives back.
+
+| Method | Entangled mean | Ent min | Non-ent mean | Non-ent min |
+|---|---|---|---|---|
+| Old chord-perp (one perp_unit per edge) | 0.754 | 0.446 | 1.000 | 1.000 |
+| Local-tangent perp (intermediate) | 0.993 | 0.919 | 1.000 | 1.000 |
+| **Outward curvature normal (shipped)** | **1.000** | **1.000** | 1.000 | 1.000 |
+
+Zero dive-in on every graft, entangled or not. Non-entangled behaviour is unchanged because the curvature-vector check falls back to the random-perpendicular path on straight backbones.
+
+**Follow-up**
+- Combined demos (`atomistic/combined`, `coarse_grained/combined`) refreshing in background to update their `expected_output/` artifacts with the new placement.
+- Smoke 8/8 + diagnostics 6/6 + shell 7/7 all green.
+
+---
+
+## 2026-05-11 — UX overhaul (init / doctor / inspect / recipes / topro) + CG graft conformation fix
+
+**Change — CLI surface**
+- **`topon init`** rewritten: `--preset {atomistic_pdms,cg_kg,poss,martini_resilin,charmm_resilin}` copies a bundled demo `config.json` (preset-produced files pass `topon validate` immediately); `--interactive` walks through the 5–6 knobs that vary (study name, output dir, model type, lattice, DP, density) and writes the result; the MARTINI/CHARMM presets print the right `python -m` invocation rather than write a JSON.
+- **`topon doctor <config>`** (new) lints for semantic footguns beyond Pydantic schema. Rule registry in [topon/diagnostics/rules.py](topon/diagnostics/rules.py): POSS-at-internal-junction (P1-H), unknown-node-type (P0-2 silent Si fallback), atomistic-graft-non-PDMS, lattice-size-format, DP-below-Kuhn, schema-gap-extras, defects-endcap-safe. 6 unit tests, [tests/unit/diagnostics/test_doctor_rules.py](tests/unit/diagnostics/test_doctor_rules.py).
+- **`topon inspect <run_dir>`** (new) summarises a finished pipeline output: atom count / atom-type count / box / per-stage status / next LAMMPS commands. Works in both nested layout (`02_Chemistry/`+`03_Conformation/`+`04_Simulation/`) and flat `expected_output/`-style. Implementation in [topon/analysis/run_summary.py](topon/analysis/run_summary.py).
+- **`topon recipes`** (new) prints "I want X → run Y" cheatsheet covering polymer / MARTINI / CHARMM / simbox / chain / batch / inspect / analyze.
+- **`topon topro`** (new) subcommand wraps the existing argparse `topon.protein_network` CLI as a click subgroup, so `topon topro generate|sweep|topology` works alongside `topon generate ...`. Inner `--help` is preserved via `help_option_names=[]`.
+- **Friendly errors** in [topon/utils/errors.py](topon/utils/errors.py): `format_pydantic_error()` prints field path + plain-language message + hints, replacing raw stack traces. `load_config_or_die()` shared helper for `validate` / `doctor`. Handles JSON parse errors, file-not-found, Pydantic validation errors uniformly.
+- **Duplicate `gui` command removed** — `cli.py` had two `@main.command()` defs for `gui` (lines 145 and 411 pre-refactor); the second was dead code overriding the first. Replaced with `recipes`.
+
+**Change — CG graft chemistry (P1-J resolved)**
+- Pipeline's CG branch was emitting only the legacy 2-displace-file layout (`system_nodes.displace` + `system_beads.displace`) and never consulted `graft_atom_map`, so graft beads landed at (0,0,0) in `system_conformed.data` (user-reported: "I am not seeing grafts appended to the backbone chain").
+- Unified the CG branch with the atomistic branch in [topon/pipeline.py:`_run_chemistry_stage`](topon/pipeline.py): same entanglement-aware kink loop, same 3-way graft-length cap, same perpendicular placement. CG now writes `system_backbone.displace` + `system_grafts.displace` (replacing the combined `system_beads.displace`).
+- Verified on `examples/demos/polymer/coarse_grained/graft/`: 8589 atoms (was 8479 backbone-only), graft beads at IDs 8584-8589 now sit at `(16.88, 17.5-18.4, 17.3-17.5)` instead of `(0, 0, 0)`. **LAMMPS stage 1 now passes in 2.2 s** — P1-J "Neighbor list overflow" turned out to be caused by co-located graft beads, not crowding.
+
+**Verification**
+- 8/8 smoke tests pass in ~60 s.
+- 6/6 diagnostics unit tests pass.
+- `topon validate`, `topon doctor`, `topon inspect`, `topon recipes`, `topon topro --help`, `topon init --preset cg_kg` all manually tested.
+- CG graft demo: chemistry → conformation → LAMMPS stage 1 all clean.
+
+**Follow-up**
+- `examples/demos/polymer/coarse_grained/graft/expected_output/` refresh (stages 2+3 currently running in background).
+- Per-monomer "graft attachment site" attribute in `MonomerConfig` to lift the PDMS-only restriction on atomistic grafts (P1-L follow-up).
+
+---
+
+## 2026-05-10 (latest) — Defect chemistry root-fixed; atomistic graft side chains implemented; 4 new workflow examples
+
+**Change**
+- **Defect chemistry** (`topon/assignment/defects.py` + `topon/assignment/manager.py`): primary-loop injection now wires `max_degree=4` (was ignored), re-checks degree per-injection (was computed once before any injection — a single node in two selected pairs over-valenced), and excludes `node_type='end'` nodes from candidates (their effective valence cap is 1, not 4). Result: defect demo's RDKit mol no longer has any over-valent Si; `Sanitize → AddHs → Gasteiger` returns a clean neutral system naturally. **No charge neutralisation, no NaN scrub, no `SANITIZE_PROPERTIES` skip is triggered for any current demo.**
+- **Atomistic graft chemistry** (`topon/chemistry/builder.py`): added `_build_pdms_chain_with_grafts` — a per-repeat PDMS builder that reads `graft_positions` from the edge data and emits a real side chain at each marked backbone Si (1 methyl cap + branch O + `graft_dp` repeats of Si-C-C-O, dropping the trailing O on the last repeat so all Si stay at valence 4). `_build_chain_atomistic` falls back to this builder when graft data is present and the monomer is PDMS; non-PDMS-with-grafts emits a warning and skips grafts (no silent corruption).
+- **CG graft-map reshape**: `_build_chain_cg` was already populating `graft_atom_map` but as `dict[int -> list[int]]`; Pipeline's placement loop expects `[(frac, [atoms]), ...]`. Reshaped to the canonical form so the placement loop is no longer dead code for CG either.
+- **Graft placement cap** (`topon/pipeline.py`): three-way length cap on the graft vector — `min(extension_factor=0.5, graft_dp/backbone_dp, 0.5 * lattice_spacing / edge_len)`. The third term keeps graft tips inside their own lattice cell regardless of edge length.
+- **Four new workflow scripts** under `examples/workflows/` — these are standalone Python scripts (not config-driven demos), each with a knob-block at top:
+  - `batch_polymer_topology/run.py` — generates 25 lattice networks, exports each as `.nodes/.edges` + GraphML + NPZ + writes a `summary.csv` of per-graph properties.
+  - `bfm_gel_point_sweep/run.py` — sweeps 9 BFM parameter sets (n_chains, n_repeats, segs_per_block, intra-chain sep, equilibration steps) and records the gel-point conversion to `summary.csv`. Wall: < 5 s for the whole sweep.
+  - `bfm_to_martini/run.py` — drives `topon.protein_network.workflow.run_protein_network` end-to-end (BFM → MARTINI 3 CG LAMMPS files).
+  - `bfm_to_charmm/run.py` — drives `topon.protein_network.charmm.build_systems` end-to-end (BFM → CHARMM36m atomistic, multiple water contents).
+- Index at `examples/workflows/README.md` ties them together.
+
+**Why**
+User pushed back twice. First: "defect has residual charge, something looks off." Second: "graft side chains aren't being built." Both turned out to be real chemistry bugs in `ChemistryBuilder`, not Pipeline-level fitting issues. Investigator agents traced the defect issue to one missing kwarg (`max_degree=4`) and a second silent over-valence path through end-cap nodes; the graft issue to two parallel-edge atoms-shape mismatches (CG's dict vs. Pipeline's list-of-tuples) AND atomistic never building side chains at all. Per-demo charge tables show all 6 atomistic demos at net charge ≤ 1e-8 e after these fixes.
+
+**Verification**
+- All 6 atomistic demos build through Pipeline with neutral net charge (≤ 5e-9 e), 4 DREIDING types incl. H_, and the correct displacement files:
+  - basic: 10,949 atoms (no grafts, as configured)
+  - combined: 53,635 atoms (was 42,449; +11k from real grafts at density 0.05)
+  - copolymer: 21,449 atoms
+  - defect: 21,944 atoms (was failing Sanitize before; now natural neutral)
+  - entanglement: 21,449 atoms
+  - graft: 41,941 atoms (was 21,449 — 90% more from real side chains at density 0.2)
+- All 8 smoke tests pass in ~3 min.
+- `system_grafts.displace` for the graft demo is now 2 MB of perpendicular placement coords (was 190-byte stub).
+
+**Follow-up**
+- `examples/demos/polymer/atomistic/{defect,graft}/expected_output/` are being refreshed through full LAMMPS stages 1/2/3 in a background runner (~2 h wall). Pre-fix `combined` expected_output is still on disk; given the atom count changed (42 k → 54 k), it should also be refreshed when wall time permits.
+- The user-facing examples (`examples/workflows/`) have been smoke-tested for syntax + import; `batch_polymer_topology` and `bfm_gel_point_sweep` were run end-to-end. The two BFM-to-FF scripts wire to existing topon CLI entrypoints (covered by their own smoke tests).
+- `P1-J` (CG graft stage-1 neighbour overflow) is now an opportunity rather than a regression — the CG graft path has the same `graft_atom_map` reshape applied, so re-running CG graft demo would presumably reveal whether the neighbour-overflow was a placement issue (now fixed via perpendicular cap) or a deeper crowding issue.
+
+---
+
+## 2026-05-10 (later) — P1-K fixed: Pipeline atomistic now matches canonical workflow end-to-end
+
+**Change**
+- Reverted my earlier same-day Gasteiger-only edit at `topon/pipeline.py:212-228` (which had been making things strictly worse: heavy-atom-only `ComputeGasteigerCharges` produced a net-−160-e system that crashed PPPM downstream).
+- Re-implemented `_run_chemistry_stage`'s atomistic branch + displacement-writing tail to mirror `topon.workflows.atomistic_network.run` — the canonical hand-written workflow that produced the v21/v43 reference outputs. Order: `Chem.SanitizeMol` → `Chem.AddHs(mol)` → `AllChem.ComputeGasteigerCharges(mol_h)` → mass-based volume → DreidingWriter with `mol_h` and `use_charges=True` → five displacement files (`system_nodes`, `system_backbone`, `system_grafts`, `system_pendant`, `system_hydrogens`).
+- Three Pipeline-specific patches over the canonical tail: keep the `isinstance(atom_ref, (list, tuple))` branch in node-coords for POSS cage; iterate `_builder.edge_atom_map` by `(u, v, key)` MultiGraph triples (canonical's int-indexed `edges` list doesn't apply); leave `system_grafts.displace` empty for atomistic-graft (preexisting — `ChemistryBuilder._build_chain_atomistic` doesn't populate `graft_atom_map`).
+- Fallback path kept: `Sanitize → AddHs → Gasteiger` wrapped in try/except; on failure (over-valent atom etc.) falls back to writing the heavy-atom mol uncharged. Defect demo's degree-6 Si triggers a non-fatal RDKit warning but the main path succeeds anyway.
+- Regenerated `examples/demos/polymer/atomistic/basic/expected_output/` with the full P1-K-fixed run: 10 949-atom data file, 5 displace files, stage 1/2/3 logs, `system_equilibrated.data`. Total wall: ~6 m 40 s on one core.
+
+**Why**
+User pushed back on my P1-K and P1-J "both pre-existing geometry issues" claim with "topro and cg was working fine before". Three investigator agents in parallel confirmed: (1) the legacy hand-written workflow `tests/workflows/generate_atomistic_combined.py` did produce healthy stage-2/3 output (v21/v43 reference logs prove it); (2) the new `topon.pipeline.Pipeline` atomistic path has never been validated end-to-end past stage 1; (3) my Gasteiger-without-AddHs edit had introduced a strictly-worse regression. The user said "carefully revert to canonical pipeline" — the fix is to make Pipeline's atomistic chemistry-stage tail equivalent to the canonical workflow's, not to invent new logic.
+
+**Issue / solution**
+- `Chem.AddHs` was the central missing call. The canonical workflow runs Gasteiger on `mol_h` (with H atoms) so net charge sums to 0 and PPPM auto-gewald tunes cleanly. Pipeline was running it on the heavy-only mol → net charge −160 e → PPPM warned, then stage-3 explosion at step 0 (T = 69 186 K).
+- The five-displace split (vs Pipeline's two) is also load-bearing: with only `system_nodes` + `system_beads`, every pendant heavy atom and every H sat at (0, 0, 0) after `apply_displacements` → thousands of co-located atoms → infinite force at stage 2's first step.
+- AddHs preserves heavy-atom indices, so Pipeline's `node_map` and `edge_atom_map` remained valid post-AddHs — no reindexing needed. This made Option C (hybrid: keep `ChemistryBuilder`, swap the tail) feasible with ~110 LOC in `pipeline.py` and **zero changes** to `ChemistryBuilder`, `ConformationManager`, or the calibrated LAMMPS scripts.
+
+**Result**
+- All 6 polymer atomistic demos now build through Pipeline with charge-neutral output and 5 displacement files (`basic`, `combined`, `copolymer`, `defect`, `entanglement`, `graft`). All 6 CG demos still build identically to before (2 displace files). All 8 smoke tests pass.
+- Verified end-to-end LAMMPS run on `basic`: stages 1/2/3 all clean (4 s + 5 min 05 s + 1 min 31 s). E_pair drops monotonically through stage 2 (−87 k → −163 k) instead of exploding. `system_equilibrated.data` produced.
+
+**Follow-up**
+- P1-J (CG graft stage-1 neighbor overflow) is still pre-existing — `graft_density=0.2` + side-chain stacking exceeds default `neigh_modify one 2000`. Pure config issue. Easy fix: lower demo's density to 0.1 or 0.05 (matches the working `combined` demo).
+- Other 5 atomistic demos' `expected_output/` folders still ship the old 2-displace format from the earlier failed runs; bulk regen (~35 minutes wall) is straightforward when desired.
+- Atomistic graft side-chain placement is silent-broken (no atoms in `system_grafts.displace`; pendant pass catches them but extension isn't v20-dynamic). Logged as a follow-up — needs `ChemistryBuilder._build_chain_atomistic` to populate `graft_atom_map`.
+
+---
+
+## 2026-05-10 — CHARMM topro wired in; atomistic stages-2/3 PPPM/overlap diagnosis (P1-K)
+
+**Change**
+- **CHARMM atomistic protein networks** are now reachable through `topon.protein_network.charmm.build_systems` (also as `python -m`). The legacy topro CHARMM-side files were copied verbatim into `topon/protein_network/charmm/`: `charmm_ff.py`, `builder.py`, `lammps_writer.py`, `topology_io.py`. Bundled CHARMM36m PRM/RTF/CMAP files at `data/`. BFM topology stage continues to come from the existing `topon.protein_network.bfm` (the JSON schema is byte-identical to topro's). One small bug fix in the writer: `group protein all` (invalid LAMMPS syntax) → `group protein union all` for the dry path.
+- **Demo at** `examples/demos/protein/charmm/`: README rewritten from stub → working quick-start; added `config.json` (declarative reference) + `run.py` (end-to-end runner that generates topology + builds LAMMPS files); `expected_output/` populated with `topo.json`, dry data file, settings, groups, three stage scripts, and a stage-1 reference log (~5 s wall on this machine).
+- **Smoke test** `tests/smoke/test_charmm_protein_smoke.py` covers the CLI entry point + LAMMPS stage 1 on a small (8×8) system; ~6 s.
+- **Pipeline atomistic chemistry**: `_run_chemistry_stage` now calls `Chem.SanitizeMol` + `AllChem.ComputeGasteigerCharges` and passes `use_charges=True` to `DreidingWriter`. Rationale: the calibrated polymer atomistic LAMMPS scripts use `lj/cut/coul/long` + PPPM, which auto-tunes `gewald` from per-atom charges and errors on a neutral system. The fix lives in chemistry, not the LAMMPS scripts.
+
+**Why**
+User asked: "the rest + charmm topro should be working fine." Translation: get CHARMM running and finish the polymer atomistic path. Both were stuck — CHARMM hadn't been migrated past the BFM stage, and atomistic LAMMPS was crashing at stage 2 with the gewald error.
+
+**Issue / solution**
+- *PPPM uncharged crash*: tried hardcoding `kspace_modify gewald 0.279` first → wrong (FFT mesh blows up to GB-class). Reverted, and instead enabled Gasteiger charges in the chemistry stage so PPPM auto-tunes correctly. Required a `Chem.SanitizeMol` call first to populate implicit valence.
+- *CHARMM `group protein all`*: legacy code emitted invalid LAMMPS syntax for the dry-system path (no water/ions to subtract). Switched to `group protein union all`, which is valid and equivalent.
+- **P1-K — atomistic stages 2/3 still don't relax cleanly.** With charges enabled and PPPM happy, stage 1 succeeds but stage 2 explodes (E_pair ~10²¹ kcal/mol at step 651, system stuck at numerical-pathology temperature). Root cause is geometry, not the script: Pipeline conformation stage's `noise_magnitude` default is 1e-4 Å (too small per the user's own xyz-perturbation memory; should be 0.05–0.1 Å) and `overlap_cutoff` is 0.2 Å (sub-LJ-sigma). Bumping both didn't unstick stage 2 in a smoke test, so the issue is deeper than just the perturbation magnitude. Per the user's "don't modify the calibrated scripts" memory, the fix lives in the conformation stage; logged as **P1-K** for follow-up.
+
+**Result**
+- CHARMM atomistic builder: working end-to-end through stage 1, stage 2 healthy (epsilon ramp brings E_pair from 6.6e10 → -1.99e4 over 1000 steps), stage 3 wired correctly. Smoke test passes.
+- Polymer atomistic demos: stage 1 works for all 6 atomistic configs; stage 2 still blocked by P1-K.
+
+**Follow-up**
+- P1-K: investigate `topon/conformation/manager.py` — likely candidates: bump `noise_magnitude` default to 0.05 Å, raise `overlap_cutoff` to ~1.0 Å for atomistic, or check whether `apply_displacements` is leaving same-position atoms at chain junctions.
+- The deferred POSS-at-junctions bug (P1-H) remains parked.
+
+---
+
 ## 2026-05-10 — POSS clarified, coverage probe, expected_output for 3 demos
 
 **Change**

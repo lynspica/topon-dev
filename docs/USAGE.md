@@ -18,7 +18,39 @@ Runtime dependencies: `numpy`, `networkx`, `rdkit`, `pydantic`, `scipy`. LAMMPS 
 
 ## 2. Quick start
 
-The fastest path from a checked-out repo to a runnable LAMMPS system:
+### 2.1 Interactive shell (recommended)
+
+Run `topon` (or `python -m topon`) with no arguments on a real terminal. You land in the `topon>` REPL, where every subcommand is one token away:
+
+```text
+$ python -m topon
+   +================ ... banner ... ================+
+   Type `help` for the command list, or `exit` to leave.
+
+topon> init --preset cg_kg --output my_run.json
+Wrote my_run.json (preset: cg_kg, copied from config.json)
+
+topon> doctor my_run.json
+[ok]    schema_gap_extras: ...
+Summary: 0 error / 0 warn / 1 ok
+
+topon> generate my_run.json
+... runs the 6-stage pipeline ...
+
+topon> inspect output_my_run
+... atom counts, box, next LAMMPS commands ...
+
+topon> exit
+bye.
+```
+
+Shell built-ins: `help`, `help <cmd>`, `exit | quit | q | Ctrl-D`. Arrow keys for history if `readline` is installed. `help <cmd>` shows the same click `--help` page you'd see in one-shot mode.
+
+The shell auto-launches when stdin is a TTY. To force it from a non-TTY context use `topon shell`; to skip it and just print the banner, use `topon --no-shell`.
+
+### 2.2 One-shot mode
+
+Same commands, but each one re-invokes the CLI:
 
 ```bash
 # 1. Generate a starter config
@@ -80,18 +112,64 @@ topon validate CONFIG_PATH
 
 Prints `Configuration is valid!` or lists every validation error. Cheap pre-flight check before submitting a long run to HPC.
 
-### 3.3 `topon init`
+### 3.3 `topon init` — starter config that runs as-is
 
 ```bash
-topon init [--output FILE] [--full]
+topon init                              # fastest: write atomistic_pdms preset
+topon init --preset cg_kg               # different preset
+topon init --interactive                # prompt-driven walk through 6 knobs
+topon init --preset martini_resilin     # print the right MARTINI CLI invocation
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `--output`, `-o` | `config.json` | Output path |
-| `--full` | off | Include all options with default values (otherwise minimal) |
+| `--output`, `-o` | `config.json` | Path for the new config file |
+| `--preset` | `atomistic_pdms` | One of `atomistic_pdms`, `cg_kg`, `poss`, `martini_resilin`, `charmm_resilin`. The first three copy a bundled demo `config.json`; the last two print the right `python -m` invocation (those paths use a separate CLI). |
+| `--interactive`, `-i` | off | Prompt for the 5–6 knobs that actually vary (study name, output dir, model type, lattice type+size, max functionality, DP, density) and write the result. |
 
-Edit the generated file to set topology source, DP, entanglements, etc.
+The non-interactive default copies `examples/demos/polymer/atomistic/basic/config.json`. Every preset-produced file passes `topon validate` immediately.
+
+### 3.3a `topon doctor` — semantic lint
+
+```bash
+topon doctor my_run.json           # informational + warns
+topon doctor my_run.json --strict  # warns also exit 1
+```
+
+Where `validate` is a Pydantic schema check, `doctor` runs a small rule registry sourced from known footguns (`internal/DEVELOPMENT_INTERNAL.md` issues + things new users trip on). Current rules:
+
+| Rule | Level | Catches |
+|---|---|---|
+| `lattice_size_format` | error | `"lattice_size": 5` instead of `"5x5x5"` |
+| `unknown_node_type` | warn | `assignment.node_types.degree.mapping` references a type that's not in `chemistry.node_type_map` (would silently fall through to Si — P0-2) |
+| `poss_at_internal_junction` | warn | POSS mapped to degree >= 2 (hits known bug P1-H) |
+| `atomistic_graft_non_pdms` | warn | Graft density set on a non-PDMS atomistic monomer (currently silently skipped) |
+| `dp_below_kuhn` | warn | DP < 5 — conformation/entanglement edge cases |
+| `defects_endcap_safe` | ok | Reminder that primary-loop defects safely skip end-caps post-2026-05-10 |
+| `schema_gap_extras` | ok | Config has `conformation`/`simulation`/`execution` (not Pydantic-validated; CLI handles via `load_config_full`) |
+
+Adding a new rule: write `check_<name>(cfg, raw) -> list[Issue]` in `topon/diagnostics/rules.py` and append to `RULE_REGISTRY`.
+
+### 3.3b `topon inspect <run_dir>` — post-run summary
+
+```bash
+topon inspect runs/my_study
+topon inspect examples/demos/polymer/atomistic/graft/expected_output
+```
+
+Replaces hand-grepping `system.data` headers after a long pipeline. Parses each stage directory (Pipeline layout: `02_Chemistry/`, `03_Conformation/`, `04_Simulation/`) or the flat `expected_output/`-style layout, and prints:
+
+- atom count, atom-type count, box dimensions
+- per-stage status (which files landed, what they say)
+- the next LAMMPS commands to run
+
+### 3.3c `topon recipes` — common use cases
+
+```bash
+topon recipes
+```
+
+Prints a "I want X -> run Y" cheatsheet covering all sub-systems (polymer networks via Pipeline, MARTINI/CHARMM protein networks, simbox, single-chain, batch workflows). Edit `topon/cli.py:recipes()` to add rows.
 
 ### 3.4 `topon simbox` — pack a crosslink box
 
