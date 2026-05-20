@@ -182,3 +182,89 @@ def test_get_tyr_node_indices_consistent_with_y_positions():
     via_seq = sequence.get_tyr_node_indices(n_repeats, segs)
     via_bfm = set(bfm.get_y_positions(n_repeats, segs))
     assert via_seq == via_bfm
+
+
+# --------------------------------------------------------------------------
+# winding-safe crosslinking (2026-05-19): a candidate crosslink is rejected
+# if it would close a cycle in the chain-plus-crosslink bond graph whose
+# accumulated lattice image-delta is non-zero around the periodic box.
+# Goal: the projected geometry has zero winding-cycle drops at write time.
+# --------------------------------------------------------------------------
+
+def test_winding_safe_produces_zero_writer_drops():
+    """End-to-end: a `winding_safe` BFM topology projected via the
+    builder and written via the LAMMPS writer must produce zero
+    winding-cycle drops. The new method's whole point is to filter the
+    candidate set at reaction time so the writer never has to drop.
+
+    Uses a system small enough to run fast (~3s) but large enough that
+    a few candidates trigger the winding rejection path (verified via
+    the ``n_rejected_winding`` field in the snapshot).
+    """
+    from topon.protein_network import builder, lammps_writer, sequence
+    from topon.protein_network.martini_ff import MartiniLibrary
+    import tempfile
+
+    topo = bfm.generate_topology(
+        n_chains=20, n_repeats=12, segs_per_block=2,
+        target_packing=0.45, equil_steps=50_000,
+        crosslink_method="winding_safe", seed=99, verbose=False,
+    )
+    snap = topo["snapshots"][0]  # gel_point if reached, else no_gel
+    assert snap["n_rejected_winding"] >= 1, (
+        f"expected at least one winding rejection for seed=99 (got "
+        f"{snap['n_rejected_winding']}); this canary test relies on the "
+        f"realisation actually exercising the rejection path."
+    )
+
+    lib = MartiniLibrary.from_package_data()
+    seq3 = sequence.build_full_sequence("GGRPSDSYGAPGGGN", 12)
+    sys_ = builder.build_protein_system(
+        snap, seq3, lib, block_seq="GGRPSDSYGAPGGGN", seed=99,
+    )
+
+    # The writer prints a drop report to stdout if it dropped anything,
+    # AND the kept_bonds count would be less than the total. Easier
+    # check: parse the header.
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = lammps_writer.write_lammps(sys_, lib, tmp)
+        data_text = paths["data"].read_text(encoding="utf-8")
+
+    # Total bonds in the System (input to writer)
+    n_input = len(sys_.bonds) + len(sys_.constraints)
+    # Emitted bonds count (writer header)
+    n_bonds_line = next(
+        l for l in data_text.splitlines() if l.strip().endswith("bonds")
+    )
+    n_emitted = int(n_bonds_line.split()[0])
+    assert n_emitted == n_input, (
+        f"winding_safe should produce zero drops, but writer emitted "
+        f"{n_emitted} of {n_input} bonds ({n_input - n_emitted} dropped). "
+        f"Snapshot conversion was {snap['conv']:.4f} with "
+        f"{snap['n_rejected_winding']} winding-rejections."
+    )
+
+
+def test_winding_safe_matches_adjacent_on_no_winding_seed():
+    """For a small / sparse system where no candidates wind, the
+    `winding_safe` method must produce the same accepted crosslink set
+    as the default `adjacent` method (modulo nothing — same shuffle
+    order, same rng seed). This guards against unintended divergence
+    in the easy case.
+    """
+    common_args = dict(
+        n_chains=6, n_repeats=4, segs_per_block=2,
+        target_packing=0.45, equil_steps=2000, seed=3, verbose=False,
+    )
+    topo_adj = bfm.generate_topology(**common_args, crosslink_method="adjacent")
+    topo_ws = bfm.generate_topology(**common_args, crosslink_method="winding_safe")
+
+    # No rejections for this small/sparse setup
+    last_ws = topo_ws["snapshots"][-1]
+    if last_ws.get("n_rejected_winding", 0) == 0:
+        rxns_adj = topo_adj["snapshots"][-1]["reactions"]
+        rxns_ws = topo_ws["snapshots"][-1]["reactions"]
+        assert rxns_adj == rxns_ws, (
+            "with zero winding-rejections, winding_safe should produce "
+            "an identical reaction list to the adjacent method"
+        )

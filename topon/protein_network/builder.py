@@ -37,6 +37,10 @@ DEFAULT_SC_JITTER_ANG: float = 0.3        # sidechain bead offset (small, so ini
                                            # bond lengths sit close to equilibrium ~ 2.7-3.0 A)
 DITYROSINE_BOND_LENGTH_NM: float = 0.270  # SC4-SC4 dityrosine bond
 DITYROSINE_BOND_K_KJ: float = 8000.0      # treat like a stiff backbone bond
+CROSSLINK_SEP_ANG: float = 7.0            # separation of the two merged TYR residues at a
+                                           # crosslink, so the rings form an adjacent dimer
+                                           # instead of landing coincident (r~0). The SC4-SC4
+                                           # bond relaxes them to equilibrium during minimisation.
 
 
 def _auto_lattice_scale_ang(n_residues: int, n_segments_per_chain: int) -> float:
@@ -186,6 +190,85 @@ def _select_bbbb_label(quad_resnames: tuple[str, str, str, str]) -> str:
     return "BBBB"
 
 
+def _embed_residue_local(
+    n_beads: int,
+    edges: list[tuple[int, int, float]],
+    seed: int,
+    min_sep: float = 3.0,
+    lr: float = 0.08,
+    iters: int = 250,
+) -> np.ndarray:
+    """Embed one residue's beads in 3D from its intra bond/constraint edges.
+
+    Bead 0 (BB) is pinned at the origin. ``edges`` are ``(i, j, target_len_ang)``
+    local-index pairs (bonds AND ring constraints). Minimises sum of squared
+    length errors plus a soft repulsion that keeps every NON-bonded pair at least
+    ``min_sep`` Angstrom apart. This replaces the old ``bb + jitter`` placement,
+    which piled all sidechain beads onto the backbone (down to ~0.02 nm apart) and
+    was only tolerable in LAMMPS because ``special_bonds 0 0 0`` over-excluded the
+    resulting intra-residue overlaps. Returns ``(n_beads, 3)`` offsets from BB.
+    """
+    if n_beads <= 1:
+        return np.zeros((1, 3))
+    rng = np.random.default_rng(seed)
+    pos = np.zeros((n_beads, 3))
+    for k in range(1, n_beads):
+        pos[k] = np.array([0.0, 0.0, 3.0 * k]) + rng.normal(0.0, 0.3, 3)
+    bonded = {(min(i, j), max(i, j)) for (i, j, _l) in edges}
+    for _ in range(iters):
+        grad = np.zeros((n_beads, 3))
+        for (i, j, L) in edges:
+            d = pos[i] - pos[j]
+            r = float(np.linalg.norm(d)) + 1e-9
+            g = (r - L) / r * d
+            grad[i] += g
+            grad[j] -= g
+        for i in range(n_beads):
+            for j in range(i + 1, n_beads):
+                if (i, j) in bonded:
+                    continue
+                d = pos[i] - pos[j]
+                r = float(np.linalg.norm(d)) + 1e-9
+                if r < min_sep:
+                    g = (min_sep - r) / r * d  # push i away from j
+                    grad[i] -= g
+                    grad[j] += g
+        pos -= lr * grad
+        pos[0] = 0.0
+    return pos - pos[0]
+
+
+def _orient_offsets(offsets: np.ndarray, tangent: np.ndarray, seed: int) -> np.ndarray:
+    """Rotate residue-local offsets so the sidechain centroid points 'outward'
+    (a per-residue direction perpendicular to the backbone tangent), reducing
+    sidechain<->neighbour-backbone clashes. BB (offsets[0]==0) is unchanged."""
+    if offsets.shape[0] <= 1:
+        return offsets
+    c = offsets[1:].mean(axis=0)
+    nc = float(np.linalg.norm(c))
+    if nc < 1e-6:
+        return offsets
+    axis_from = c / nc
+    rng = np.random.default_rng(seed)
+    t = tangent / (float(np.linalg.norm(tangent)) + 1e-9)
+    v = rng.normal(0.0, 1.0, 3)
+    outward = v - np.dot(v, t) * t
+    no = float(np.linalg.norm(outward))
+    if no < 1e-6:
+        outward = np.array([1.0, 0.0, 0.0]); no = 1.0
+    axis_to = outward / no
+    vc = np.cross(axis_from, axis_to)
+    s = float(np.linalg.norm(vc))
+    cdot = float(np.dot(axis_from, axis_to))
+    if s < 1e-9:
+        R = np.eye(3) if cdot > 0 else -np.eye(3)
+    else:
+        k = vc / s
+        K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+        R = np.eye(3) + s * K + (1.0 - cdot) * (K @ K)
+    return offsets @ R.T
+
+
 def build_protein_system(
     snapshot: dict,
     sequence_3letter: list[str],
@@ -244,6 +327,21 @@ def build_protein_system(
     )
     inv = _build_inverse_mapping(node_to_res)
 
+    # Crosslink dimer offsets: separate the two merged crosslinked TYR residues
+    # so their rings don't land coincident (r~0). See template_builder for detail.
+    crosslink_anchor_offset: dict[tuple[int, int], np.ndarray] = {}
+    for rxn in snapshot.get("reactions", []):
+        (ci1, ni1), (ci2, ni2) = rxn[0], rxn[1]
+        r1 = node_to_res.get(ni1)
+        r2 = node_to_res.get(ni2)
+        if r1 is None or r2 is None:
+            continue
+        axrng = np.random.default_rng(seed * 991 + ni1 * 7 + ni2 * 13)
+        axis = axrng.normal(0.0, 1.0, 3)
+        axis = axis / (float(np.linalg.norm(axis)) + 1e-9)
+        crosslink_anchor_offset[(ci1, r1)] = +axis * (CROSSLINK_SEP_ANG / 2.0)
+        crosslink_anchor_offset[(ci2, r2)] = -axis * (CROSSLINK_SEP_ANG / 2.0)
+
     sys_ = System(box_dims_ang=tuple(box.tolist()))
     next_atom_id = 1
     # per-chain (chain_id, residue_idx, atom_name) -> atom_id
@@ -272,15 +370,34 @@ def build_protein_system(
             is_c_term = (r_idx == n_residues - 1)
             patched = _patch_terminal_beads(raw_beads, is_n_term, is_c_term)
 
-            anchor = residue_positions.get(r_idx, np.zeros(3))
+            anchor = (residue_positions.get(r_idx, np.zeros(3))
+                      + crosslink_anchor_offset.get((ci, r_idx), np.zeros(3)))
+
+            # proper sidechain geometry (embedded per residue, oriented outward),
+            # not anchor+jitter (which piled SC beads on BB -> intra overlaps).
+            _names = [bn for (bn, _bt, _q) in patched]
+            _embed_order = (["BB"] if "BB" in _names else []) + [n for n in _names if n != "BB"]
+            _ei = {n: i for i, n in enumerate(_embed_order)}
+            _edges: list[tuple[int, int, float]] = []
+            for _rec in res_def["intra_bonds"]:
+                if _rec[0] in _ei and _rec[1] in _ei:
+                    _edges.append((_ei[_rec[0]], _ei[_rec[1]], _rec[3] * 10.0))
+            for _rec in res_def["intra_constraints"]:
+                if _rec[0] in _ei and _rec[1] in _ei:
+                    _edges.append((_ei[_rec[0]], _ei[_rec[1]], _rec[3] * 10.0))
+            _offl = _embed_residue_local(len(_embed_order), _edges, seed=seed + r_idx)
+            _tan = residue_positions.get(r_idx + 1, anchor) - residue_positions.get(r_idx - 1, anchor)
+            if float(np.linalg.norm(_tan)) < 1e-6:
+                _tan = np.array([0.0, 0.0, 1.0])
+            _offl = _orient_offsets(_offl, _tan, seed=seed * 100003 + ci * 9176 + r_idx)
+            _sc_off = {n: _offl[_ei[n]] for n in _embed_order}
 
             local_atom_ids: dict[str, int] = {}
             for atom_name, bead_type, charge in patched:
                 if atom_name == "BB":
                     pos = anchor.copy()
                 else:
-                    jitter = rng.normal(0.0, sc_jitter_ang, size=3)
-                    pos = anchor + jitter
+                    pos = anchor + _sc_off.get(atom_name, np.zeros(3))
                 bead = Bead(
                     atom_id=next_atom_id,
                     bead_type=bead_type,
@@ -351,10 +468,13 @@ def build_protein_system(
 
     # Apply dityrosine crosslinks recorded in the BFM snapshot.
     # Each reaction = [[ci1, ni1], [ci2, ni2]] where ni* are chain node indices.
-    # Wrap-only writer convention: all crosslinks are kept; LAMMPS computes
-    # bond forces using min-image distance via the neighbor/ghost system, so
-    # a crosslink between two beads at the same lattice site is short
-    # regardless of which chain wrap-counts placed them there.
+    # All crosslinks are added here; the writer's priority-MST image-flag pass
+    # (``lammps_writer._kruskal_image_flags_and_drop``) processes non-crosslink
+    # bonds first and crosslinks last, so any winding-cycle back-edge in the
+    # crosslink graph (≈ 0.1% of crosslinks in a typical BFM realisation) is
+    # identified as a crosslink rather than a backbone bond and dropped from
+    # the LAMMPS data file. Real backbone / sidechain bonds are tree edges by
+    # construction and never drop.
     for rxn in snapshot.get("reactions", []):
         (ci1, ni1), (ci2, ni2) = rxn[0], rxn[1]
         r1 = node_to_res.get(ni1)

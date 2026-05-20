@@ -32,23 +32,80 @@ GROMACS function-type mapping:
                                                types per quadruplet allowed)
 * dihedral funct 2 (improper, harmonic)  ->  improper_style harmonic
                                               (placed in the Impropers section)
-* `[ constraints ]`              ->  emitted as ULTRA-stiff harmonic bonds
-                                     (K = 1e6 kJ/mol/nm^2, matching the
-                                      reference's `#ifdef FLEXIBLE` block).
-                                     A `fix shake` block is offered as an
-                                     opt-in alternative in the input script
-                                     comments.
+* `[ constraints ]`              ->  emitted as stiff harmonic bonds with
+                                     K = CONSTRAINT_K_GMX = 10000 kJ/mol/nm^2
+                                     (NOT 1e6 -- see the constant's rationale
+                                      below; softened so mis-placed sidechains
+                                      don't explode during NVT). This is the
+                                      same K as the stiffest backbone bonds, so
+                                      the constraint bonds are NOT the timestep
+                                      limiter -- the dt~2 fs requirement comes
+                                      from elsewhere (likely the r=0 dityrosine
+                                      crosslinks before relaxation separates
+                                      them; see internal/option_c_rigid/DESIGN.md).
+                                     `fix shake` does NOT work on the TYR rings
+                                     (over-constrained connected clusters);
+                                     `fix rattle` or rigid bodies would be
+                                     needed for true rigid constraints.
 
 Reaction-field electrostatics are approximated with `dielectric 15.0` plus
 `pair_style lj/cut/coul/cut`, mirroring the reference's `coulombtype = reaction-field
 epsilon_r = 15`. The RF correction term is omitted (documented in the .in
 header).
+
+Image-flag assignment (added 2026-05; replaces the prior wrap-only convention):
+
+  The Atoms section emits the full ``atom_style full`` row (10 columns:
+  ``id mol type q x y z ix iy iz``). Image flags are computed by a
+  priority-weighted MST (Kruskal) over the molecular bond graph using
+  a 2-key sort:
+    * priority 0 (non-crosslink bonds — backbone, sidechain, constraints):
+      processed first, ordered by length within the priority.
+    * priority 1 (crosslinks — dityrosine SC4-SC4): processed last,
+      ordered by length within the priority.
+  Image flags propagate from the spanning-tree root such that every
+  tree-edge bond is minimum-image. Non-tree (cycle-closing) back-edges
+  whose BFS-implied image-flag delta disagrees with the wrapped
+  min-image delta are "winding-cycle bonds" — topologically forced
+  long bonds around the periodic box, which no image-flag assignment
+  can make MIC, and which break parallel-MPI ghost-shell construction
+  in LAMMPS. They are dropped at write time.
+
+  Why the priority key (2026-05-19 BB-BB-drop fix):
+    The BFM topology generator merges two TYR residues onto the same
+    lattice node at every dityrosine crosslink site. The two TYR/SC4
+    beads belong to two different chains and are placed by two
+    independent min-image chain walks — these walks may reach the
+    shared lattice node from opposite sides of the periodic box, so
+    the beads end up at the SAME wrapped position but with DIFFERENT
+    natural (chain-walk) image flags. The crosslink bond, in wrapped
+    MIC, is therefore length ≈ 0.05 A (essentially the per-axis
+    coord_perturbation). With a pure length-sorted MST, every
+    crosslink is added as a tree edge before any BB-BB bond. After
+    the crosslinks merged chains into one giant component, BB-BB
+    bonds (≈ 6.7 A at the BFM-projected scale) became the longest
+    edges in chain-wraps-around-the-box cycles and got dropped.
+    With the priority key, BB-BB bonds are now tree edges by
+    construction and the crosslinks responsible for the cycle's
+    winding are the ones dropped — matching the original design
+    intent that crosslinks are the redundant, sacrificial elements.
+
+  Why this is not the v33-v38 "phantom 240 A bonds" anti-pattern:
+  v33-v38 assigned image flags per-chain by walking each chain
+  independently and accumulating wrap counts. When two chains met at a
+  dityrosine crosslink, their walk-accumulated images disagreed and
+  the crosslink bond's image-flag-implied length was ~one box. This
+  writer computes image flags over the GLOBAL bond graph using a
+  spanning forest; tree edges are MIC by construction, regardless of
+  which chain they belong to. The 240 A failure mode cannot recur.
 """
 from __future__ import annotations
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
+
+import numpy as np
 
 from .martini_ff import (
     KJ_TO_KCAL,
@@ -103,6 +160,207 @@ def _assign_ids(records: list, key_fn) -> tuple[dict, list[int]]:
 _BB_BEAD_TYPES: set[str] = {"Q5", "SP1", "P2", "SP2", "SP2a"}
 _WATER_BEAD_TYPES: set[str] = {"W", "WF", "SW", "TW"}
 _CROSSLINK_BEAD_TYPES: set[str] = {"TN6"}  # TYR SC4 = dityrosine site
+
+
+# ----------------------------------------------------------------------
+# Image-flag assignment via priority-weighted MST + winding-cycle drop
+# ----------------------------------------------------------------------
+
+def _kruskal_image_flags_and_drop(
+    bead_positions: dict,
+    all_bonds: list,
+    Lx: float, Ly: float, Lz: float,
+) -> tuple[dict, list[bool]]:
+    """Assign per-atom image flags so every tree-edge of a priority-
+    weighted MST over the bond graph is minimum-image; drop the back-
+    edges whose unwrapped image-flag delta cannot be made MIC (cycles
+    with non-zero winding around the periodic box).
+
+    Args:
+        bead_positions: mapping atom_id -> (x, y, z) WRAPPED into
+            [0, Lx) x [0, Ly) x [0, Lz). Every atom that appears in
+            ``all_bonds`` MUST have an entry here.
+        all_bonds: list of bond records as 6-tuples
+            ``(a_id, b_id, funct, length_nm, k_kj, is_crosslink)``.
+            ``funct`` may be the int GROMACS function code or the
+            string ``"constraint"`` for stiffened constraint bonds.
+        Lx, Ly, Lz: box side lengths (A).
+
+    Returns:
+        ``(image_flags, keep_mask)`` where:
+          * ``image_flags[atom_id] = (ix, iy, iz)`` for every atom.
+            Atoms not reachable through bonds (e.g. water W beads with
+            no bonds) get ``(0, 0, 0)``.
+          * ``keep_mask`` is a list[bool] of length ``len(all_bonds)``;
+            False = winding-cycle back-edge, drop.
+
+    Sort priority (the structural fix for the "BB-BB drop" pathology):
+        Bonds are sorted by a 2-key composite (priority, length):
+          * priority 0 = non-crosslink bonds (backbone, sidechain,
+            constraints) — chain-internal structural connectivity.
+          * priority 1 = crosslinks (dityrosine SC4-SC4 between
+            chains) — designed to be the redundant, sacrificial
+            elements of the network.
+        Within a priority, bonds are still ordered by length so that
+        Kruskal's "longest back-edge gets dropped" property holds
+        locally (e.g. inside a TYR ring triangle near a box boundary).
+
+        Without the priority key, the BFM-merged dityrosine atoms
+        place two SC4 beads at the same wrapped position (MIC distance
+        ≈ 0.05 A), so crosslinks always sorted to the FRONT of the
+        length list. After crosslinks merged chains into one giant
+        component, BB-BB backbone bonds (~6.7 A at the BFM-projected
+        scale, much longer than crosslinks) became the longest edges
+        in every chain-wraps-around-the-box cycle and got dropped
+        instead of the topologically responsible crosslink. The fix
+        is to demote crosslinks to priority 1 so the longest edge in
+        every cycle is now the crosslink itself.
+
+    Why we still allow constraint drops:
+        Even within a single TYR ring (SC1-SC2-SC3-SC4 triangles), if
+        the 5 sidechain atoms straddle a box boundary in wrapped
+        coords, NO image-flag assignment can satisfy all 5 constraint
+        bonds simultaneously (one bond will always be ~half-box). That
+        is a real topological winding inside the ring, separate from
+        crosslink-induced winding, and dropping one constraint per
+        offending ring is the principled response. Caller reports
+        these counts.
+
+    Hard invariant — real funct=1/9 bonds can NEVER drop:
+        With the priority key, non-crosslink bonds form a forest
+        (one tree per chain, plus the small TYR-ring cycles). The
+        only non-crosslink edges that can land in a cycle are the
+        intra-residue ring bonds (constraints). Any backbone /
+        sidechain / inter-residue funct-int bond that drops is a
+        topology corruption upstream; the caller raises AssertionError
+        if this happens.
+
+    Why an exact integer image-flag-delta criterion (not a magnitude
+    threshold):
+        10 A is project-specific magic that would be wrong for an
+        atomistic CHARMM bond (~1.5 A) or a different lattice. The
+        principled test is "after MST, does the bond's BFS-implied
+        image-flag delta equal the wrapped min-image delta?" — pure
+        integer arithmetic, no scale-dependent constants.
+    """
+    atom_ids = list(bead_positions.keys())
+    id_to_idx = {aid: i for i, aid in enumerate(atom_ids)}
+    box = np.array([Lx, Ly, Lz], dtype=float)
+
+    def _mic_delta(a_id: int, b_id: int):
+        """Return ``(d_mic, image_delta)`` for a bond a -> b.
+
+        ``d_mic`` is the wrapped min-image displacement of B relative
+        to A. ``image_delta`` is the integer (Δix, Δiy, Δiz) such that
+        ``image_flags[B] = image_flags[A] + image_delta`` makes the
+        bond minimum-image in unwrapped coords.
+
+        Sign convention: raw difference ``d = B - A`` (wrapped); the
+        number of boxes B needs shifting by is
+        ``-round(d / L)``, hence ``image_delta = -round(d / L)``.
+        """
+        Ax, Ay, Az = bead_positions[a_id]
+        Bx, By, Bz = bead_positions[b_id]
+        d = np.array([Bx - Ax, By - Ay, Bz - Az])
+        n_boxes = np.round(d / box).astype(int)
+        d_mic = d - n_boxes * box
+        return d_mic, -n_boxes
+
+    # Pre-compute (length, image_delta) per bond. Sort key is
+    # (priority, length): priority 0 for non-crosslinks (real bonds +
+    # constraints) and priority 1 for crosslinks. This guarantees that
+    # all non-crosslink bonds enter the MST as tree edges before any
+    # crosslink is considered, so the only edges that can become
+    # back-edges across chains are crosslinks themselves.
+    bond_mic: list[tuple[np.ndarray, np.ndarray]] = []
+    sortable: list[tuple[int, float, int]] = []
+    for bidx, bond_tup in enumerate(all_bonds):
+        a, b, _funct, _length_nm, _k_kj, is_xl = bond_tup
+        d_mic, image_delta = _mic_delta(a, b)
+        bond_mic.append((d_mic, image_delta))
+        priority = 1 if is_xl else 0
+        sortable.append((priority, float(np.linalg.norm(d_mic)), bidx))
+    sortable.sort()
+
+    # Kruskal MST with Union-Find
+    n = len(atom_ids)
+    parent = list(range(n))
+    rank = [0] * n
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> bool:
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return False
+        if rank[ra] < rank[rb]:
+            ra, rb = rb, ra
+        parent[rb] = ra
+        if rank[ra] == rank[rb]:
+            rank[ra] += 1
+        return True
+
+    tree_edge_set: set[int] = set()
+    backedge_bond_indices: list[int] = []
+    for _priority, _length, bidx in sortable:
+        a, b = all_bonds[bidx][0], all_bonds[bidx][1]
+        ia, ib = id_to_idx[a], id_to_idx[b]
+        if union(ia, ib):
+            tree_edge_set.add(bidx)
+        else:
+            backedge_bond_indices.append(bidx)
+
+    # BFS over each spanning-tree component to assign image flags
+    tree_adj: dict[int, list[tuple[int, int]]] = defaultdict(list)
+    for bidx in tree_edge_set:
+        a, b, *_ = all_bonds[bidx]
+        tree_adj[a].append((b, bidx))
+        tree_adj[b].append((a, bidx))
+
+    image_flags: dict[int, tuple[int, int, int]] = {}
+    visited_atoms: set[int] = set()
+    for seed in atom_ids:
+        if seed in visited_atoms:
+            continue
+        image_flags[seed] = (0, 0, 0)
+        visited_atoms.add(seed)
+        q = deque([seed])
+        while q:
+            u = q.popleft()
+            for (v, bidx) in tree_adj[u]:
+                if v in visited_atoms:
+                    continue
+                a_in_bond, b_in_bond, *_ = all_bonds[bidx]
+                _, image_delta = bond_mic[bidx]
+                if u == a_in_bond:
+                    inc = image_delta
+                else:
+                    assert u == b_in_bond
+                    inc = -image_delta
+                u_img = np.array(image_flags[u], dtype=int)
+                image_flags[v] = tuple(int(x) for x in (u_img + inc))
+                visited_atoms.add(v)
+                q.append(v)
+
+    # Back-edge drop check: BFS-implied delta vs wrapped-MIC delta.
+    # Drop bonds where the BFS-tree-implied image flags disagree with
+    # the wrapped min-image delta (these are cycles with non-zero
+    # winding around the box; topologically forced long bonds).
+    keep: list[bool] = [True] * len(all_bonds)
+    for bidx in backedge_bond_indices:
+        ia = np.array(image_flags[all_bonds[bidx][0]], dtype=int)
+        ib = np.array(image_flags[all_bonds[bidx][1]], dtype=int)
+        bfs_delta = ib - ia
+        _, mic_delta = bond_mic[bidx]
+        mic_delta = np.asarray(mic_delta, dtype=int)
+        if not np.array_equal(bfs_delta, mic_delta):
+            keep[bidx] = False
+
+    return image_flags, keep
 
 
 def write_lammps(
@@ -167,13 +425,88 @@ def write_lammps(
     dihedral_type_keys, dihedral_per_record = _assign_ids(propers, _dihedral_type_key)
     improper_type_keys, improper_per_record = _assign_ids(impropers, _dihedral_type_key)
 
+    # Pre-compute wrapped bead positions + jitter (the same positions the
+    # Atoms section will emit), then run priority-weighted MST over the
+    # bond graph (non-crosslinks first, crosslinks last) to assign per-
+    # atom image flags and identify winding-cycle back-edges that need
+    # dropping. See _kruskal_image_flags_and_drop docstring for the
+    # rationale; see module docstring for why this replaces the v33-v38
+    # wrap-only convention.
+    bx, by, bz = sys_.box_dims_ang
+    _pert_rng = np.random.default_rng(coord_perturbation_seed)
+    bead_positions: dict[int, tuple[float, float, float]] = {}
+    for b in sys_.beads:
+        if coord_perturbation_ang > 0.0:
+            jx, jy, jz = _pert_rng.normal(0.0, coord_perturbation_ang, size=3)
+        else:
+            jx = jy = jz = 0.0
+        x = (b.position[0] + jx) % bx
+        y = (b.position[1] + jy) % by
+        z = (b.position[2] + jz) % bz
+        bead_positions[b.atom_id] = (x, y, z)
+
+    image_flags, keep_mask = _kruskal_image_flags_and_drop(
+        bead_positions, all_bonds, bx, by, bz,
+    )
+    kept_bonds = [bond for bond, k in zip(all_bonds, keep_mask) if k]
+    kept_bond_per_record = [tid for tid, k in zip(bond_per_record, keep_mask) if k]
+    n_dropped = sum(1 for k in keep_mask if not k)
+    if n_dropped:
+        n_xl_dropped = 0
+        n_constraint_dropped = 0
+        real_bond_drops: list[tuple[int, int, object]] = []
+        for i, k in enumerate(keep_mask):
+            if k:
+                continue
+            _a, _b, funct, _length, _kj, is_xl = all_bonds[i]
+            if is_xl:
+                n_xl_dropped += 1
+            elif funct == "constraint":
+                n_constraint_dropped += 1
+            else:
+                real_bond_drops.append((_a, _b, funct))
+
+        # Hard invariant: with the priority-MST sort, real backbone /
+        # sidechain bonds (funct=integer, is_crosslink=False) can NEVER
+        # be back-edges in the spanning tree, so they must never drop.
+        # If this assertion fires, something is corrupt upstream (e.g.
+        # duplicate atom IDs in the System, or a chain whose bond graph
+        # was made disconnected by a bug). The previous "warning only"
+        # behaviour was masking the real BB-BB drop pathology that the
+        # priority-MST fix addresses.
+        assert not real_bond_drops, (
+            f"BUG: {len(real_bond_drops)} real (non-crosslink, "
+            f"non-constraint) bond(s) flagged as winding-cycle "
+            f"back-edges by the priority-MST. First 5: "
+            f"{real_bond_drops[:5]}. With the priority-MST sort key, "
+            f"all non-crosslink bonds must be tree edges; this can "
+            f"only happen if the System has structural corruption "
+            f"(duplicate atom IDs, disconnected chains, etc.)."
+        )
+
+        print(
+            f"[protein_network/lammps_writer] dropped {n_dropped} "
+            f"winding-cycle bond(s) out of {len(all_bonds)} total "
+            f"({100.0 * n_dropped / max(len(all_bonds), 1):.3f} %). "
+            f"These are topologically forced long bonds in cycles with "
+            f"non-zero winding around the periodic box and cannot be "
+            f"made minimum-image by any image-flag assignment.\n"
+            f"  Breakdown:  "
+            f"crosslinks: {n_xl_dropped} (BFM crosslink graph has "
+            f"winding cycles around the periodic box; the longest "
+            f"crosslink in each cycle gets dropped), "
+            f"constraints: {n_constraint_dropped} (TYR ring atoms "
+            f"that straddle a box boundary in wrapped coords; "
+            f"unavoidable when SC1-SC4 cluster crosses a face)"
+        )
+
     # Data file ----------------------------------------------------------------
     data_path = out / f"{base_name}.data"
     with data_path.open("w", encoding="utf-8") as f:
         f.write(HEADER_BANNER)
         f.write("\n")
         f.write(f"{sys_.n_atoms()} atoms\n")
-        f.write(f"{len(all_bonds)} bonds\n")
+        f.write(f"{len(kept_bonds)} bonds\n")
         f.write(f"{len(sys_.angles)} angles\n")
         f.write(f"{len(propers)} dihedrals\n")
         f.write(f"{len(impropers)} impropers\n\n")
@@ -182,7 +515,6 @@ def write_lammps(
         f.write(f"{max(1, len(angle_type_keys))} angle types\n")
         f.write(f"{max(1, len(dihedral_type_keys))} dihedral types\n")
         f.write(f"{max(1, len(improper_type_keys))} improper types\n\n")
-        bx, by, bz = sys_.box_dims_ang
         f.write(f"0.0 {bx:.6f} xlo xhi\n")
         f.write(f"0.0 {by:.6f} ylo yhi\n")
         f.write(f"0.0 {bz:.6f} zlo zhi\n\n")
@@ -193,41 +525,26 @@ def write_lammps(
             f.write(f"{tid} {mass:.4f}  # {bt}\n")
         f.write("\n")
 
+        # Atoms section: 10 columns including image flags (id mol type q x y z
+        # ix iy iz). Image flags come from the MST-assigned set computed
+        # above. The xyz perturbation is the same one the previous wrap-only
+        # writer used, applied during bead_positions build above.
         f.write("Atoms  # full\n\n")
-        bx, by, bz = sys_.box_dims_ang
-        # Tiny xyz perturbation to break zero-distance degeneracies (BFM
-        # merges two crosslink endpoints onto one lattice node, so their BBs
-        # are coincident in the wrapped frame; without a jitter the bond/
-        # angle gradient computation hits division-by-zero in stage 1).
-        # Mirrors core topon's hierarchical-relaxation precondition.
-        import numpy as _np
-        _pert_rng = _np.random.default_rng(coord_perturbation_seed)
         for b in sys_.beads:
             tid = bead_type_id[b.bead_type]
-            # Wrap-only convention (matches core topon writer). All atoms
-            # placed inside [0, box); no image flag column. LAMMPS handles
-            # bonds across periodic boundaries via the neighbor/ghost system
-            # using min-image distance, which is correct as long as every
-            # bond is shorter than box/2 (always the case for MARTINI 3.6 A
-            # bonds in a >= 240 A box).
-            if coord_perturbation_ang > 0.0:
-                jx, jy, jz = _pert_rng.normal(0.0, coord_perturbation_ang, size=3)
-            else:
-                jx = jy = jz = 0.0
-            x = (b.position[0] + jx) % bx
-            y = (b.position[1] + jy) % by
-            z = (b.position[2] + jz) % bz
+            x, y, z = bead_positions[b.atom_id]
+            ix, iy, iz = image_flags.get(b.atom_id, (0, 0, 0))
             f.write(
                 f"{b.atom_id} {b.molecule_id} {tid} {b.charge:.4f} "
-                f"{x:.6f} {y:.6f} {z:.6f}  "
+                f"{x:.6f} {y:.6f} {z:.6f} {ix} {iy} {iz}  "
                 f"# {b.residue_name}/{b.atom_name} {b.bead_type}\n"
             )
         f.write("\n")
 
-        if all_bonds:
+        if kept_bonds:
             f.write("Bonds\n\n")
-            for i, (a, b, funct, length, k, is_xl) in enumerate(all_bonds, start=1):
-                tid = bond_per_record[i - 1]
+            for i, (a, b, funct, length, k, is_xl) in enumerate(kept_bonds, start=1):
+                tid = kept_bond_per_record[i - 1]
                 tag = "crosslink" if is_xl else ("constraint" if funct == "constraint" else "bond")
                 f.write(f"{i} {tid} {a} {b}  # {tag}\n")
             f.write("\n")
@@ -400,7 +717,7 @@ def _stage1_hierarchical(base_name: str, has_water: bool) -> str:
 {_COMMON_HEADER}
 pair_style      lj/cut/coul/cut 12.0
 pair_modify     shift yes
-special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+special_bonds   lj 0.0 1.0 1.0 coul 0.0 1.0 1.0
 dielectric      15.0
 
 read_data       ../{base_name}.data
@@ -476,7 +793,7 @@ def _stage1_soft(base_name: str) -> str:
 {_COMMON_HEADER}
 pair_style      lj/cut/coul/cut 12.0
 pair_modify     shift yes
-special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+special_bonds   lj 0.0 1.0 1.0 coul 0.0 1.0 1.0
 dielectric      15.0
 
 read_data       ../{base_name}.data
@@ -546,7 +863,7 @@ minimize        1.0e-4 1.0e-6 1000 10000
 # Switch to MARTINI lj/cut/coul/cut (supports `fix adapt` epsilon scaling)
 pair_style      lj/cut/coul/cut 12.0
 pair_modify     shift yes
-special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+special_bonds   lj 0.0 1.0 1.0 coul 0.0 1.0 1.0
 dielectric      15.0
 include         ../{base_name}.in.settings
 
@@ -574,7 +891,9 @@ def _stage3_min_nvt_npt(base_name: str) -> str:
 # 1 fs timestep, same 100.0 Tdamp). MARTINI-specific changes are noted inline:
 #   * pair_style lj/cut/coul/cut    (vs lj/charmm/coul/long + kspace pppm)
 #   * dielectric 15.0               (RF approximation; MARTINI default)
-#   * special_bonds lj/coul 0 0 0   (vs special_bonds charmm)
+#   * special_bonds lj/coul 0 1 1   (nrexcl=1: exclude 1-2 only, matching the
+#     reference high_pro.itp + GROMACS; was 0 0 0 which OVER-excluded 1-3/1-4 and
+#     let the proper sidechain geometry collapse during dynamics)
 #   * angle_style cosine/squared    (MARTINI 3 IDP backbone funct=10)
 #   * no fix cmap                   (CMAP is CHARMM-only)
 #   * comm_modify cutoff 60         (MARTINI bonds longer than atomistic)
@@ -583,7 +902,7 @@ def _stage3_min_nvt_npt(base_name: str) -> str:
 {_COMMON_HEADER}
 pair_style      lj/cut/coul/cut 12.0    # MARTINI: was lj/charmm/coul/long + pppm
 pair_modify     shift yes
-special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0   # MARTINI: was special_bonds charmm
+special_bonds   lj 0.0 1.0 1.0 coul 0.0 1.0 1.0   # MARTINI: was special_bonds charmm
 dielectric      15.0                              # MARTINI: RF approx (no equivalent in CHARMM)
 
 read_data       system_ramped.data

@@ -172,13 +172,14 @@ def test_in_memory_positions_within_one_box_image(lib, small_snapshot_2chains):
         assert -bz < z < 2 * bz
 
 
-def test_writer_wraps_positions_into_box_no_image_flags(lib, small_snapshot_2chains, tmp_path):
-    """Wrap-only convention: positions inside [0, box), NO image flag column.
-
-    Mirrors core topon's lammps writer. Bond forces use min-image via the
-    LAMMPS neighbor/ghost system, so writing image flags is unnecessary and
-    actually counterproductive (was causing phantom-bond bugs at BFM-merged
-    crosslink endpoints whose chain-walks accumulated different image counts).
+def test_writer_wraps_positions_into_box_emits_image_flags(lib, small_snapshot_2chains, tmp_path):
+    """Atoms section: positions wrapped into [0, box), image flags emitted
+    as columns 8-10 (ix, iy, iz). Image flags are computed by a length-
+    weighted MST over the bond graph (see
+    ``lammps_writer._kruskal_image_flags_and_drop``) so every tree-edge
+    bond is minimum-image. This is the post-2026-05 convention; the prior
+    wrap-only 7-column writer left LAMMPS to assume ix=iy=iz=0 and broke
+    parallel-MPI bond communication for chains that wrap across the box.
     """
     from topon.protein_network import lammps_writer
     sys_ = _build(lib, small_snapshot_2chains, n_repeats=3)
@@ -191,14 +192,18 @@ def test_writer_wraps_positions_into_box_no_image_flags(lib, small_snapshot_2cha
         s = line.strip()
         if not s or s.startswith("#"): continue
         toks = s.split("#")[0].split()
-        # full atom_style row: id mol type q x y z   (7 cols, NO image flags)
-        if len(toks) != 7: continue
+        # full atom_style row: id mol type q x y z ix iy iz (10 cols)
+        if len(toks) != 10: continue
         try:
             x, y, z = float(toks[4]), float(toks[5]), float(toks[6])
+            ix, iy, iz = int(toks[7]), int(toks[8]), int(toks[9])
         except ValueError:
             continue
         assert 0.0 <= x < bx, f"atom outside box on x: {x}"
         assert 0.0 <= y < bx, f"atom outside box on y: {y}"
         assert 0.0 <= z < bx, f"atom outside box on z: {z}"
+        # ix/iy/iz are ints (no sign/magnitude constraint here — the
+        # MIC-consistency invariant is checked in test_writer.py's
+        # test_bonds_are_minimum_image_under_emitted_image_flags).
         n_checked += 1
     assert n_checked > 0

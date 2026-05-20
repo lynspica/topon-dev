@@ -552,6 +552,233 @@ def apply_crosslinks_distance_based(
     return snapshots
 
 
+def _lattice_image_delta(
+    flat_a: int, flat_b: int, Nx: int, Ny: int, Nz: int,
+) -> tuple[int, int, int]:
+    """Integer image-flag delta along the BFM bond from flat_a to flat_b.
+
+    Returns ``(dix, diy, diz)`` such that, in an unwrapped lattice
+    frame, the position of ``flat_b`` equals the position of ``flat_a``
+    plus the BFM bond vector. The wrapped delta is ``pos_b - pos_a``;
+    the integer ``n_boxes = round(delta / N)`` says how many full
+    periodic shifts the wrap step crossed; ``image_delta = -n_boxes``
+    is the per-axis image-flag increment that makes the bond
+    minimum-image when applied as ``image[b] = image[a] + image_delta``.
+
+    For BFM lattice-adjacent pairs (`|diff| in {2, √5, √6, 3, √10}` and
+    always small relative to N), this returns 0 along an axis unless
+    the bond straddles that face (then it returns ±1).
+    """
+    xa, ya, za = flat_to_xyz(flat_a, Nx, Ny)
+    xb, yb, zb = flat_to_xyz(flat_b, Nx, Ny)
+    dx, dy, dz = xb - xa, yb - ya, zb - za
+    nbx = int(round(dx / Nx))
+    nby = int(round(dy / Ny))
+    nbz = int(round(dz / Nz))
+    return (-nbx, -nby, -nbz)
+
+
+def _compute_chain_node_images(
+    chain_flat: list[int], Nx: int, Ny: int, Nz: int,
+) -> list[tuple[int, int, int]]:
+    """Walk a chain forward, accumulating per-node image flags relative
+    to the chain's own root (node 0 at image ``(0, 0, 0)``).
+
+    Each consecutive (n_i, n_{i+1}) bond contributes its lattice
+    image-delta to the accumulating image flag. The result is a list
+    of length ``len(chain_flat)`` giving every chain node's image flag
+    in the chain's own unwrapped lattice frame.
+    """
+    imgs: list[tuple[int, int, int]] = [(0, 0, 0)]
+    for i in range(1, len(chain_flat)):
+        d = _lattice_image_delta(chain_flat[i - 1], chain_flat[i], Nx, Ny, Nz)
+        prev = imgs[-1]
+        imgs.append((prev[0] + d[0], prev[1] + d[1], prev[2] + d[2]))
+    return imgs
+
+
+def apply_crosslinks_winding_safe(
+    chains,
+    y_positions,
+    Nx,
+    Ny,
+    Nz,
+    n_extra_snapshots=4,
+    snapshot_delta_conv=0.05,
+    min_intrachain_sep=2,
+    rng=None,
+    target_conversion: float | None = None,
+):
+    """Lattice-adjacent crosslinking with winding-cycle rejection.
+
+    Same outer loop as `apply_crosslinks_with_snapshots` (random shuffle
+    of lattice-adjacent TYR pairs, merge sites, snapshot at gel point +
+    N post-gel snapshots), with one additional acceptance gate: a
+    candidate crosslink is REJECTED if it would close a cycle in the
+    chain-plus-crosslink bond graph whose accumulated lattice image-
+    delta around the loop is non-zero (a winding cycle around the
+    periodic box). Rejected candidates are skipped; the loop continues
+    until ``target_conversion`` is reached or the candidate list is
+    exhausted.
+
+    The winding check is incremental: every (chain_idx, node_idx) atom
+    carries an image flag in the unwrapped lattice frame of its
+    union-find component. When merging two components via a crosslink,
+    the entire component's image flags are rebased so that the new
+    crosslink is minimum-image by construction. When closing a cycle
+    within a single component, the image flags already give the
+    BFS-implied delta along the existing spanning tree; that delta is
+    compared to the crosslink's own lattice image-delta. Match =
+    trivial cycle (accept); mismatch = winding cycle (reject).
+
+    This is the BFM-level analogue of the writer's priority-MST
+    drop logic, applied at reaction time so the dropped crosslinks
+    are simply never formed, and replaced with non-winding candidates
+    from the remaining pool until the target conversion is reached.
+
+    Notes:
+      * ``target_conversion`` defaults to ``None`` = "exhaust the
+        candidate list, take whatever conversion the topology allows".
+        Pass an explicit value (e.g. 0.25) to stop early once the
+        target is met. The gel-point snapshot is still emitted on the
+        first reaction that achieves single-component connectivity.
+      * Statistics on rejections are written to the snapshot config
+        so callers can audit how often the topology was winding-
+        constrained.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    n_chains = len(chains)
+    total_y = n_chains * len(y_positions)
+
+    candidates = find_crosslink_candidates(
+        chains, y_positions, Nx, Ny, Nz, min_intrachain_sep
+    )
+    rng.shuffle(candidates)
+
+    # Per-atom image flags in the unwrapped lattice frame. Start by
+    # walking each chain independently (each chain is its own component).
+    node_image: dict[tuple[int, int], tuple[int, int, int]] = {}
+    for ci, chain_flat in enumerate(chains):
+        imgs = _compute_chain_node_images(chain_flat, Nx, Ny, Nz)
+        for ni, img in enumerate(imgs):
+            node_image[(ci, ni)] = img
+
+    # Union-find over CHAIN indices (each chain is internally connected
+    # via backbone bonds; the only inter-chain bonds are crosslinks).
+    uf = UnionFind(n_chains)
+    # Reverse map from union-find root -> list of chain indices in that
+    # component. Initialised lazily on first merge.
+    component_members: dict[int, list[int]] = {ci: [ci] for ci in range(n_chains)}
+
+    reacted_y: set[tuple[int, int]] = set()
+    reactions: list[tuple] = []
+    snapshots: list[dict] = []
+    n_rejected_winding = 0
+
+    gel_found = False
+    next_snap_conv = 0.0
+    chains_work = [list(c) for c in chains]
+
+    for pair in candidates:
+        (ci1, ni1), (ci2, ni2) = pair
+        if (ci1, ni1) in reacted_y or (ci2, ni2) in reacted_y:
+            continue
+
+        # Crosslink's own lattice image-delta (a -> b convention).
+        xl_delta = _lattice_image_delta(
+            chains_work[ci1][ni1], chains_work[ci2][ni2], Nx, Ny, Nz,
+        )
+
+        ra, rb = uf.find(ci1), uf.find(ci2)
+        if ra != rb:
+            # Different components: merge. The crosslink edge becomes
+            # a tree edge by construction. Shift component B's image
+            # flags so that image[ni2] = image[ni1] + xl_delta.
+            tgt = (
+                node_image[(ci1, ni1)][0] + xl_delta[0],
+                node_image[(ci1, ni1)][1] + xl_delta[1],
+                node_image[(ci1, ni1)][2] + xl_delta[2],
+            )
+            cur = node_image[(ci2, ni2)]
+            shift = (tgt[0] - cur[0], tgt[1] - cur[1], tgt[2] - cur[2])
+            if shift != (0, 0, 0):
+                for ci_shift in component_members[rb]:
+                    for ni_shift in range(len(chains_work[ci_shift])):
+                        old = node_image[(ci_shift, ni_shift)]
+                        node_image[(ci_shift, ni_shift)] = (
+                            old[0] + shift[0], old[1] + shift[1], old[2] + shift[2],
+                        )
+            # Merge component membership lists.
+            merged_members = component_members[ra] + component_members[rb]
+            del component_members[ra]
+            del component_members[rb]
+            uf.union(ci1, ci2)
+            component_members[uf.find(ci1)] = merged_members
+        else:
+            # Same component: this crosslink closes a cycle. Compute
+            # the BFS-implied image-delta along the existing tree and
+            # compare to the crosslink's own lattice image-delta.
+            ia = node_image[(ci1, ni1)]
+            ib = node_image[(ci2, ni2)]
+            tree_delta = (ib[0] - ia[0], ib[1] - ia[1], ib[2] - ia[2])
+            if tree_delta != xl_delta:
+                # Winding cycle — reject this crosslink. Try the next
+                # candidate. The current TYRs remain unreacted and may
+                # still pair with other partners later in the loop.
+                n_rejected_winding += 1
+                continue
+            # Trivial cycle (same image-delta both ways): accept.
+            # The crosslink is structurally redundant but doesn't wind.
+
+        reacted_y.add((ci1, ni1))
+        reacted_y.add((ci2, ni2))
+        reactions.append(pair)
+        merged_flat = chains_work[ci1][ni1]
+        chains_work[ci2][ni2] = merged_flat
+        conv = len(reacted_y) / total_y
+
+        if not gel_found and uf.n_components() == 1:
+            gel_found = True
+            next_snap_conv = conv + snapshot_delta_conv
+            snapshots.append(
+                _make_snapshot("gel_point", conv, chains_work, y_positions,
+                               reactions, Nx, Ny, Nz)
+            )
+        if gel_found and len(snapshots) <= n_extra_snapshots:
+            if conv >= next_snap_conv:
+                label = f"post_gel_{len(snapshots)}"
+                snapshots.append(
+                    _make_snapshot(label, conv, chains_work, y_positions,
+                                   reactions, Nx, Ny, Nz)
+                )
+                next_snap_conv = conv + snapshot_delta_conv
+        if target_conversion is not None and conv >= target_conversion:
+            break
+        if len(snapshots) > n_extra_snapshots:
+            break
+
+    if not gel_found:
+        conv = len(reacted_y) / total_y
+        snapshots.append(
+            _make_snapshot("no_gel", conv, chains_work, y_positions,
+                           reactions, Nx, Ny, Nz)
+        )
+        warnings.warn(
+            f"Gel point not reached with winding-safe crosslinking "
+            f"(max conv = {conv:.3f}, accepted = {len(reactions)}, "
+            f"rejected_winding = {n_rejected_winding}). Consider more "
+            f"equil_steps, larger n_chains, or smaller min_intrachain_sep."
+        )
+
+    # Annotate snapshots with rejection statistics so callers can audit.
+    for snap in snapshots:
+        snap["n_rejected_winding"] = n_rejected_winding
+
+    return snapshots
+
+
 def apply_crosslinks_with_snapshots(
     chains,
     y_positions,
@@ -698,7 +925,12 @@ def generate_topology(
             print(f"[BFM]   Acceptance rate: {acc:.3f}")
 
     if verbose:
-        method_label = "distance-based (alt)" if crosslink_method == "distance" else "lattice-adjacent"
+        if crosslink_method == "distance":
+            method_label = "distance-based (alt)"
+        elif crosslink_method == "winding_safe":
+            method_label = "lattice-adjacent + winding-cycle rejection"
+        else:
+            method_label = "lattice-adjacent"
         print(f"[BFM] Crosslinking ({method_label}) ...")
 
     if crosslink_method == "distance":
@@ -721,6 +953,14 @@ def generate_topology(
             snapshot_delta_conv=snapshot_delta_conv,
             min_intrachain_sep=min_intrachain_sep,
             pre_gel_conversions=pre_gel_conversions,
+            rng=rng,
+        )
+    elif crosslink_method == "winding_safe":
+        snapshots = apply_crosslinks_winding_safe(
+            chains, y_positions, Nx, Ny, Nz,
+            n_extra_snapshots=n_extra_snapshots,
+            snapshot_delta_conv=snapshot_delta_conv,
+            min_intrachain_sep=min_intrachain_sep,
             rng=rng,
         )
     else:
