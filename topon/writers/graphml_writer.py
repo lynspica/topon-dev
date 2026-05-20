@@ -13,6 +13,7 @@ The output GraphML uses the dual (line-graph) representation:
           + entanglement      (entangled chain pairs, with multiplicity)
 """
 
+import json
 from pathlib import Path
 from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, ElementTree
@@ -27,6 +28,8 @@ def write_graphml(
     output_path: str,
     dp: int = 50,
     dims: Optional[np.ndarray] = None,
+    strain: Optional[np.ndarray] = None,
+    stress: Optional[np.ndarray] = None,
 ) -> Path:
     """
     Write a topon graph to GraphML with the dual-graph transformation.
@@ -35,7 +38,17 @@ def write_graphml(
         G: Topon MultiGraph (nodes=crosslinks, edges=chains).
         output_path: Path for the output .graphml file.
         dp: Default degree of polymerization if not stored per-edge.
-        dims: Box dimensions [x, y, z] (written as graph attributes).
+        dims: Box dimensions [Lx, Ly, Lz]. Written as graph-level box
+            bounds [0, Lx] x [0, Ly] x [0, Lz] (xlo/xhi/ylo/yhi/zlo/zhi).
+            ``None`` leaves them as ``NaN``.
+        strain: Optional 1-D stress-strain ``strain`` array. Serialised
+            as a JSON-array string into graph-level key ``d14``.
+            ``None`` (the usual case for a freshly generated topology)
+            writes ``"[]"`` -- matching the GNN-pipeline ``translate.py``
+            convention so the file is format-complete and round-trips
+            cleanly through ``translate.py to-npz``.
+        stress: Optional 1-D stress-strain ``stress`` array. Serialised
+            into graph-level key ``d15``; ``None`` -> ``"[]"``.
 
     Returns:
         Path to the written file.
@@ -127,6 +140,13 @@ def write_graphml(
         "http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd",
     )
 
+    # Graph-level stress-strain keys (d14/d15). Matches the GNN-pipeline
+    # translate.py convention: for="graph", attr.type="string", value is
+    # a JSON-array string ("[]" when unavailable). Declared here so every
+    # topon graphml is format-complete and round-trips through
+    # translate.py without needing its `fix` subcommand.
+    _add_key(root, "d15", "graph", "stress", "string")
+    _add_key(root, "d14", "graph", "strain", "string")
     _add_key(root, "d13", "edge", "edge_type", "string")
     _add_key(root, "d12", "node", "COMZ", "double")
     _add_key(root, "d11", "node", "COMY", "double")
@@ -185,13 +205,33 @@ def write_graphml(
         edge_el = SubElement(graph_el, "edge", source=str(src), target=str(tgt))
         _add_data(edge_el, "d13", "entanglement")
 
-    # --- Graph-level data (box bounds) ---
-    _add_data(graph_el, "d0", "NaN")  # xlo
-    _add_data(graph_el, "d1", "NaN")  # xhi
-    _add_data(graph_el, "d2", "NaN")  # ylo
-    _add_data(graph_el, "d3", "NaN")  # yhi
-    _add_data(graph_el, "d4", "NaN")  # zlo
-    _add_data(graph_el, "d5", "NaN")  # zhi
+    # --- Graph-level data (box bounds + stress/strain) ---
+    # Populate box from dims when supplied: [0, Lx] x [0, Ly] x [0, Lz]
+    # (mirrors npz_writer's box convention). NaN if dims is None.
+    if dims is not None and np.asarray(dims).size >= 3:
+        d_arr = np.asarray(dims, dtype=float).flatten()
+        box_vals = [
+            "0.0", str(float(d_arr[0])),    # xlo, xhi
+            "0.0", str(float(d_arr[1])),    # ylo, yhi
+            "0.0", str(float(d_arr[2])),    # zlo, zhi
+        ]
+    else:
+        box_vals = ["NaN"] * 6
+    for kid, val in zip(("d0", "d1", "d2", "d3", "d4", "d5"), box_vals):
+        _add_data(graph_el, kid, val)
+
+    # Stress/strain as JSON-array strings (matches GNN-pipeline
+    # translate.py: empty -> "[]", populated -> json.dumps(list)).
+    def _arr_to_json(a: Optional[np.ndarray]) -> str:
+        if a is None:
+            return "[]"
+        arr = np.asarray(a, dtype=float).flatten()
+        if arr.size == 0:
+            return "[]"
+        return json.dumps(arr.tolist(), separators=(",", ":"))
+
+    _add_data(graph_el, "d14", _arr_to_json(strain))
+    _add_data(graph_el, "d15", _arr_to_json(stress))
 
     # ------------------------------------------------------------------
     # 5. Write to disk

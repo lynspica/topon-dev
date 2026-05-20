@@ -198,6 +198,7 @@ class ConformationManager:
             atom_lines_map[atom_id] = (i, parts) 
 
         # Relaxation Loop
+        moved_count = 0  # initialise outside the loop so max_iters=0 doesn't UnboundLocalError
         for iteration in range(max_iters):
             grid = defaultdict(list)
             for aid, pos in coords.items():

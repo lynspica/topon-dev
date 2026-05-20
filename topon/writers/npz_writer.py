@@ -170,6 +170,12 @@ def write_npz(
 
     # Build edge_index and edge_type arrays. PyG expects undirected edges
     # represented as both directions, so we emit (i, j) and (j, i).
+    #
+    # NOTE: the (src, tgt) values collected here are in the *original
+    # ID space* -- ``cid`` chain dual-ids (offset above max_xlink_id) and
+    # ``u``/``v`` crosslink node-ids (sparse: vacancy removal leaves
+    # gaps). They are NOT yet 0-based row positions into node_features.
+    # The remap step below converts them; see the bugfix block.
     edge_pairs: list[tuple[int, int, int]] = []  # (src, tgt, type_int)
     for src, tgt in chemical_edges:
         edge_pairs.append((src, tgt, 0))
@@ -184,6 +190,28 @@ def write_npz(
     else:
         ei = np.zeros((2, 0), dtype=np.int32)
         et = np.zeros((0,), dtype=np.int32)
+
+    # --- BUGFIX: remap edge_index from original-ID space -> 0-based row
+    # positions into node_features.
+    #
+    # node_features rows are [chain rows ... crosslink rows]; node_ids[i]
+    # is the original simulation/mol ID of row i. edge_index built above
+    # holds those original IDs, but PyG (and the spec) require edge_index
+    # to be 0-based positions into node_features. Crosslink IDs are
+    # sparse and chain IDs are offset above max_xlink_id, so the raw-ID
+    # range exceeds N -> PyTorch Geometric throws CUDA "index out of
+    # bounds". Remap with a dense ID->position lookup table.
+    if ei.shape[1] > 0:
+        max_id = int(node_ids.max()) + 1
+        id_to_pos = np.full(max_id, -1, dtype=np.int64)
+        id_to_pos[node_ids] = np.arange(len(node_ids), dtype=np.int64)
+        ei = id_to_pos[ei].astype(np.int32)
+        if (ei < 0).any():
+            raise ValueError(
+                "npz_writer: edge_index references an ID absent from "
+                "node_ids -- cannot remap to a row position. This "
+                "indicates an upstream graph-construction bug."
+            )
 
     # Box bounds: [xlo, xhi, ylo, yhi, zlo, zhi].
     if dims is not None and np.asarray(dims).size >= 3:

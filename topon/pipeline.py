@@ -148,6 +148,54 @@ class Pipeline:
         print()
         print("=== Pipeline Complete ===")
 
+    def run_from_graph(
+        self,
+        graph,
+        dims,
+    ) -> None:
+        """Run only chemistry + conformation + output stages.
+
+        Use when the graph is already fully prepared (e.g. loaded from a
+        graphml / npz dual-graph file via
+        :func:`topon.topology.loader.load_graphml` /
+        :func:`topon.topology.loader.load_npz`) and stages 1-3 (topology,
+        analysis, assignment) should be skipped.
+
+        For deterministic output across different sources of the same
+        topology (e.g. graphml-load vs npz-load), seed both
+        :mod:`random` and :mod:`numpy.random` before calling this. The
+        chemistry stage uses ``np.random.randn`` for graft-perp
+        directions, and the conformation stage uses noise from
+        ``numpy.random`` -- without seeding, byte-equivalence cannot be
+        guaranteed.
+
+        Args:
+            graph: NetworkX MultiGraph with crosslink nodes (``pos``) and
+                chain edges (``dp``, ``entangled_with``,
+                ``entanglement_count``). Edge / node ``type`` attributes
+                are optional and default to ``"A"``.
+            dims: Box dimensions array ``[Lx, Ly, Lz]``.
+        """
+        self.graph = graph
+        self.dims = (
+            np.asarray(dims, dtype=float)
+            if not isinstance(dims, np.ndarray) else dims.astype(float)
+        )
+        print(f"=== Topon Pipeline (rebuild from graph): "
+              f"{self.config.study.name} ===")
+        print(f"Output directory: {self.output_dir}")
+        print(f"  Skipping stages 1-3 (graph supplied directly).")
+        print(f"  Nodes: {self.graph.number_of_nodes()}, "
+              f"Edges: {self.graph.number_of_edges()}")
+        print()
+
+        self._run_chemistry_stage()
+        self._run_conformation_stage()
+        self._run_output_stage()
+
+        print()
+        print("=== Pipeline Complete (rebuild) ===")
+
     # ------------------------------------------------------------------
     # Stage 1: Topology
     # ------------------------------------------------------------------
@@ -275,7 +323,16 @@ class Pipeline:
         density = self.config.chemistry.target_density
 
         if model == "coarse_grained":
-            writer = CGWriter(self.chemical_space, data_path)
+            # Honour raw_config's simulation.include_angles flag (default True
+            # to preserve historic behaviour). Mirrors the topon.workflows.
+            # cg_network call pattern and the schema doc-string in
+            # topon/chemistry/kg/__init__.py.
+            sim_cfg_for_writer = self.raw_config.get("simulation", {})
+            include_angles = sim_cfg_for_writer.get("include_angles", True)
+            writer = CGWriter(
+                self.chemical_space, data_path,
+                include_angles=include_angles,
+            )
             writer.write()
             # Count-based volume for CG (matches v21 cg_network reference).
             n_atoms = self.chemical_space.GetNumAtoms()

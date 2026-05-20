@@ -1,10 +1,19 @@
 """
 Graph loader for Topon.
 
-Handles loading topology from various file formats.
+Handles loading topology from various file formats:
+
+* gpickle / .nodes+.edges -- basic topology (lattice + connectivity).
+* graphml / npz           -- post-assignment dual graph: chains + crosslinks
+                              with DP, entanglements (multiplicity preserved),
+                              and crosslink positions. Suitable for skipping
+                              the topology + analysis + assignment stages and
+                              going straight into chemistry/conformation/output.
 """
 
 import pickle
+import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 from typing import Optional, Union
 
@@ -240,10 +249,10 @@ def save_graph(
 def get_node_positions(G: nx.Graph) -> dict[int, np.ndarray]:
     """
     Extract node positions as a dictionary.
-    
+
     Args:
         G: Graph with 'pos' node attributes.
-        
+
     Returns:
         Dict mapping node ID to position array.
     """
@@ -252,3 +261,299 @@ def get_node_positions(G: nx.Graph) -> dict[int, np.ndarray]:
         if "pos" in data:
             positions[node] = np.array(data["pos"])
     return positions
+
+
+# ======================================================================
+# Dual-graph loaders (graphml + npz)
+#
+# Both formats are written by ``topon.writers.{graphml_writer,npz_writer}``
+# in the dual representation:
+#   * polymer nodes   (one per topon chain) carry DP via "length"
+#   * crosslinker nodes (one per junction) carry pos via COMX/Y/Z
+#   * chemical edges connect chain <-> its two end-crosslinks
+#   * entanglement edges connect chain <-> chain, replicated `count` times
+#     to preserve multiplicity
+#
+# The loaders here invert that transformation to rebuild the topon
+# MultiGraph (junctions = nodes, chains = edges with dp / entangled_with /
+# entanglement_count attributes). With that graph plus dims, the chemistry
+# + conformation + output stages can be re-run without going through
+# topology generation or assignment.
+# ======================================================================
+
+
+def load_graphml(
+    path: Union[str, Path],
+) -> tuple[nx.MultiGraph, Optional[np.ndarray]]:
+    """Load a topon graphml dual graph back into a MultiGraph + dims.
+
+    Reverses :func:`topon.writers.graphml_writer.write_graphml`.
+
+    Args:
+        path: Path to the ``.graphml`` file.
+
+    Returns:
+        ``(G, dims)`` where ``G`` is a ``nx.MultiGraph`` with crosslink
+        nodes (carrying ``pos``) and chain edges (carrying ``dp``,
+        ``entangled_with``, ``entanglement_count``). ``dims`` is the
+        inferred box dimensions (from graph attributes if present, else
+        from node positions).
+    """
+    path = Path(path)
+    tree = ET.parse(path)
+    root = tree.getroot()
+    ns = {"g": "http://graphml.graphdrawing.org/xmlns"}
+
+    # Parse <key> declarations so we can map data-element key IDs back to
+    # their semantic names (e.g. "length", "COMX", "edge_type", "xhi").
+    key_meta: dict[str, tuple[str, str, str]] = {}
+    for key in root.findall("g:key", ns):
+        key_meta[key.get("id")] = (
+            key.get("for"),
+            key.get("attr.name"),
+            key.get("attr.type"),
+        )
+
+    graph_el = root.find("g:graph", ns)
+    if graph_el is None:
+        raise ValueError(f"No <graph> element in {path}")
+
+    polymer_attrs: dict[int, dict] = {}     # chain dual-id -> attrs
+    crosslink_attrs: dict[int, dict] = {}   # junction id   -> attrs
+
+    for node in graph_el.findall("g:node", ns):
+        nid = int(node.get("id"))
+        attrs: dict = {}
+        for d in node.findall("g:data", ns):
+            kid = d.get("key")
+            if kid not in key_meta:
+                continue
+            _, name, type_ = key_meta[kid]
+            txt = d.text
+            if txt is None or txt == "NaN":
+                val = float("nan")
+            elif type_ == "long":
+                val = int(txt)
+            elif type_ in ("double", "float"):
+                val = float(txt)
+            else:
+                val = txt
+            attrs[name] = val
+        ntype = attrs.get("type", "")
+        if ntype == "polymer":
+            polymer_attrs[nid] = attrs
+        elif ntype == "crosslinker":
+            crosslink_attrs[nid] = attrs
+        else:
+            # Fall back on whether the node has COMX/Y/Z that aren't NaN
+            # (crosslinks carry positions; chains do not).
+            comx = attrs.get("COMX")
+            if isinstance(comx, float) and not np.isnan(comx):
+                crosslink_attrs[nid] = attrs
+            else:
+                polymer_attrs[nid] = attrs
+
+    # Pull edges, split by edge_type. Chemical edges link a chain to a
+    # crosslink; entanglement edges link chain to chain (replicated for
+    # multiplicity).
+    chemical_pairs: list[tuple[int, int]] = []
+    entanglement_pairs: list[tuple[int, int]] = []
+    for e in graph_el.findall("g:edge", ns):
+        src = int(e.get("source"))
+        tgt = int(e.get("target"))
+        etype = "chemical"
+        for d in e.findall("g:data", ns):
+            kid = d.get("key")
+            if kid in key_meta and key_meta[kid][1] == "edge_type":
+                etype = d.text or "chemical"
+        if etype == "chemical":
+            chemical_pairs.append((src, tgt))
+        elif etype == "entanglement":
+            entanglement_pairs.append((src, tgt))
+
+    G, cid_to_edge = _build_multigraph_from_dual(
+        polymer_attrs, crosslink_attrs, chemical_pairs, entanglement_pairs
+    )
+
+    # Graph-level box bounds (xlo/xhi/ylo/yhi/zlo/zhi). All NaN by default
+    # in the writer, so fall back to inferring from positions.
+    box: dict[str, float] = {}
+    for d in graph_el.findall("g:data", ns):
+        kid = d.get("key")
+        if kid in key_meta and key_meta[kid][0] == "graph":
+            try:
+                box[key_meta[kid][1]] = float(d.text)
+            except (TypeError, ValueError):
+                pass
+    dims: Optional[np.ndarray] = None
+    needed = {"xlo", "xhi", "ylo", "yhi", "zlo", "zhi"}
+    if needed <= set(box) and not any(np.isnan(box[k]) for k in needed):
+        dims = np.array(
+            [box["xhi"] - box["xlo"], box["yhi"] - box["ylo"], box["zhi"] - box["zlo"]],
+            dtype=float,
+        )
+    else:
+        dims = infer_dims_from_graph(G)
+
+    n_ent_pairs = sum(
+        1 for _, _, _, data in G.edges(keys=True, data=True)
+        if data.get("entangled_with")
+    ) // 2  # symmetric
+    print(f"Loaded graphml from {path.name}")
+    print(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}, "
+          f"Entangled pairs: {n_ent_pairs}")
+    return G, dims
+
+
+def load_npz(
+    path: Union[str, Path],
+) -> tuple[nx.MultiGraph, Optional[np.ndarray]]:
+    """Load a topon npz dual graph back into a MultiGraph + dims.
+
+    Reverses :func:`topon.writers.npz_writer.write_npz`.
+
+    Args:
+        path: Path to the ``.npz`` file.
+
+    Returns:
+        ``(G, dims)`` -- same shape as :func:`load_graphml`.
+    """
+    path = Path(path)
+    data = np.load(path)
+    node_features = data["node_features"]
+    node_ids = data["node_ids"]
+    edge_index = data["edge_index"]
+    edge_type = data["edge_type"]
+    box = data["box"]
+    n_polymer = int(data["n_polymer"])
+    n_crosslinker = int(data["n_crosslinker"])
+
+    # Feature columns (must match npz_writer._FEATURE_COLUMNS):
+    #   [type, length, contour_length, rg, COMX, COMY, COMZ, node_degree]
+    polymer_attrs: dict[int, dict] = {}
+    crosslink_attrs: dict[int, dict] = {}
+
+    for i in range(n_polymer):
+        nid = int(node_ids[i])
+        polymer_attrs[nid] = {"length": int(node_features[i, 1])}
+    for i in range(n_polymer, n_polymer + n_crosslinker):
+        nid = int(node_ids[i])
+        crosslink_attrs[nid] = {
+            "COMX": float(node_features[i, 4]),
+            "COMY": float(node_features[i, 5]),
+            "COMZ": float(node_features[i, 6]),
+        }
+
+    # Edges are stored bi-directionally; reduce to unordered pairs.
+    #
+    # edge_index holds 0-based ROW POSITIONS into node_features (PyG
+    # convention -- see the npz_writer remap bugfix). The rest of this
+    # loader keys nodes by their original IDs, so map each edge endpoint
+    # back through node_ids: node_ids[row_position] -> original ID.
+    chemical_pairs_set: set[tuple[int, int]] = set()
+    entanglement_pairs_list: list[tuple[int, int]] = []
+    n_edges = edge_index.shape[1]
+    for k in range(n_edges):
+        src = int(node_ids[int(edge_index[0, k])])
+        tgt = int(node_ids[int(edge_index[1, k])])
+        et = int(edge_type[k])
+        if et == 0:                              # chemical (bidirectional copy)
+            chemical_pairs_set.add(tuple(sorted((src, tgt))))
+        elif et == 1 and src < tgt:              # entanglement: keep one dir
+            entanglement_pairs_list.append((src, tgt))
+
+    G, cid_to_edge = _build_multigraph_from_dual(
+        polymer_attrs,
+        crosslink_attrs,
+        list(chemical_pairs_set),
+        entanglement_pairs_list,
+    )
+
+    # Box: [xlo, xhi, ylo, yhi, zlo, zhi]
+    if box.size == 6 and not np.isnan(box[1]):
+        dims = np.array(
+            [box[1] - box[0], box[3] - box[2], box[5] - box[4]], dtype=float
+        )
+    else:
+        dims = infer_dims_from_graph(G)
+
+    n_ent_pairs = sum(
+        1 for _, _, _, data in G.edges(keys=True, data=True)
+        if data.get("entangled_with")
+    ) // 2
+    print(f"Loaded npz from {path.name}")
+    print(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}, "
+          f"Entangled pairs: {n_ent_pairs}")
+    return G, dims
+
+
+def _build_multigraph_from_dual(
+    polymer_attrs: dict[int, dict],
+    crosslink_attrs: dict[int, dict],
+    chemical_pairs: list[tuple[int, int]],
+    entanglement_pairs: list[tuple[int, int]],
+) -> tuple[nx.MultiGraph, dict[int, tuple[int, int, int]]]:
+    """Shared dual-graph -> MultiGraph reconstruction (graphml & npz).
+
+    * Each polymer (chain) dual-node becomes an edge in the topon graph;
+      its two chemical-edge neighbours are the chain's u/v crosslinks.
+    * Crosslink positions come from the COMX/Y/Z fields.
+    * Entanglement multiplicity is recovered by counting how many times
+      a chain-chain pair appears among ``entanglement_pairs``.
+
+    Returns the rebuilt graph plus a ``{chain_dual_id: (u, v, key)}`` map
+    so the caller can wire `entangled_with` after edges are added.
+    """
+    G = nx.MultiGraph()
+    for xid, attrs in crosslink_attrs.items():
+        pos = (
+            float(attrs.get("COMX", 0.0)),
+            float(attrs.get("COMY", 0.0)),
+            float(attrs.get("COMZ", 0.0)),
+        )
+        G.add_node(xid, pos=pos)
+
+    # For each chain, find its two crosslink endpoints from chemical pairs.
+    chain_endpoints: dict[int, list[int]] = {}
+    for a, b in chemical_pairs:
+        chain, junction = (a, b) if a in polymer_attrs else (b, a)
+        if chain not in polymer_attrs:
+            # Neither end is a known polymer dual-node; skip
+            continue
+        chain_endpoints.setdefault(chain, []).append(junction)
+
+    # Add edges in chain-id sorted order so the resulting (u, v, key)
+    # assignment is deterministic across graphml and npz loads of the
+    # same network.
+    cid_to_edge: dict[int, tuple[int, int, int]] = {}
+    for cid in sorted(chain_endpoints):
+        endpoints = chain_endpoints[cid]
+        if len(endpoints) != 2:
+            print(f"  [warn] chain {cid} has {len(endpoints)} crosslink "
+                  f"endpoints (expected 2); skipping")
+            continue
+        # Canonicalise the (u, v) order so the same chain always yields
+        # the same edge key regardless of how chemical_pairs were ordered
+        # in the source file.
+        u, v = sorted(endpoints)
+        dp = int(polymer_attrs[cid].get("length", 1))
+        key = G.add_edge(u, v, dp=dp)
+        cid_to_edge[cid] = (u, v, key)
+
+    # Recover entanglement multiplicities by counting chain pairs.
+    ent_counts: Counter = Counter()
+    for cid1, cid2 in entanglement_pairs:
+        pair = tuple(sorted((cid1, cid2)))
+        ent_counts[pair] += 1
+
+    for (cid1, cid2), count in ent_counts.items():
+        if cid1 not in cid_to_edge or cid2 not in cid_to_edge:
+            continue
+        e1 = cid_to_edge[cid1]
+        e2 = cid_to_edge[cid2]
+        G[e1[0]][e1[1]][e1[2]]["entangled_with"] = e2
+        G[e1[0]][e1[1]][e1[2]]["entanglement_count"] = count
+        G[e2[0]][e2[1]][e2[2]]["entangled_with"] = e1
+        G[e2[0]][e2[1]][e2[2]]["entanglement_count"] = count
+
+    return G, cid_to_edge
