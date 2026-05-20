@@ -177,9 +177,24 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
 
         for res_idx in range(n_residues):
             res_name = full_sequence[res_idx]
+            # Histidine: CHARMM RTF defines protonation-state-specific
+            # residues (HSD/HSE/HSP), never a bare "HIS". Map the
+            # one-letter 'H' (emitted as "HIS") to the neutral HSD
+            # tautomer (the CHARMM default). Without this, HIS misses
+            # the lookup below.
+            if res_name == "HIS":
+                res_name = "HSD"
             res_tmpl = ff.residues.get(res_name)
             if not res_tmpl:
-                continue
+                # Silently skipping a residue corrupts the chain — the
+                # peptide-bond logic then fuses the neighbours across the
+                # gap. Fail loudly so an unmapped residue can never
+                # masquerade as a valid build.
+                raise ValueError(
+                    f"No CHARMM RTF template for residue {res_name!r} "
+                    f"(chain {chain_id}, position {res_idx}). Map it to a "
+                    f"supported residue/protonation variant before building."
+                )
 
             global_res_counter += 1
             center = residue_positions.get(res_idx, np.zeros(3))
@@ -189,9 +204,21 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
             impr_list = list(res_tmpl.get("impropers", []))
             deletes = []
 
-            # Terminal patches
+            # Terminal patches. The N-terminus needs a residue-specific
+            # patch: GLYP for glycine (two HA), PROP for proline (secondary
+            # amine in a ring -> keeps CA=CP1, N=NP, CD=CP3 and adds only
+            # two N-H), and the generic NTER (NH3+) otherwise. Applying the
+            # generic NTER to a proline mis-types CA as CT1 and N as NH3,
+            # which produces CHARMM-nonexistent angles/dihedrals (CT1-CP2,
+            # NH3-CT1, ...) that fall through to the writer's K=0 DEFAULT and
+            # also corrupts the residue's net charge (non-integer total).
             if res_idx == 0:
-                patch_name = "GLYP" if res_name == "GLY" else "NTER"
+                if res_name == "GLY":
+                    patch_name = "GLYP"
+                elif res_name == "PRO":
+                    patch_name = "PROP"
+                else:
+                    patch_name = "NTER"
                 _apply_patch(ff, patch_name, atom_list, bond_list, impr_list, deletes)
 
             if res_idx == n_residues - 1:
@@ -345,7 +372,22 @@ def add_water_and_ions(atoms, bonds, box, water_content_pct=35.0,
     """
     # Protein mass & charge
     protein_mass = _estimate_protein_mass(atoms)
-    net_charge = round(sum(a.charge for a in atoms))
+    raw_charge = sum(a.charge for a in atoms)
+    net_charge = round(raw_charge)
+    # A correctly built protein (complete RTF residues + correct terminal
+    # patches) always sums to an integer charge. A non-integer raw sum means
+    # an upstream typing/patch bug (e.g. wrong N-terminal patch on proline),
+    # and rounding it here would silently leave the final system non-neutral
+    # by the fractional remainder. Surface it loudly rather than mask it.
+    if abs(raw_charge - net_charge) > 1e-3:
+        import warnings
+        warnings.warn(
+            f"Protein net charge {raw_charge:+.4f} e is not an integer "
+            f"(rounds to {net_charge:+d}). Ion neutralisation will leave a "
+            f"residual of {raw_charge - net_charge:+.4f} e. This indicates "
+            f"an upstream atom-typing or terminal-patch bug — fix the charge "
+            f"assignment rather than relying on rounding."
+        )
 
     # Water count from weight fraction
     num_waters = 0

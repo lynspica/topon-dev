@@ -144,20 +144,59 @@ class CHARMMForceField:
                 self.angles_prm.get((t3, t2, t1)))
 
     def lookup_dihedral(self, t1, t2, t3, t4):
-        return (self.dihedrals_prm.get((t1, t2, t3, t4)) or
-                self.dihedrals_prm.get((t4, t3, t2, t1)))
+        """Look up a proper dihedral, honouring CHARMM wildcard terms.
+
+        CHARMM .prm dihedrals are matched in priority order:
+          1. fully specified term (all four atom types), forward or reverse;
+          2. wildcard term ``X t2 t3 X`` (wildcards only ever sit on the two
+             OUTER atoms in CHARMM36), forward or reverse on the inner pair.
+
+        The previous implementation tried only step (1), so every dihedral
+        whose CHARMM parameter is defined as a wildcard term -- which is the
+        majority of proline-ring (CP1/CP2/CP3) and many sidechain torsions --
+        fell through to the writer's K=0 ``(DEFAULT)`` fallback, silently
+        zeroing those torsion barriers. Mirrors the wildcard fallback that
+        ``lookup_improper`` already performs.
+        """
+        # 1. Fully specified term (forward or reverse).
+        hit = (self.dihedrals_prm.get((t1, t2, t3, t4)) or
+               self.dihedrals_prm.get((t4, t3, t2, t1)))
+        if hit:
+            return hit
+        # 2. Wildcard on the outer atoms (inner pair forward or reverse).
+        return (self.dihedrals_prm.get(("X", t2, t3, "X")) or
+                self.dihedrals_prm.get(("X", t3, t2, "X")))
 
     def lookup_improper(self, t1, t2, t3, t4):
-        """CHARMM impropers: central atom first.  Try all orderings of (t2,t3,t4)."""
-        for perm in itertools.permutations([t2, t3, t4]):
-            key = (t1, *perm)
-            if key in self.impropers_prm:
-                return self.impropers_prm[key]
-        # Wildcard fallback
-        for perm in itertools.permutations([t2, t3, t4]):
-            for key in self.impropers_prm:
-                if key[0] in (t1, "X") and all(
-                    k in (p, "X") for k, p in zip(key[1:], perm)
-                ):
+        """CHARMM impropers, matched bidirectionally with X wildcards.
+
+        CHARMM improper parameters may list the central atom either first
+        (e.g. ``C NC2 NC2 NC2``) or last (e.g. ``NC2 X X C`` for the
+        guanidinium, ``OC X X CC`` for the carboxylate), and use X
+        wildcards on the two non-central positions. The lookup therefore
+        tries the improper in BOTH directions (t1->t4 and t4->t1), fixing
+        the leading atom as central and permuting the other three, against
+        exact parameter keys first and wildcard keys second.
+
+        The previous implementation fixed only ``t1`` as central, so
+        impropers whose CHARMM parameter places the central atom last
+        (ARG guanidinium, ASP/GLU/C-term carboxylate) fell through to the
+        writer's K=20 ``(DEFAULT)`` fallback, applying a wrong planarity
+        constant (should be 45 for guanidinium, 96 for carboxylate).
+        """
+        directions = [(t1, t2, t3, t4), (t4, t3, t2, t1)]
+        # 1. Exact: leading atom central, permute the other three.
+        for c0, a, b, c in directions:
+            for perm in itertools.permutations([a, b, c]):
+                key = (c0, *perm)
+                if key in self.impropers_prm:
                     return self.impropers_prm[key]
+        # 2. Wildcard fallback (X stands in for any non-central atom).
+        for c0, a, b, c in directions:
+            for perm in itertools.permutations([a, b, c]):
+                for key in self.impropers_prm:
+                    if key[0] in (c0, "X") and all(
+                        k in (p, "X") for k, p in zip(key[1:], perm)
+                    ):
+                        return self.impropers_prm[key]
         return None

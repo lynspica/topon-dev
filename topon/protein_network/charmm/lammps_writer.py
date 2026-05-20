@@ -55,14 +55,23 @@ def find_dihedrals(bonds, atom_idx_set=None):
 
 # ── Type map builder ──────────────────────────────────────────────────────────
 
-def build_type_maps(atoms, bonds, angles, dihedrals, impropers):
+def build_type_maps(atoms, bonds, angles, dihedrals, impropers, ff=None):
     """
     Build integer type maps for all interaction kinds.
+
+    ``dihedral_type_map`` maps a canonical atom-type quad (and its reverse)
+    to a LIST of LAMMPS dihedral type IDs — one per CHARMM Fourier term.
+    CHARMM proper dihedrals are sums of cosine terms (up to ~4 per quad,
+    each with its own multiplicity); `dihedral_style charmm` represents
+    each term as a separate dihedral type with the atom quad listed once
+    per term in the Dihedrals section. ``ff`` is needed to count the terms;
+    if omitted, every quad collapses to a single type (legacy behaviour,
+    which silently dropped all but the first term).
 
     Returns
     -------
     atom_type_map, bond_type_map, angle_type_map,
-    dihedral_type_map, improper_type_map
+    dihedral_type_map (quad -> [type_id, ...]), improper_type_map
     """
     idx_to_atom = {a.idx: a for a in atoms}
 
@@ -93,7 +102,7 @@ def build_type_maps(atoms, bonds, angles, dihedrals, impropers):
     for k, v in list(angle_type_map.items()):
         angle_type_map[(k[2], k[1], k[0])] = v
 
-    # Dihedral types
+    # Dihedral types — one LAMMPS type per CHARMM Fourier term per quad.
     dtype_set = set()
     for a1, a2, a3, a4 in dihedrals:
         at1 = idx_to_atom.get(a1)
@@ -103,9 +112,18 @@ def build_type_maps(atoms, bonds, angles, dihedrals, impropers):
         if all([at1, at2, at3, at4]):
             k = (at1.atype, at2.atype, at3.atype, at4.atype)
             dtype_set.add(min(k, (k[3], k[2], k[1], k[0])))
-    dihedral_type_map = {k: i + 1 for i, k in enumerate(sorted(dtype_set))}
-    for k, v in list(dihedral_type_map.items()):
-        dihedral_type_map[(k[3], k[2], k[1], k[0])] = v
+    dihedral_type_map = {}
+    next_tid = 1
+    for k in sorted(dtype_set):
+        n_terms = 1
+        if ff is not None:
+            prm = ff.lookup_dihedral(*k)
+            if prm:
+                n_terms = len(prm)
+        tids = list(range(next_tid, next_tid + n_terms))
+        next_tid += n_terms
+        dihedral_type_map[k] = tids
+        dihedral_type_map[(k[3], k[2], k[1], k[0])] = tids
 
     # Improper types
     itype_set = set()
@@ -126,13 +144,24 @@ def build_type_maps(atoms, bonds, angles, dihedrals, impropers):
 def write_lammps_data(filename, atoms, bonds, angles, dihedrals, impropers,
                       atom_type_map, bond_type_map, angle_type_map,
                       dihedral_type_map, improper_type_map, box, ff,
-                      crossterms=None):
+                      crossterms=None, image_flags=None):
     """
     Write a LAMMPS data file in 'full' atom style.
 
     All atom IDs are renumbered contiguously.  Bond/angle/dihedral/improper
     entries are pre-collected into lists so header counts are exact and IDs
     are always sequential even when some interactions are skipped.
+
+    ``image_flags`` (optional): mapping ``atom.idx -> (ix, iy, iz)``. When
+    given, each Atoms row is written with 10 columns
+    ``(id mol type q x y z ix iy iz)`` instead of the legacy 7. This is
+    required for percolated/crosslinked networks run under MPI: without
+    image flags, a bond whose two atoms wrap to opposite box faces appears
+    ~box-long in wrapped coords, which breaks parallel ghost-shell
+    construction (``bond atoms missing``). Image flags are assigned by a
+    priority-MST over the bond graph (see ``build_systems``); with them,
+    every emitted bond is minimum-image. Omit (None) for the legacy
+    7-column behaviour.
 
     Returns
     -------
@@ -175,8 +204,12 @@ def write_lammps_data(filename, atoms, bonds, angles, dihedrals, impropers,
         at1, at2 = atoms[na1-1].atype, atoms[na2-1].atype
         at3, at4 = atoms[na3-1].atype, atoms[na4-1].atype
         k = (at1, at2, at3, at4)
-        dt = dihedral_type_map.get(k) or dihedral_type_map.get((at4, at3, at2, at1), 1)
-        dih_rows.append((dt, na1, na2, na3, na4))
+        dts = (dihedral_type_map.get(k)
+               or dihedral_type_map.get((at4, at3, at2, at1))
+               or [1])
+        # One Dihedrals row per CHARMM Fourier term of this quad.
+        for dt in dts:
+            dih_rows.append((dt, na1, na2, na3, na4))
 
     impr_rows = []
     for a1, a2, a3, a4 in impropers:
@@ -202,7 +235,8 @@ def write_lammps_data(filename, atoms, bonds, angles, dihedrals, impropers,
         f.write(f"{len(set(atom_type_map.values()))} atom types\n")
         f.write(f"{len(set(bond_type_map.values()))} bond types\n")
         f.write(f"{len(set(angle_type_map.values()))} angle types\n")
-        f.write(f"{len(set(dihedral_type_map.values()))} dihedral types\n")
+        n_dih_types = len({tid for tids in dihedral_type_map.values() for tid in tids})
+        f.write(f"{n_dih_types} dihedral types\n")
         f.write(f"{len(set(improper_type_map.values()))} improper types\n\n")
         f.write(f"0.0 {box[0]:.4f} xlo xhi\n")
         f.write(f"0.0 {box[1]:.4f} ylo yhi\n")
@@ -218,9 +252,16 @@ def write_lammps_data(filename, atoms, bonds, angles, dihedrals, impropers,
             nid = old_to_new[a.idx]
             tid = atom_type_map[a.atype]
             pos = a.pos % box
-            f.write(f"{nid} {a.mol_id} {tid} {a.charge:.6f} "
-                    f"{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f} "
-                    f"# {a.res_name} {a.name}\n")
+            if image_flags is not None:
+                ix, iy, iz = image_flags.get(a.idx, (0, 0, 0))
+                f.write(f"{nid} {a.mol_id} {tid} {a.charge:.6f} "
+                        f"{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f} "
+                        f"{ix} {iy} {iz} "
+                        f"# {a.res_name} {a.name}\n")
+            else:
+                f.write(f"{nid} {a.mol_id} {tid} {a.charge:.6f} "
+                        f"{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f} "
+                        f"# {a.res_name} {a.name}\n")
 
         f.write("\nBonds\n\n")
         for i, (bt, na1, na2) in enumerate(bond_rows, 1):
@@ -293,15 +334,24 @@ def write_lammps_settings(filename, ff, atom_type_map, bond_type_map,
                         f"# {akey[0]}-{akey[1]}-{akey[2]} (DEFAULT)\n")
 
         f.write("\n# Dihedral Coeffs  K  n  d  weight  (charmm style)\n")
-        for dkey, dt in sorted(dihedral_type_map.items(), key=lambda x: x[1]):
+        # dihedral_type_map maps each quad (and its reverse) to a LIST of
+        # type IDs, one per CHARMM Fourier term. Emit one coeff line per
+        # term; dedup the reverse-key alias via the first term's id.
+        emitted: set[int] = set()
+        for dkey, dts in sorted(dihedral_type_map.items(), key=lambda x: x[1][0]):
+            if dts[0] in emitted:
+                continue
+            emitted.add(dts[0])
+            label = f"{dkey[0]}-{dkey[1]}-{dkey[2]}-{dkey[3]}"
             prm = ff.lookup_dihedral(dkey[0], dkey[1], dkey[2], dkey[3])
             if prm:
-                k, n, d = prm[0]
-                f.write(f"dihedral_coeff {dt} {k:.4f} {n} {int(d)} 0.0 "
-                        f"# {dkey[0]}-{dkey[1]}-{dkey[2]}-{dkey[3]}\n")
+                for (k, n, d), dt in zip(prm, dts):
+                    f.write(f"dihedral_coeff {dt} {k:.4f} {n} {int(d)} 0.0 "
+                            f"# {label}\n")
             else:
-                f.write(f"dihedral_coeff {dt} 0.0 1 0 0.0 "
-                        f"# {dkey[0]}-{dkey[1]}-{dkey[2]}-{dkey[3]} (DEFAULT)\n")
+                for dt in dts:
+                    f.write(f"dihedral_coeff {dt} 0.0 1 0 0.0 "
+                            f"# {label} (DEFAULT)\n")
 
         f.write("\n# Improper Coeffs  K  chi0  (harmonic)\n")
         for ikey, it in sorted(improper_type_map.items(), key=lambda x: x[1]):

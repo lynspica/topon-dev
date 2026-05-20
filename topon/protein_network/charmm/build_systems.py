@@ -90,6 +90,13 @@ def parse_args():
                    help="Root output directory")
     p.add_argument("--prefix", default="protein_network",
                    help="File name prefix for LAMMPS output files")
+    p.add_argument("--no-image-flags", dest="image_flags", action="store_false",
+                   help="Emit legacy 7-column Atoms (no ix iy iz) and do NOT "
+                        "drop winding-cycle crosslinks. Keeps the exact "
+                        "topology (all crosslinks) but is single-rank only "
+                        "(not MPI-safe). Default: emit 10-column image flags "
+                        "and drop winding crosslinks (MPI-safe).")
+    p.set_defaults(image_flags=True)
     return p.parse_args()
 
 
@@ -168,7 +175,7 @@ def main():
             )
         print(f"  Lattice scale: {scale:.3f} A/unit | box ~= {Nx*scale:.1f}^3 A")
 
-        atoms, bonds, impropers, box, _ = build_protein_system(
+        atoms, bonds, impropers, box, xlinks_wc = build_protein_system(
             ff, snapshot, full_seq, node_to_res, lattice_scale=scale
         )
         add_water_and_ions(
@@ -176,6 +183,48 @@ def main():
             water_content_pct=wc,
             salt_conc_M=args.salt_conc,
         )
+
+        if args.image_flags:
+            # Image-flag pass: assign per-atom image flags via a priority-MST
+            # over the bond graph (non-crosslink bonds first, crosslinks last)
+            # so every tree-edge bond is minimum-image, and drop only the
+            # winding-cycle crosslinks that no image assignment can make MIC.
+            # Without this the writer emits wrapped coords with no image flags,
+            # and any bond whose atoms straddle a box face appears ~box-long ->
+            # breaks parallel-MPI ghost-shell construction ("bond atoms
+            # missing"). Reuses the MARTINI writer's MST helper.
+            from topon.protein_network.lammps_writer import _kruskal_image_flags_and_drop
+            _xl = set(frozenset(p) for p in xlinks_wc)
+            _wrapped = {a.idx: (float(a.pos[0] % box[0]),
+                                float(a.pos[1] % box[1]),
+                                float(a.pos[2] % box[2])) for a in atoms}
+            _all_b = [(i, j, 1, 0.0, 0.0, frozenset((i, j)) in _xl) for (i, j) in bonds]
+            image_flags, _keep = _kruskal_image_flags_and_drop(
+                _wrapped, _all_b, float(box[0]), float(box[1]), float(box[2])
+            )
+            _dropped_real = [(_all_b[k][0], _all_b[k][1])
+                             for k, kp in enumerate(_keep)
+                             if not kp and not _all_b[k][5]]
+            assert not _dropped_real, (
+                f"BUG: priority-MST would drop {len(_dropped_real)} non-crosslink "
+                f"bond(s) (first: {_dropped_real[:3]}). Only winding crosslinks "
+                f"may ever drop."
+            )
+            n_drop = sum(1 for kp in _keep if not kp)
+            if n_drop:
+                print(f"  [image-flags] dropped {n_drop} winding-cycle "
+                      f"crosslink(s) of {len(xlinks_wc)} (cannot be made "
+                      f"minimum-image around the periodic box)")
+            bonds = [b for b, kp in zip(bonds, _keep) if kp]
+        else:
+            # Legacy 7-column path (--no-image-flags): keep ALL crosslinks
+            # exactly (no drops), emit no image flags. LAMMPS reconstructs
+            # image flags via minimum-image at read; a winding crosslink stays
+            # a short bond under serial/OMP single-rank but breaks parallel
+            # MPI ghost shells. Used to preserve the exact input topology.
+            image_flags = None
+            print("  [image-flags] disabled (--no-image-flags): 7-column, all "
+                  f"{len(xlinks_wc)} crosslinks kept, single-rank only")
 
         print("  Computing angles and dihedrals ...")
         atom_idx_set = set(a.idx for a in atoms)
@@ -188,7 +237,7 @@ def main():
 
         (atom_type_map, bond_type_map, angle_type_map,
          dihedral_type_map, improper_type_map) = build_type_maps(
-            atoms, bonds, angles, dihedrals, impropers
+            atoms, bonds, angles, dihedrals, impropers, ff
         )
 
         cmap_filename = None
@@ -207,7 +256,7 @@ def main():
             data_file, atoms, bonds, angles, dihedrals, impropers,
             atom_type_map, bond_type_map, angle_type_map,
             dihedral_type_map, improper_type_map, box, ff,
-            crossterms=crossterms,
+            crossterms=crossterms, image_flags=image_flags,
         )
         write_lammps_settings(
             settings_file, ff,
