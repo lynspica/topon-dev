@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import bfm, builder, ions, lammps_writer, sequence, topology_io, water
+from . import bfm, builder, ions, lammps_writer, residues, sequence, topology_io, water
 from . import itp_template, template_builder
 from .martini_ff import MartiniLibrary
 
@@ -36,6 +36,8 @@ def run_protein_network(
     pre_gel_conversions: list[float] | None = None,
     sc_jitter_ang: float = 1.5,
     water_density_w_per_nm3: float = 0.0,
+    water_content_pct: float | None = None,
+    target_density_g_cm3: float = 0.85,
     water_exclusion_ang: float = 4.0,
     water_bead_type: str = "W",
     n_na_ions: int = 0,
@@ -130,6 +132,53 @@ def run_protein_network(
                 f"(label={snapshot['label']!r})"
             )
 
+    # Optional: size the box for a target WEIGHT-PERCENT water content,
+    # mirroring the CHARMM builder's `water_content_pct` semantics (water mass
+    # as % of total mass: water_mass = protein_mass * pct/(100-pct)). When set,
+    # this OVERRIDES lattice_scale_ang so the box holds protein + water at
+    # `target_density_g_cm3`, and fixes the number of W beads packed so the
+    # system actually has that weight fraction (the MARTINI density knob
+    # `water_density_w_per_nm3` is ignored on this path). NPT then fine-tunes
+    # the density; we don't force it.
+    n_water_target: int | None = None
+    if water_content_pct is not None:
+        if not (0.0 <= water_content_pct < 100.0):
+            raise ValueError(
+                f"water_content_pct must be in [0, 100); got {water_content_pct}"
+            )
+        Nx = snapshot["Nx"]
+        # Protein mass is geometry-independent: sum of per-chain bead masses.
+        if template is not None:
+            per_chain_mass = sum(library.get_mass(a.bead_type) for a in template.atoms)
+        else:
+            _seq3 = sequence.build_full_sequence(block_seq, n_repeats)
+            per_chain_mass = sum(
+                library.get_mass(bt)
+                for rn in _seq3
+                for (_an, bt, _q) in residues.RESIDUES[rn]["beads"]
+            )
+        protein_mass = per_chain_mass * len(snapshot["chains"])
+        w_bead_mass = library.get_mass(water_bead_type)
+        if water_content_pct > 0.0:
+            water_mass = protein_mass * water_content_pct / (100.0 - water_content_pct)
+            n_water_target = int(round(water_mass / w_bead_mass))
+        else:
+            water_mass = 0.0
+            n_water_target = 0
+        total_mass = protein_mass + water_mass
+        # V[A^3] = M[Da] * 1.66054 (A^3/Da per g/cm^3) / target_density
+        V_ang3 = total_mass * 1.66054 / target_density_g_cm3
+        lattice_scale_ang = (V_ang3 ** (1.0 / 3.0)) / Nx
+        if verbose:
+            print(
+                f"[workflow] water_content_pct={water_content_pct:.1f} wt%: "
+                f"protein_mass={protein_mass:.3e} amu -> "
+                f"n_water_target={n_water_target} {water_bead_type} beads; "
+                f"target_density={target_density_g_cm3} g/cm^3 -> "
+                f"lattice_scale={lattice_scale_ang:.3f} A/unit "
+                f"(box {lattice_scale_ang * Nx:.1f} A)"
+            )
+
     if template is not None:
         # ITP-template: replicate the polyply chain topology per BFM chain.
         sys_ = template_builder.build_protein_system_from_template(
@@ -165,8 +214,35 @@ def run_protein_network(
         if verbose:
             print(f"[workflow] packed {nna} NA + {ncl} CL ions")
 
-    # 4b. Optional water packing (fills remaining space around protein + ions)
-    if water_density_w_per_nm3 > 0:
+    # 4b. Water packing.
+    if n_water_target is not None:
+        # WEIGHT-PERCENT path: pack a fixed COUNT of W beads, uniformly spread
+        # (shuffle) across the density-sized box, so the system's water mass is
+        # `water_content_pct` % of the total. Candidate grid density is set
+        # generously above the per-box target so exclusions near protein don't
+        # starve the count.
+        n_w = 0
+        if n_water_target > 0:
+            box_vol_nm3 = (lattice_scale_ang * snapshot["Nx"] / 10.0) ** 3
+            cand_density = max(water.DEFAULT_W_DENSITY_NM3,
+                               2.0 * n_water_target / max(box_vol_nm3, 1e-9))
+            n_w = water.pack_water(
+                sys_, library,
+                density_w_per_nm3=cand_density,
+                exclusion_radius_ang=water_exclusion_ang,
+                seed=seed + 1, bead_type=water_bead_type,
+                max_beads=n_water_target, shuffle=True,
+            )
+        if verbose:
+            w_mass = library.get_mass(water_bead_type) * n_w
+            p_mass = sum(library.get_mass(b.bead_type)
+                         for b in sys_.beads if b.bead_type != water_bead_type)
+            achieved = 100.0 * w_mass / max(w_mass + p_mass, 1e-9)
+            print(f"[workflow] packed {n_w}/{n_water_target} {water_bead_type} "
+                  f"beads -> {achieved:.1f} wt% water "
+                  f"(target {water_content_pct:.1f} wt%)")
+    elif water_density_w_per_nm3 > 0:
+        # DENSITY path (legacy): fill the BFM box at a fixed number density.
         n_w = water.pack_water(
             sys_, library,
             density_w_per_nm3=water_density_w_per_nm3,

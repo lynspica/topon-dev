@@ -95,6 +95,7 @@ def pack_water(
     seed: int = 42,
     max_beads: int | None = None,
     bead_type: str = "W",
+    shuffle: bool = False,
 ) -> int:
     """Add water beads to `sys_` on a voxel grid, avoiding existing protein beads.
 
@@ -106,6 +107,16 @@ def pack_water(
     `density_w_per_nm3` is BEADS per nm^3, regardless of bead type. To preserve
     the actual H2O number-density when switching mappings, scale this value:
     ``density_SW = density_W * 4/3`` and ``density_TW = density_W * 4/2``.
+
+    `max_beads`: cap the number of beads placed. With ``shuffle=False`` (default)
+    the cap takes the first ``max_beads`` voxels in grid order, which clusters
+    them in one corner -- only use that for "fill until N" with no spatial
+    requirement. With ``shuffle=True`` the accepted voxels are randomly
+    permuted before the cap, giving a UNIFORM random subset of size
+    ``max_beads`` across the whole box. Use ``shuffle=True`` whenever you pack
+    a target *count* (e.g. a weight-percent target) into an oversized grid and
+    need the water spread out -- see ``workflow.run_protein_network``'s
+    ``water_content_pct`` path.
 
     Returns the number of beads added. Mutates ``sys_.beads`` in place;
     each bead gets a fresh ``molecule_id`` (one molecule per water bead, matching
@@ -139,6 +150,42 @@ def pack_water(
     default_mass = 18.0 * WATER_BEAD_TYPES[bead_type]   # 18 g/mol per H2O * mapping
     w_mass = library.atomtypes[bead_type].mass if bead_type in library.atomtypes else default_mass
 
+    def _make_bead(p: np.ndarray, aid: int, mid: int) -> Bead:
+        return Bead(
+            atom_id=aid, bead_type=bead_type, molecule_id=mid,
+            residue_idx=0, residue_name=bead_type, atom_name=bead_type,
+            charge=0.0, mass=w_mass, position=tuple(p.tolist()),
+        )
+
+    if shuffle:
+        # Two-pass: collect every accepted voxel, randomly permute, then take
+        # up to max_beads. Gives a UNIFORM subset across the whole box (vs the
+        # grid-order corner fill below). Used by the weight-percent path, which
+        # packs a target count into an oversized grid.
+        accepted: list[np.ndarray] = []
+        for ix in range(n_grid[0]):
+            for iy in range(n_grid[1]):
+                for iz in range(n_grid[2]):
+                    base = np.array([
+                        (ix + 0.5) * actual_grid[0],
+                        (iy + 0.5) * actual_grid[1],
+                        (iz + 0.5) * actual_grid[2],
+                    ])
+                    jitter = (rng.random(3) - 0.5) * actual_grid * 0.1
+                    p = base + jitter
+                    p = p - box * np.floor(p / box)
+                    if _too_close_to_any(p, cells, protein_pos, box, cell_size, excl_sq):
+                        continue
+                    accepted.append(p)
+        rng.shuffle(accepted)
+        if max_beads is not None:
+            accepted = accepted[:max_beads]
+        for p in accepted:
+            sys_.beads.append(_make_bead(p, next_atom_id, next_mol_id))
+            next_atom_id += 1
+            next_mol_id += 1
+        return len(accepted)
+
     placed = 0
     for ix in range(n_grid[0]):
         for iy in range(n_grid[1]):
@@ -156,18 +203,7 @@ def pack_water(
                 p = p - box * np.floor(p / box)  # wrap into box
                 if _too_close_to_any(p, cells, protein_pos, box, cell_size, excl_sq):
                     continue
-                bead = Bead(
-                    atom_id=next_atom_id,
-                    bead_type=bead_type,
-                    molecule_id=next_mol_id,
-                    residue_idx=0,
-                    residue_name=bead_type,
-                    atom_name=bead_type,
-                    charge=0.0,
-                    mass=w_mass,
-                    position=tuple(p.tolist()),
-                )
-                sys_.beads.append(bead)
+                sys_.beads.append(_make_bead(p, next_atom_id, next_mol_id))
                 next_atom_id += 1
                 next_mol_id += 1
                 placed += 1
