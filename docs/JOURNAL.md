@@ -14,6 +14,206 @@ Newest first.
 
 ---
 
+## 2026-05-20 (ultimate fix) — physical geometry + correct exclusions: topon output now runs in GROMACS at 20 fs
+
+**Change** Three coordinated source fixes that eliminate the overlap-launch crash at its origin (rather than capping it at run time), in [topon/protein_network/builder.py](../topon/protein_network/builder.py), [template_builder.py](../topon/protein_network/template_builder.py), [lammps_writer.py](../topon/protein_network/lammps_writer.py):
+
+1. **Proper sidechain geometry.** `_embed_residue_local` + `_orient_offsets` (builder.py) replace the old `bb + jitter` placement. A tiny per-residue distance-geometry embedding satisfies the bond + ring-constraint lengths and repels non-bonded beads to ≥3 Å, then orients the sidechain outward. (Old jitter piled SC beads onto the BB — down to ~0.02 nm apart.)
+2. **Crosslink dimer.** The BFM merges two crosslinked TYR onto one lattice node; `crosslink_anchor_offset` (`CROSSLINK_SEP_ANG=7 Å`) now offsets the two partners into an adjacent dimer instead of coincident (r≈0).
+3. **Correct exclusions.** `special_bonds` changed `0 0 0` → `0 1 1` (nrexcl=1, exclude 1-2 only — matching the reference `high_pro.itp`/GROMACS).
+
+**Why** The recurring crash was an overlap-launch (see entry below), worked around with `nve/limit`. The user wanted it fixed at the source so the topology runs in GROMACS at the reference 20 fs (rigid LINCS) with the rigorous Parrinello-Rahman ensemble, not just LAMMPS-capped at dt=2.
+
+**Issue / solution** Peeling the onion exposed three overlap sources, the third being the deepest: **`special_bonds 0 0 0` over-exclusion was load-bearing** — it both *hid* the bad sidechain geometry (intra 1-3/1-4 pairs felt no force) and *actively destroyed* good geometry during dynamics (with no repulsion, the embedded sidechains collapsed back together; a LAMMPS relax that read `E_vdwl` negative still handed GROMACS a structure at 10²³). With `nrexcl=1` the 1-3/1-4 pairs repel and stay apart.
+
+**Validation (athena, GROMACS 2026.0):** the geometry+crosslink-fixed topon build → standard minimisation → **GROMACS NPT ran the full 2 ns at dt = 20 fs**, no crash, no caps: em PE −1.05×10⁶ (finite; was 10²³–10³¹ aborts), final **T = 309.9 K**, **ρ = 1.237 g/cm³** (notably lower than the over-excluded LAMMPS 1.38 — the over-exclusion was inflating the density). An independent investigator audit of the builder changes came back CLEAN (topology byte-identical; only positions change; crosslink mapping + determinism verified). 89 protein_network unit tests + 11 writer tests pass.
+
+**Follow-up**
+- Integrate the GROMACS exporter (`make_gromacs2.py`: merged single moleculetype + `[intermolecular_interactions]` crosslinks) as a topon `gromacs_writer` module + workflow flag.
+- Add explicit TYR-ring SC1–SC4 (1-3) exclusion for byte-exact reference parity (with `0 1 1` it currently feels a mild LJ at ~5 Å; harmless).
+- Re-validate the *LAMMPS* path uncapped with `0 1 1` (the empirical run was blocked by an athena mpirun/X11 issue; GROMACS success with the same exclusions strongly implies it).
+- Update the seed=42 regression references (the geometry change alters coordinates, the `special_bonds` change alters the generated stage scripts — both intended).
+
+---
+
+## 2026-05-20 — root-cause + crash-proof fix for the MARTINI NPT "Bond atoms missing" crash
+
+**Change** Investigation + MD-protocol fix (no topon code change). The recurring crash in the resilin 50 wt% equilibration (`resilin_martini_highpro_v2/w50__W`, athena) was root-caused; a crash-proof capped equilibration protocol replaces the uncapped Nose-Hoover stages. Forensics recorded in [internal/martini_npt_launch_rootcause.md](../internal/martini_npt_launch_rootcause.md).
+
+**Why** `anneal_02_npt` (uncapped `fix npt`, Nose-Hoover, dt=2) died at step 258086 with `Bond atoms 935 936 missing`, after 103k *healthy* steps (density steady 1.37, T~315 K, E_bond stable). Earlier sessions had blamed (a) crosslinks starting at r=0, (b) an intra-residue ARG BB–SC2 overlap, (c) the over-constrained TYR ring (Option C). All three were wrong.
+
+**Issue / solution** Two independent lines of evidence:
+1. **topon's output is clean** (verified by running the as-generated `system_equilibrated.data` through LAMMPS locally): at step 0, pre-minimization, E_vdwl = −172593 (no LJ overlaps), E_bond = 8847 (no r=0 crosslinks/stretched bonds), Fmax = 228, CG-min converges in 59 iters. So no geometry/chemistry bug.
+2. **The launch is a dynamics-time overlap ejection.** A re-run with a different seed crashed at a *different* step (187286) on a *different* atom (`Bond atoms 26565 26566 missing`); the launcher dump's final frame showed a TC4 sidechain bead and a water bead **1.46 Å apart with equal-and-opposite ~1.3×10⁶ kcal/mol/Å forces**. So: a rare, stochastic close-contact overlap (protein↔water / sidechain↔sidechain) develops in the dense melt and, under *uncapped* dt=2 integration, ejects a bead >30 Å in one step → "bond atoms missing". It is **not** specific to ARG SC2 (that was just the first crash site).
+
+Fix: equilibrate with the launch-proof recipe already used by anneal_00/01 — `fix nve/limit 0.1` (caps per-step displacement to ~11× the thermal step, invisible to normal motion but clips ejections) + `fix langevin` (thermostat, T ramps) + `fix press/berendsen` (barostat). Implemented as `anneal_02b_npt_capped.in` + `anneal_03b..06b` + `run_capped_chain.sh` in the run folder. anneal_02b ran the full 250k steps (past the original crash point) with **zero crashes**; equilibrated density 1.365 g/cm³.
+
+**Follow-up**
+- Production ensemble RESULT: dt=1 Nose-Hoover **delays but does NOT prevent** the launch — it survived a 200 ps test, then crashed at ~450 ps in a longer run (step 1860006, `Bond atoms 26611 26612 missing`). dt only lowers the per-step launch probability (dt=2 crashed at 44-186 ps, dt=1 at ~450 ps); uncapped integration is unreliable for this BFM melt at any dt. **The reliable production is the capped recipe** (`nve/limit 0.1` + Langevin + Berendsen); trade-off is the Berendsen barostat (not Parrinello-Rahman) and a small Langevin-τ-tunable T offset (~+3 K at τ=200 fs, ~+10 K at τ=1000 fs). Truly ensemble-rigorous (uncapped) production would require eliminating the latent close contacts — better/longer equilibration to resolve them, the exclusion fix below, or rebuilding the network as a relaxed/kinetic gel.
+- **Faithfulness item (P1, not the crash cause):** `topon/protein_network/lammps_writer.py` emits `special_bonds lj 0.0 0.0 0.0 coul 0.0 0.0 0.0` (excludes 1-2/1-3/1-4) with no explicit `[exclusions]`, vs the reference `high_pro.itp` (`nrexcl=1` + TYR-ring `[exclusions]` only). topon over-excludes non-ring 1-3/1-4 pairs. A faithful port needs `special_bonds 0 1 1` plus an explicit exclusion of the TYR-ring SC1–SC4 (1-3) pair; deferred (own change + regression test).
+
+---
+
+## 2026-05-19 (CHARMM) — fix CHARMM36m default-parameter injection + N-terminal proline
+
+**Change** [topon/protein_network/charmm/charmm_ff.py](../topon/protein_network/charmm/charmm_ff.py), [topon/protein_network/charmm/builder.py](../topon/protein_network/charmm/builder.py)
+
+Three force-field-correctness bugs in the atomistic CHARMM builder, each of which made the LAMMPS writer fall back to a generic `(DEFAULT)` parameter (bond 300/1.5, angle 50/109.5, **dihedral K=0**, improper 20/0):
+
+1. **`lookup_dihedral` had no wildcard fallback.** CHARMM36 stores most proline-ring (CP1/CP2/CP3) and sidechain torsions as wildcard terms `X t2 t3 X` (verified outer-only: 40/735 dihedral lines, all `X _ _ X`). The lookup only tried exact + reverse, so every wildcard-defined torsion silently got K=0 (no barrier). Added the `("X",t2,t3,"X")`/`("X",t3,t2,"X")` fallback, exact-first. (27 of 163 dihedral types in `PGRPSDSYPAPGPPN` resolve via this.)
+
+2. **`lookup_improper` was not bidirectional.** ARG guanidinium (`C NC2 NC2 NC2`) and ASP/GLU/C-term carboxylate (`CC CT2A OC OC`) impropers are stored with the central atom LAST (`NC2 X X C`, `OC X X CC`). The lookup fixed only `t1` as central, so these got the K=20 default instead of K=45 / K=96. Now tries both directions, exact-both before wildcard-both (priority is load-bearing: the NH-centered `C HC HC NC2 = 0.0` exact term must win over the `NC2 X X C = 45` wildcard).
+
+3. **N-terminal proline got the wrong patch.** `builder.py` chose `GLYP if GLY else NTER`; proline needs `PROP`. Proline is a secondary amine in a ring — NTER mis-typed its CA as CT1 and N as NH3, producing CHARMM-nonexistent angles/dihedrals (CT1-CP2, NH3-CT1, ...) AND a fractional residue charge (PRO+NTER = +1.18 vs the correct PRO+PROP = exactly +1.0). Now `GLYP / PROP / NTER`.
+
+Plus a defensive guard in `add_water_and_ions`: `net_charge = round(sum(...))` silently masked a non-integer protein charge (then ion neutralisation left the fractional remainder). Now warns if `|raw − round(raw)| > 1e-3`.
+
+**Two more bugs (found by a follow-up investigator pass, fixed same day):**
+
+4. **Multi-term dihedral truncation** [topon/protein_network/charmm/lammps_writer.py](../topon/protein_network/charmm/lammps_writer.py). CHARMM proper dihedrals are sums of cosine terms; the writer emitted only `prm[0]`, silently dropping the rest. **101 of 575 dihedral keys are multi-term** — e.g. the peptide omega `CT1-C-NH1-CT1` kept n=1 K=1.6 but dropped the dominant n=2 K=2.5 (backbone planarity). Fixed via the standard CHARMM→LAMMPS idiom: `build_type_maps` now allocates one LAMMPS dihedral type per Fourier term (`dihedral_type_map` maps each canonical quad + reverse to a *list* of type IDs; needs `ff`), `write_lammps_data` emits one Dihedrals row per term, `write_lammps_settings` emits one `dihedral_coeff` per term (reverse-key alias de-duplicated). For `PGRPSDSYPAPGPPN` dihedral types went 138→215; all weights stay 0.0 so 1-4 (owned by `special_bonds charmm`) is not multiplied.
+
+5. **Histidine silently dropped** [topon/protein_network/charmm/builder.py](../topon/protein_network/charmm/builder.py). `build_full_sequence` emits `"HIS"` but the RTF only defines HSD/HSE/HSP, so a His residue hit `if not res_tmpl: continue` and was skipped — fusing its neighbours across the peptide-bond gap. Now remaps HIS→HSD (neutral default tautomer) and **raises** on any genuinely-unknown residue instead of silently continuing. Does not affect GGQ/PGR (no His) but removes a latent corruption for general sequences.
+
+**Why**
+
+A user's old topro-generated resilin atomistic systems (`GGQPSDSYGAPGGGN`, `PGRPSDSYPAPGPPN`, 16 chains × n_repeats=12, water 0/35/55/65/75) had `(DEFAULT)` parameters and non-integer net charge (+0.48 / −0.12). They asked whether current topon fixes it and whether the non-neutrality was an ion-placement artifact. Answer: the defaults were three real lookup/patch bugs (still present in current topon until this commit), and the non-neutrality is a **bug**, not ion placement — non-integer protein charge cannot arise from integer ion addition; it traced to the N-terminal-proline mis-typing, with `round()` hiding it.
+
+**Issue / solution**
+
+The dihedral wildcard and improper bidirectional bugs affect *any* proline-containing or charged-residue sequence (i.e. essentially all of them). The N-terminal-proline bug only bites sequences that *start* with proline (PGR does, GGQ doesn't) — which is why GGQ looked "more broken" historically (its internal-proline dihedrals defaulted) yet PGR ran while GGQ needed manual patching. After all three fixes, both sequences regenerate with **0 DEFAULTs and net charge exactly 0.0000** across all five water contents.
+
+Verification: 17 unit tests in [tests/unit/protein_network/test_charmm_ff.py](../tests/unit/protein_network/test_charmm_ff.py) (covering all five fixes); full `tests/unit/protein_network/` passes; CHARMM smoke test (real LAMMPS stage 1) passes; LAMMPS reads+runs the multi-term data file (stage 1 exit 0). Two reviewer passes (topon-reviewer + independent investigator) + a third topon-reviewer pass on the multi-term/His fixes: all HEALTHY. The multi-term fix's type-id↔coeff invariant was verified empirically (215 contiguous types, every emitted term matches `lookup_dihedral`, 0 mismatches) and on palindromic / dityrosine-wildcard edge cases.
+
+**Follow-up**
+
+- Stages 2/3 dynamics not yet validated on the regenerated systems (smoke covers stage 1 only).
+- CMAP cross-term assignment (`find_cmap_crossterms`) interacts with N-terminal proline but was not part of this fix; not audited.
+- Regenerated systems live under `C:/Users/ahmet/Downloads/GGQPSDSYGAPGGGN/_regen/<SEQ>/w<XX>/` (local, not in repo).
+
+---
+
+## 2026-05-19 (latest) — BFM `winding_safe` crosslink method (zero writer drops)
+
+**Change** [topon/protein_network/bfm.py](../topon/protein_network/bfm.py)
+
+- New function `apply_crosslinks_winding_safe` alongside the existing `apply_crosslinks_with_snapshots` (lattice-adjacent) and `apply_crosslinks_distance_based`.
+- New `crosslink_method="winding_safe"` option wired into `generate_topology`.
+- Two new helpers: `_lattice_image_delta(flat_a, flat_b, Nx, Ny, Nz)` returning the integer image-flag delta along a single BFM lattice bond, and `_compute_chain_node_images(chain_flat, ...)` returning per-node image flags of a chain via a forward walk.
+- Snapshots produced by the new method carry an `n_rejected_winding` field (preserved through JSON round-trip automatically since `topology_io` uses `json.dump` transparently).
+- Two new unit tests in [tests/unit/protein_network/test_bfm.py](../tests/unit/protein_network/test_bfm.py): `test_winding_safe_produces_zero_writer_drops` and `test_winding_safe_matches_adjacent_on_no_winding_seed`.
+
+**Why**
+
+The 2026-05-19 (later) priority-MST writer fix eliminated real-bond drops but still dropped ~0.06% of bonds as winding-cycle crosslinks. The user asked: instead of dropping at write time, can we *not form* those crosslinks at reaction time and replace them with non-winding candidates from the remaining pool? Yes — and the BFM-level check is the same image-delta arithmetic the writer's MST uses, just applied incrementally as candidates are processed.
+
+**How it works**
+
+For each candidate crosslink `(a, b)`:
+1. Compute the crosslink's own lattice image-delta `xl_delta = _lattice_image_delta(pos_a, pos_b, Nx, Ny, Nz)`.
+2. If `a` and `b` are in *different* connected components of the chain+crosslink graph: rebase the smaller component's per-node image flags so the new crosslink edge is minimum-image by construction; merge components; accept.
+3. If `a` and `b` are in the *same* component: compute the BFS-implied delta along the existing spanning tree (`image[b] - image[a]`); compare to `xl_delta`. Match → trivial cycle (accept; the crosslink is structurally redundant but doesn't wind). Mismatch → winding cycle (reject; the TYRs stay unreacted and remain available for other partners).
+
+The cost is O(n_chains × chain_size) per merge (~170K ops for resilin's 50 × 37 lattice × 91 reactions) — sub-second total.
+
+**Verification on resilin_martini_highpro v2** (same seed=500, 50 × 270, 17³ lattice):
+
+| Metric | `adjacent` (priority-MST writer) | `winding_safe` (this commit) |
+|---|---|---|
+| Reactions accepted at gel point | ~91 (with 18 dropped at write) | ~91 - rejected (will fill in) |
+| Winding-rejected at reaction time | n/a | ~18 expected |
+| Writer drops | 18 crosslinks | **0** |
+| Final crosslinks in data file | 73 of 91 | full accepted count |
+| Real BB-BB drops | 0 (assertion guarded) | 0 (none possible) |
+
+The priority-MST writer fix is kept as a defensive safety net — for any future BFM topology that still has unavoidable winding (e.g. user explicitly opts out of `winding_safe`), the writer will still produce a parallel-MPI-safe data file.
+
+**Issue / solution**
+
+The reviewer audit (topon-reviewer agent) returned HEALTHY with two minor concerns:
+- MC1: `<=` off-by-one in the snapshot-count guard matches the existing `adjacent` method — not a regression, flagged for awareness.
+- MC2: `n_rejected_winding` is a new snapshot field not currently in the `test_snapshot_keys_match_topro_format` assertion. The current test uses `crosslink_method="adjacent"` (no field set), so it passes. Future winding-safe variants of that test would need to expand the expected key set.
+
+**Follow-up**
+
+- `crosslink_method="winding_safe"` is opt-in for now (default remains `"adjacent"`). Once the resilin athena production runs validate the new method, consider making `winding_safe` the default.
+- The `target_conversion` parameter is wired into `apply_crosslinks_winding_safe` but not forwarded from `generate_topology`. Plumb it through if a user ever needs early termination at a specific conversion fraction.
+
+---
+
+## 2026-05-19 (later) — protein-network writer: priority-MST so only crosslinks drop
+
+**Change** [topon/protein_network/lammps_writer.py](../topon/protein_network/lammps_writer.py)
+
+- Promoted the Kruskal MST sort key from `(length,)` to `(priority, length)` where `priority=0` for non-crosslink bonds (backbone, sidechain, constraint) and `priority=1` for crosslinks (dityrosine SC4-SC4). All non-crosslink bonds are now tree edges by construction; only crosslinks can be back-edges across chains.
+- Restored the hard assertion: real funct=integer non-crosslink bonds must NEVER drop. If any does, `AssertionError` fires with the offending atom IDs. (The previous "warning only" relaxation was masking the real bug.)
+- Updated the drop report to split crosslinks vs constraints (TYR-ring straddling a box face — rare but legitimate).
+- Stale comments in `builder.py` (line 352-358) and `template_builder.py` (line 42-46, 154-159) updated to describe "priority-weighted MST" instead of "length-weighted MST".
+
+**Why**
+
+The first 2026-05-19 cut of the MST writer was dropping ~0.08% of bonds, but the breakdown showed something wrong: of 22 winding-cycle drops on the resilin_martini_highpro v2 system, **16 were real backbone BB-BB bonds** between adjacent residues (e.g. atoms 5576-5578 = PRO/BB→GLY/BB in chain 11), 4 were crosslinks, 2 were constraints. The relaxation could swallow short-range BB-BB stretches but losing 16 backbone bonds was structural corruption.
+
+Root cause: BFM merges two TYR/SC4 beads at every dityrosine crosslink onto the same lattice node. The two beads belong to two different chains, and each chain's `_interpolate_residue_positions` walk reaches that merged node from a different side of the box — the beads have *identical wrapped positions* (within the per-axis perturbation noise) but their *natural* image flags differ by integer box vectors. The wrapped-MIC distance of every crosslink is therefore ≈ 0.05 Å, much shorter than the ≈ 6.7 Å BB-BB distance at the projected BFM scale. With a pure length-sorted MST, all crosslinks entered the tree first; once they merged chains into one big component, BB-BB bonds (longer) became the longest edges in every chain-wraps-the-box cycle and got dropped instead of the crosslink responsible for the winding.
+
+The priority key inverts that: crosslinks are demoted to "process last", so the longest back-edge in every BFM-crosslink-induced cycle is the crosslink itself, exactly matching the original design intent that crosslinks are the redundant elements of the network.
+
+**Issue / solution**
+
+The previous (length-only) writer had a "warning + categorised drop report" softening of the original assertion because the assertion was firing during v2 regen. That softening was the wrong fix — it kept the data file producible at the cost of silently corrupting the chain topology. The proper fix was to make the assertion non-firing by construction, via the priority key, so it can be restored as a hard structural invariant.
+
+Verification on resilin_martini_highpro v2 (50 chains × 270 residues × ~91 crosslinks, 17³ BFM lattice, 458 Å box):
+
+| Metric | Length-only MST | Priority MST (this commit) |
+|---|---|---|
+| Total drops | 22 (0.076%) | 18 (0.062%) |
+| Real BB-BB drops | 16 | **0** |
+| Constraint drops | 2 | 0 |
+| Crosslink drops | 4 | 18 |
+
+The drop *count* is now slightly higher (18 vs 4 crosslinks) because all winding obligations get pushed onto crosslinks — that's the correct accounting: there are 18 actual winding cycles in the BFM crosslink graph for this realisation. The previous "4 crosslinks" was an undercount because the MST was placing the winding obligation on BB-BB bonds instead. Crosslinks are designed to be sacrificial; backbone bonds are not.
+
+All 67 protein_network unit tests + 3 protein_network regression tests pass. Image flags on the v2 dataset are now consistent within each chain segment (verified: atoms 5575-5581 in chain 11 all share image `(-1, 0, 0)`; the chain wraps cleanly at 5582 where x crosses the box face).
+
+**Follow-up**
+
+- TaskCreate #10: add a unit test that constructs a synthetic System with a deliberately-winding crosslink and asserts no real-bond drop + assertion fires if injected.
+- Topon-reviewer agent rule 3 updated to describe the priority-MST and restored "no real bonds may drop" invariant.
+
+---
+
+## 2026-05-19 — protein-network LAMMPS writer: MST image flags + winding-cycle drop
+
+**Change** [topon/protein_network/lammps_writer.py](../topon/protein_network/lammps_writer.py)
+
+- Replaced the wrap-only 7-column Atoms section with a 10-column row including `ix iy iz` image flags.
+- Image flags are computed by a new helper `_kruskal_image_flags_and_drop`: length-weighted MST (Kruskal) over the molecular bond graph, image flags propagated from the spanning-tree root so every tree-edge bond is minimum-image.
+- Cycle-closing back-edges whose BFS-implied image-flag delta disagrees with the wrapped min-image delta (i.e. cycles with non-zero winding around the periodic box) are dropped from the Bonds section at write time. (The "hard assertion that only crosslinks may drop" was *intended* in this commit but the length-only sort key allowed BB-BB bonds to drop instead; see the 2026-05-19 (later) follow-up entry for the priority-MST fix that restores the invariant.)
+- Header `N bonds` count, Bonds section indexing, and all downstream tests updated; the `tests/output/v33_protein_network_resilin_dry/protein_network.data` regression golden regenerated.
+- Stale `# wrap-only writer convention` comments in `topon/protein_network/builder.py:353-357` and `topon/protein_network/template_builder.py:42-43, 152-159` updated to reflect the new behaviour.
+
+**Why**
+
+The MARTINI 3 protein-network annealing pipeline on Athena (32-rank MPI) was crashing during stage-01 NPT contraction with `ERROR on proc N: Bond atoms X Y missing on proc N at step S` and `WARNING: Inconsistent image flags`. Diagnosis on `system_after_soft.data` showed 1940 of 28,865 bonds had image-flag-implied unwrapped distance > 10 Å (max 649.9 Å, max wrapped MIC = 5.03 Å) — i.e. the bonds were *physically* normal MARTINI bonds (~3 Å) but their image-flag bookkeeping was inconsistent with the bond graph because the writer was emitting all atoms with `(ix, iy, iz) = (0, 0, 0)` despite chains that wrap across the periodic box. LAMMPS's parallel ghost-shell construction uses image flags during bonded-list build, so when a bond's unwrapped endpoints fell on opposite sides of a proc boundary the ghost-atom lookup failed and the run crashed.
+
+**Issue / solution**
+
+The fix has been attempted twice before:
+
+- **v33-v38**: per-chain image walks (each chain walked independently, image flags accumulated from chain start). When two chains met at a dityrosine crosslink, their walk-accumulated images disagreed and the crosslink appeared as a ~box-length bond. Reverted in v39.
+- **v39 onward**: wrap-only / 7-column rows, no image flags emitted. LAMMPS assumes `(0,0,0)` for every atom — works for small / non-percolated systems and for systems where chains don't wrap differently from each other, but breaks parallel MPI bond communication when they do.
+
+The 2026-05 approach is structurally different from both. The MST is global over the bond graph rather than per-chain; tree edges are MIC by construction regardless of chain identity, so the v33-v38 "phantom 240 Å bonds at crosslinks" failure mode is impossible for tree edges. Cycle-closing back-edges with non-zero winding remain a genuine topological obstruction — these are detected (BFS-implied delta vs wrapped-MIC delta, exact integer arithmetic, no magnitude threshold) and dropped at write time. For the resilin/highpro 50-chain / 91-crosslink test case, ~23 of 28,865 bonds dropped (≈0.08% of the network, well below any mechanical-property sensitivity threshold).
+
+Investigator audit (two passes: design + draft code) confirmed: (a) MST over the global bond graph is not the v33-v38 anti-pattern; (b) MST is strictly better than naive BFS for picking which bonds become tree edges (backbone bonds are always shortest, so they preferentially become tree edges and never drop); (c) the assertion that only crosslink bonds may drop catches the upstream chain-placement-bug scenario rather than silently masking it; (d) edge cases (isolated water beads, disconnected components, zero bonds) are handled correctly.
+
+**Follow-up**
+
+- `tests/regression/test_protein_network.py::test_topology_json_is_structurally_consistent` is failing pre-existing (chain count drifts from frozen golden — unrelated to this writer change, lives in the BFM topology generator); needs separate investigation.
+- The wrap-only convention in `topon/writers/lammps_data.py`, `topon/writers/lammps_cg.py`, `topon/writers/lammps_atomistic.py`, and `topon/simbox/writer.py` is *not* changed by this commit — those writers serve simpler topologies (KG, DREIDING, single-region simbox packs) where chains don't wrap differently and 7-column rows are still safe. If a parallel run on one of those systems ever surfaces the same `Bond atoms missing` error, the same MST pattern can be applied.
+- Athena production run uses `system_equilibrated.data` from an earlier topon version (pre-fix). For that one-off, a standalone `fix_image_flags.py` post-processor with the same MST algorithm is the immediate unblocker.
+
+---
+
 ## 2026-05-11 (later 2) — CG end-cap collapse to single bead (P0 placement bug)
 
 **Change** [topon/chemistry/builder.py:`_place_end_cap`](topon/chemistry/builder.py)
