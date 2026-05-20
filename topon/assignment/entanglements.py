@@ -82,35 +82,63 @@ def select_entanglements(
     if config.avg_crosslinks_per_chain is not None:
         if num_chains is None:
             num_chains = G.number_of_edges()
-        
+
         total_draws = int(config.avg_crosslinks_per_chain * 0.5 * num_chains)
         print(f"    Distribution mode: {config.avg_crosslinks_per_chain} avg crosslinks/chain")
         print(f"    Total draws to distribute: {total_draws}")
-        
+
         # Track kink data
         kink_candidates = {}  # kink_idx -> (e1, e2)
         kink_counts = {}      # kink_idx -> count
         kink_centers = {}     # kink_idx -> center
-        
+
         # Track which edges are locked to which kink
         edge_to_kink = {}
-        
+
         # Valid candidate indices (initially all)
         valid_candidates = set(range(len(candidates)))
-        
+
+        # Spatial placement bias. When the user requested a non-uniform
+        # placement, precompute each candidate's center + bias weight
+        # once so the per-draw weighted sample is cheap. ``cand_weight``
+        # maps candidate index -> non-negative weight.
+        bias_kind = getattr(config, "placement_bias_kind", "uniform")
+        bias_params = getattr(config, "placement_bias_params", {}) or {}
+        if bias_kind != "uniform":
+            cand_centers = [get_center(c) for c in candidates]
+            cand_weight = compute_bias_weights(
+                cand_centers, dims, bias_kind, bias_params
+            )
+            print(f"    Placement bias: {bias_kind} params={bias_params}")
+        else:
+            cand_weight = None
+
         min_dist_sq = 1e-4
-        
+
         for draw in range(total_draws):
             # Build draw pool: valid candidates + existing kink indices (as negative numbers)
             # We use negative indices for existing kinks to distinguish from candidate indices
             draw_pool = list(valid_candidates) + [-k-1 for k in kink_candidates.keys()]
-            
+
             if not draw_pool:
                 print(f"    Warning: Empty draw pool at draw {draw}")
                 break
-            
-            # Pick randomly from pool
-            pick = random.choice(draw_pool)
+
+            # Pick from pool. Uniform unless the user configured a
+            # placement bias, in which case valid candidates carry the
+            # bias weight and existing kinks stay uniform (weight 1.0).
+            if cand_weight is None:
+                pick = random.choice(draw_pool)
+            else:
+                weights = [
+                    cand_weight[i] if i >= 0 else 1.0
+                    for i in draw_pool
+                ]
+                total_w = sum(weights)
+                if total_w <= 0.0:
+                    pick = random.choice(draw_pool)
+                else:
+                    pick = random.choices(draw_pool, weights=weights, k=1)[0]
             
             if pick >= 0:
                 # Picked a valid candidate -> create new kink
@@ -232,8 +260,104 @@ def select_entanglements(
     return selected
 
 
+def compute_bias_weights(
+    centers: list[np.ndarray],
+    dims: Optional[np.ndarray],
+    kind: str,
+    params: dict,
+) -> list[float]:
+    """Return one non-negative weight per candidate from a spatial bias.
+
+    Supported ``kind`` values:
+
+    * ``"uniform"`` -- all weights 1.0 (the legacy behaviour).
+    * ``"region"`` -- inside a sphere centered at ``params["center"]``
+      (fractional coords ``[0..1]`` of the box) with radius
+      ``params["radius"]`` (fraction of ``min(dims)``), weight is
+      ``params["strength"]``; outside, weight is 1.0. ``strength`` thus
+      acts as the in-vs-out density ratio.
+    * ``"anti_region"`` -- inverse of ``"region"``: depleted inside the
+      sphere (weight ``1/strength``), normal outside.
+    * ``"gradient"`` -- power-law gradient along an axis. ``params["axis"]``
+      is one of ``"x"``, ``"y"``, ``"z"``; weight is
+      ``0.01 + frac ** params["strength"]`` where ``frac`` is the
+      candidate's fractional position along that axis.
+    * ``"clusters"`` -- maximum of gaussian peaks centred at
+      ``params["centers"]`` (each a fractional xyz) with standard
+      deviation ``params["sigma"]`` (fraction of ``min(dims)``). The
+      maximum is then scaled by ``params["strength"]`` and added to a
+      uniform floor of 1.0.
+
+    Defaults are filled in when params are missing so a partial config
+    still produces a usable bias. Returns a plain Python list (PEP-8
+    list of floats), suitable for passing straight to
+    ``random.choices(..., weights=...)``.
+    """
+    if dims is None:
+        dims_arr = np.array([1.0, 1.0, 1.0])
+    else:
+        dims_arr = np.asarray(dims, dtype=float)
+    min_d = float(np.min(dims_arr))
+
+    if kind == "uniform" or not centers:
+        return [1.0] * len(centers)
+
+    def _mic_dist(a: np.ndarray, b: np.ndarray) -> float:
+        d = a - b
+        d = d - dims_arr * np.round(d / dims_arr)
+        return float(np.linalg.norm(d))
+
+    if kind in ("region", "anti_region"):
+        center_frac = np.asarray(
+            params.get("center", [0.5, 0.5, 0.5]), dtype=float
+        )
+        c = center_frac * dims_arr
+        radius = float(params.get("radius", 0.3)) * min_d
+        strength = float(params.get("strength", 10.0))
+        weights: list[float] = []
+        for pt in centers:
+            inside = _mic_dist(np.asarray(pt), c) <= radius
+            if kind == "region":
+                weights.append(strength if inside else 1.0)
+            else:                                              # anti_region
+                weights.append(1.0 / max(strength, 1e-6) if inside else 1.0)
+        return weights
+
+    if kind == "gradient":
+        axis_map = {"x": 0, "y": 1, "z": 2}
+        ax = axis_map.get(params.get("axis", "x"), 0)
+        strength = float(params.get("strength", 2.0))
+        weights = []
+        for pt in centers:
+            frac = float(pt[ax]) / max(dims_arr[ax], 1e-9)
+            frac = max(0.0, min(1.0, frac))
+            weights.append(0.01 + frac ** strength)
+        return weights
+
+    if kind == "clusters":
+        cluster_centers = [
+            np.asarray(c, dtype=float) * dims_arr
+            for c in params.get("centers", [[0.25, 0.25, 0.25],
+                                             [0.75, 0.75, 0.75]])
+        ]
+        sigma = float(params.get("sigma", 0.15)) * min_d
+        strength = float(params.get("strength", 10.0))
+        weights = []
+        for pt in centers:
+            arr = np.asarray(pt)
+            peak = max(
+                np.exp(-_mic_dist(arr, cc) ** 2 / (2 * sigma * sigma))
+                for cc in cluster_centers
+            )
+            weights.append(1.0 + strength * peak)
+        return weights
+
+    # Unknown kind: fall back to uniform.
+    return [1.0] * len(centers)
+
+
 def find_crossing_candidates(
-    G: nx.MultiGraph, 
+    G: nx.MultiGraph,
     dims: Optional[np.ndarray] = None
 ) -> list[tuple[tuple, tuple]]:
     """

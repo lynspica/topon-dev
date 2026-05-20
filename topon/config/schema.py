@@ -148,15 +148,45 @@ class EntanglementsConfig(BaseModel):
     enabled: bool = Field(default=False)
     target: int = Field(default=0, ge=0)
     target_type: Literal["count", "percentage"] = Field(default="count")
-    
+
     # Distribution mode: specify average crosslinks per chain
     # Formula: total_draws = avg_crosslinks_per_chain * 0.5 * num_chains
     avg_crosslinks_per_chain: Optional[float] = Field(
         default=None, ge=0,
         description="Average crosslinks per chain. If set, uses distribution mode with replacement."
     )
-    
+
     kink_params: KinkParams = Field(default_factory=KinkParams)
+
+    # Spatial placement bias. Default "uniform" gives the legacy
+    # behaviour (homogeneous random selection from crossing
+    # candidates). Other kinds reweight the draw pool by a spatial
+    # function of each candidate's midpoint center.
+    #
+    # See :func:`topon.assignment.entanglements.compute_bias_weights`
+    # for the supported kinds and their params keys:
+    #   * region      — uniform inside a sphere, low outside.
+    #                    params: center (fractional [0..1] x/y/z),
+    #                            radius (fraction of min(dims)),
+    #                            strength (in/out density ratio).
+    #   * anti_region — depleted inside a sphere, normal outside.
+    #                    params: center, radius, strength.
+    #   * gradient    — power-law gradient along an axis.
+    #                    params: axis ("x"/"y"/"z"), strength (exponent).
+    #   * clusters    — gaussian peaks at multiple centers.
+    #                    params: centers (list of fractional xyz),
+    #                            sigma (fraction of min(dims)),
+    #                            strength.
+    placement_bias_kind: Literal[
+        "uniform", "region", "anti_region", "gradient", "clusters"
+    ] = Field(
+        default="uniform",
+        description="Spatial bias applied to the entanglement-candidate draw.",
+    )
+    placement_bias_params: dict = Field(
+        default_factory=dict,
+        description="Parameters consumed by the placement-bias function.",
+    )
 
 
 class GraftConfig(BaseModel):
