@@ -25,17 +25,22 @@ import networkx as nx
 import numpy as np
 
 
-# Node-feature column order (must match the spec). Index in node_features[:, k].
+# Node-feature column order. Schema v2 (2026-05): 10 columns.
+# Topology-derived columns get real values at write time; conformation-
+# derived columns are NaN until a LAMMPS run fills them in.
 _FEATURE_COLUMNS = (
-    "type",            # 0 = polymer (chain), 1 = crosslinker
-    "length",          # DP for chains, 1 for crosslinkers
-    "contour_length",  # DP * bond_length (NaN if unknown)
-    "rg",              # radius of gyration (NaN if unknown)
-    "COMX",
-    "COMY",
-    "COMZ",
-    "node_degree",
+    "type",            # 0 = polymer (chain), 1 = crosslinker          [topo]
+    "length",          # DP for chains, 1 for crosslinkers              [topo]
+    "contour_length",  # sum intramolecular bond lengths                [conf -> NaN]
+    "rg",              # radius of gyration                             [conf -> NaN]
+    "COMX",            # centre of mass X                               [conf -> NaN]
+    "COMY",            # centre of mass Y                               [conf -> NaN]
+    "COMZ",            # centre of mass Z                               [conf -> NaN]
+    "chem_degree",     # # chemical edges touching this node            [topo]
+    "phys_degree",     # # entanglement edges touching this node        [topo]
+    "frac_ext",        # end-to-end distance / contour length           [conf -> NaN]
 )
+SCHEMA_VERSION = 2
 
 
 def write_npz(
@@ -68,64 +73,86 @@ def write_npz(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     edges = list(G.edges(keys=True, data=True))
+    NAN = float("nan")
 
     # Chain nodes: one per MultiGraph edge.
     edge_to_id: dict[tuple[int, int, int], int] = {}
-    chain_features: list[list[float]] = []   # rows of node_features
+    chain_features: list[list[float]] = []   # rows of node_features (v2 = 10 cols)
     chain_ids: list[int] = []                # original mol_id (per-chain)
 
     # Offset chain IDs above the max crosslink ID so they don't collide.
     max_xlink_id = max(max(u, v) for u, v, _ in G.edges) if G.edges else 0
     next_id = max_xlink_id + 1
 
+    # Schema v2: conformation-derived columns (contour_length, rg, COM,
+    # frac_ext) are NaN at write time -- they get filled in by the
+    # downstream LAMMPS run, not the topology generator.
     for u, v, key, data in edges:
         edge_to_id[(u, v, key)] = next_id
         chain_ids.append(next_id)
         length = float(data.get("dp", dp))
-        contour = length * float(bond_length)
-        # Center of mass for a chain: midpoint of its end-crosslink positions.
-        pu = G.nodes.get(u, {}).get("pos")
-        pv = G.nodes.get(v, {}).get("pos")
-        if pu is not None and pv is not None and len(pu) == 3 and len(pv) == 3:
-            comx = 0.5 * (float(pu[0]) + float(pv[0]))
-            comy = 0.5 * (float(pu[1]) + float(pv[1]))
-            comz = 0.5 * (float(pu[2]) + float(pv[2]))
-        else:
-            comx = comy = comz = float("nan")
+        # Each chain has exactly 2 chemical edges in the dual graph (one
+        # to each end crosslinker). Entanglements per chain come from the
+        # ``entanglement_count`` on this edge plus any entanglements on
+        # the partner side -- counted in the second pass below.
         chain_features.append([
-            0.0,            # type = polymer
-            length,
-            contour,
-            float("nan"),   # rg unknown at generation time
-            comx,
-            comy,
-            comz,
-            2.0,            # chain nodes have degree 2 in the dual graph
+            0.0,            # type           [topo]
+            length,         # length         [topo]
+            NAN,            # contour_length [conf]
+            NAN,            # rg             [conf]
+            NAN,            # COMX           [conf]
+            NAN,            # COMY           [conf]
+            NAN,            # COMZ           [conf]
+            2.0,            # chem_degree    [topo]: always 2 for a chain in the dual
+            0.0,            # phys_degree    [topo]: filled below
+            NAN,            # frac_ext       [conf]
         ])
         next_id += 1
 
     # Crosslink nodes: one per topon-graph node that participates in an edge.
+    # chem_degree for a crosslinker = number of chains attached = G.degree(xid).
+    # phys_degree for a crosslinker = 0 (entanglements are chain-chain only).
     crosslink_ids = sorted({u for u, v, _ in G.edges} | {v for u, v, _ in G.edges})
     crosslink_features: list[list[float]] = []
     for xid in crosslink_ids:
-        attrs = G.nodes.get(xid, {})
-        pos = attrs.get("pos")
-        if pos is not None and len(pos) == 3:
-            cx, cy, cz = float(pos[0]), float(pos[1]), float(pos[2])
-        else:
-            cx = cy = cz = float("nan")
-        # Crosslink "node_degree" in the dual = number of chains attached
-        # = original graph degree. Same as G.degree(xid).
         crosslink_features.append([
-            1.0,            # type = crosslinker
-            1.0,            # length placeholder
-            0.0,            # contour_length
-            0.0,            # rg
-            cx,
-            cy,
-            cz,
-            float(G.degree(xid)),
+            1.0,                    # type           [topo]
+            1.0,                    # length placeholder
+            NAN,                    # contour_length [conf]
+            NAN,                    # rg             [conf]
+            NAN,                    # COMX           [conf]
+            NAN,                    # COMY           [conf]
+            NAN,                    # COMZ           [conf]
+            float(G.degree(xid)),   # chem_degree    [topo]
+            0.0,                    # phys_degree    [topo]: 0 for crosslinkers
+            NAN,                    # frac_ext       [conf]
         ])
+
+    # Fill in phys_degree for chain rows: count entanglement edges touching
+    # each chain (each entanglement pair contributes 1 to both ends).
+    # Built from edge.entangled_with attribute; deduped by symmetric pair.
+    _phys_seen: set[frozenset] = set()
+    _phys_count: dict[int, int] = {}
+    for u, v, key, data in edges:
+        ew = data.get("entangled_with")
+        if not ew:
+            continue
+        ew = tuple(ew)
+        e1 = (u, v, key)
+        pair = frozenset([frozenset(e1[:2]), frozenset(ew[:2])])
+        if pair in _phys_seen:
+            continue
+        _phys_seen.add(pair)
+        cid1 = edge_to_id.get(e1) or edge_to_id.get((e1[1], e1[0], e1[2]))
+        cid2 = edge_to_id.get(ew) or edge_to_id.get((ew[1], ew[0], ew[2]))
+        if cid1 is None or cid2 is None:
+            continue
+        cnt = int(data.get("entanglement_count", 1))
+        _phys_count[cid1] = _phys_count.get(cid1, 0) + cnt
+        _phys_count[cid2] = _phys_count.get(cid2, 0) + cnt
+    # Apply to chain rows (index in chain_features = chain_id - (max_xlink_id+1))
+    for i, cid in enumerate(chain_ids):
+        chain_features[i][8] = float(_phys_count.get(cid, 0))
 
     n_polymer = len(chain_features)
     n_crosslinker = len(crosslink_features)
@@ -244,6 +271,7 @@ def write_npz(
         stress=stress_arr,
         n_polymer=np.int32(n_polymer),
         n_crosslinker=np.int32(n_crosslinker),
+        schema_version=np.int32(SCHEMA_VERSION),
     )
 
     print(f"  NPZ written to {output_path}")
