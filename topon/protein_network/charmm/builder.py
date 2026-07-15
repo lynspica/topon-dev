@@ -92,84 +92,6 @@ def _estimate_protein_mass(atoms):
 
 # ── Main system builder ────────────────────────────────────────────────────────
 
-# --- Backbone seeding geometry ------------------------------------------------
-# The initial atom placement only needs to seed the correct energy BASIN;
-# LAMMPS stage-1 minimisation expands these small offsets to true CHARMM bond
-# lengths. What the old random ±0.3 A jitter got WRONG is the peptide-bond
-# omega dihedral (CA_i-C_i-N_{i+1}-CA_{i+1}): from a random start the minimiser
-# fell ~50/50 into the cis and trans basins (and the ~20 kcal/mol omega barrier
-# is never crossed afterwards), giving ~12% cis on non-proline bonds (physical
-# ~0%) and ~50% cis on X-Pro (physical ~10-30%). These offsets instead seed
-# every peptide bond TRANS by construction, and CB on the L-chirality side.
-def _tangent(ca_prev, ca_this, ca_next):
-    """Unit chain tangent at a residue (central difference of CA neighbours)."""
-    if ca_prev is not None and ca_next is not None:
-        t = ca_next - ca_prev
-    elif ca_next is not None:
-        t = ca_next - ca_this
-    elif ca_prev is not None:
-        t = ca_this - ca_prev
-    else:
-        t = np.array([1.0, 0.0, 0.0])
-    n = float(np.linalg.norm(t))
-    return t / n if n > 1e-6 else np.array([1.0, 0.0, 0.0])
-
-
-def _transport_perp(prev_perp, t):
-    """Perpendicular to tangent `t`, PARALLEL-TRANSPORTED from prev_perp so it
-    varies smoothly residue-to-residue (no flips at chain bends). Seeding the
-    first residue from a fixed lab axis. This smoothness is what lets the +p on
-    C_i and -p on N_{i+1} stay genuinely opposite in space -> reliable trans
-    even where the lattice chain path curves sharply."""
-    if prev_perp is None:
-        ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
-        p = ref - np.dot(ref, t) * t
-    else:
-        p = prev_perp - np.dot(prev_perp, t) * t   # project onto plane ⊥ t
-        if float(np.linalg.norm(p)) < 1e-3:        # prev_perp ~parallel to t
-            ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
-            p = ref - np.dot(ref, t) * t
-    return p / (float(np.linalg.norm(p)) + 1e-12)
-
-
-def _seed_backbone_positions(ca, ca_prev, ca_next, tangent, perp, box, cis_n=False):
-    """Deterministic seed positions for N, CA, C, O, HN, CB, HA of one residue.
-
-    C points toward the next CA and N toward the previous CA (their actual
-    minimum-image directions), each offset by a distance SCALED to the local
-    CA-CA spacing so the seed never overwhelms compressed regions. C is bumped
-    +perp and N is bumped -perp (opposite sides) so the peptide bond
-    C_{i-1}--N_i starts TRANS (omega ~180). `cis_n` flips this residue's N to
-    +perp -> that one bond becomes cis (used to seed an X-Pro cis fraction).
-
-    CB/HA are placed along +/-q where q = tangent x perp is the CONSISTENT
-    third frame axis (both tangent and perp vary smoothly along the chain, and
-    N/C lie in the tangent-perp plane so q is free). CB always on +q -> uniform
-    L-chirality (sign verified by measurement; the old random jitter gave ~50/50
-    D/L). Signs verified by measurement.
-    """
-    def mi(v):
-        return v - box * np.round(v / box)
-
-    d_next = mi(ca_next - ca) if ca_next is not None else None
-    d_prev = mi(ca_prev - ca) if ca_prev is not None else None
-    ln = float(np.linalg.norm(d_next)) if d_next is not None else 0.0
-    lp = float(np.linalg.norm(d_prev)) if d_prev is not None else 0.0
-    u_next = d_next / ln if ln > 1e-6 else (-(d_prev / lp) if lp > 1e-6 else np.array([1.0, 0.0, 0.0]))
-    u_prev = d_prev / lp if lp > 1e-6 else -u_next
-    sp = np.median([x for x in (ln, lp) if x > 1e-6]) if (ln > 1e-6 or lp > 1e-6) else 1.5
-    a = min(0.75, 0.40 * sp)                  # along-chain offset, spacing-scaled
-    b = min(0.50, 0.35 * sp)                  # perpendicular bump, spacing-scaled
-
-    C = ca + a * u_next + b * perp
-    N = ca + a * u_prev + (b if cis_n else -b) * perp
-    O = C + 0.5 * u_next + 0.4 * perp
-    HN = ca + 0.5 * u_prev - 0.4 * perp
-    q = np.cross(tangent, perp)               # consistent 3rd axis (N,C are in t-perp plane)
-    nq = float(np.linalg.norm(q)); q = q / nq if nq > 1e-6 else np.cross(u_next, perp)
-    CB = ca + 0.75 * q - 0.25 * perp          # +q -> uniform L-chirality (verified)
-    HA = ca - 0.75 * q - 0.25 * perp
-    return {"N": N, "C": C, "O": O, "HN": HN, "CB": CB, "HA": HA}
 
 
 _TARGET_CACA_ANG = 3.8   # real peptide CA-CA spacing; coil segments to ~this
@@ -211,6 +133,131 @@ def _coil_positions(p_start, diff, n_pts, target):
         env = float(np.sin(np.pi * k / (n_pts - 1)))    # 0 at both endpoints
         out.append(ax + ((-1) ** k) * amp * env * e1)
     return out
+
+
+def _nerf(A, B, C, r, theta_deg, phi_deg):
+    """Place a 4th atom from three placed ones (Natural Extension Reference
+    Frame): bond C-D = r, angle B-C-D = theta, dihedral A-B-C-D = phi."""
+    th = np.radians(theta_deg); ph = np.radians(phi_deg)
+    bc = C - B; bc /= (np.linalg.norm(bc) + 1e-12)
+    n = np.cross(B - A, bc); nn = np.linalg.norm(n)
+    n = n / nn if nn > 1e-9 else np.array([0.0, 0.0, 1.0])
+    m = np.cross(n, bc)
+    return C + (-r * np.cos(th)) * bc + (r * np.sin(th) * np.cos(ph)) * m \
+             + (r * np.sin(th) * np.sin(ph)) * n
+
+
+def _build_physical_positions(residue_positions, full_sequence, n_residues,
+                              ff, box, xpro_cis_fraction, bb_rng):
+    """Physically correct per-residue atom positions from CHARMM internal
+    coordinates. Two passes: (1) place backbone N/CA/C along the (coiled) CA
+    trace at real bond lengths + ~111 deg N-CA-C, with a parallel-transported
+    perpendicular so peptide omega starts TRANS (X-Pro bonds flipped cis at
+    `xpro_cis_fraction`); (2) NeRF-build every remaining atom of each residue
+    from its RTF IC table -> correct chirality (L), planar impropers, ideal
+    sidechain geometry. Returns {(res_idx, atom_name): np.ndarray}.
+    """
+    def mi(v):
+        return v - box * np.round(v / box)
+
+    def tangent(i):
+        ca = residue_positions
+        if 0 < i < n_residues - 1 and (i - 1) in ca and (i + 1) in ca:
+            t = mi(ca[i + 1] - ca[i - 1])
+        elif (i + 1) in ca:
+            t = mi(ca[i + 1] - ca[i])
+        elif (i - 1) in ca:
+            t = mi(ca[i] - ca[i - 1])
+        else:
+            t = np.array([1.0, 0.0, 0.0])
+        n = float(np.linalg.norm(t))
+        return t / n if n > 1e-6 else np.array([1.0, 0.0, 0.0])
+
+    # parallel-transported perpendicular per residue
+    perps = {}
+    pv = None
+    for i in range(n_residues):
+        if i not in residue_positions:
+            continue
+        t = tangent(i)
+        if pv is None:
+            ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+            p = ref - np.dot(ref, t) * t
+        else:
+            p = pv - np.dot(pv, t) * t
+            if float(np.linalg.norm(p)) < 1e-3:
+                ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+                p = ref - np.dot(ref, t) * t
+        p /= (float(np.linalg.norm(p)) + 1e-12)
+        perps[i] = p
+        pv = p
+
+    # N and C sit on the SAME perpendicular side of the tangent so the
+    # N-CA-C angle is ~111 deg (opposite sides would make them collinear and
+    # leave chirality undefined). This makes the peptide omega start ~cis; the
+    # writer's stage-1 omega restraint then drives every bond to trans (and a
+    # ~5% X-Pro subset to cis). Chirality is fixed geometrically below.
+    beta = np.radians(34.5)   # half of (180 - 111)
+    cb, sb = np.cos(beta), np.sin(beta)
+    bb = {}
+    for i in range(n_residues):
+        if i not in residue_positions:
+            continue
+        ca = residue_positions[i]; t = tangent(i); p = perps[i]
+        bb[(i, "CA")] = ca
+        bb[(i, "C")] = ca + 1.52 * (cb * t + sb * p)
+        bb[(i, "N")] = ca + 1.46 * (-cb * t + sb * p)
+
+    phys = {}
+    for i in range(n_residues):
+        if (i, "N") not in bb:
+            continue
+        rn = full_sequence[i]
+        if rn == "HIS":
+            rn = "HSD"
+        tmpl = ff.residues.get(rn)
+        if not tmpl:
+            continue
+        known = {"N": bb[(i, "N")], "CA": bb[(i, "CA")], "C": bb[(i, "C")]}
+        if (i - 1, "C") in bb:
+            known["-C"] = bb[(i - 1, "C")]
+        if (i + 1, "N") in bb:
+            known["+N"] = bb[(i + 1, "N")]
+        ics = tmpl.get("ics", [])
+        for _ in range(25):
+            progressed = False
+            for ic in ics:
+                a1, a2, a3, a4 = ic["atoms"]
+                if a4 in known or a4.startswith(("+", "-")):
+                    continue
+                if a1 in known and a2 in known and a3 in known:
+                    known[a4] = _nerf(known[a1], known[a2], known[a3],
+                                      ic["r34"], ic["a234"], ic["d1234"])
+                    progressed = True
+            if not progressed:
+                break
+
+        # Enforce L-chirality deterministically. The lattice trace has hairpins
+        # where the backbone frame flips, so IC-built CB can land on the D side.
+        # Reflecting the sidechain (everything except the backbone N/CA/C/O/HN)
+        # across the N-CA-C plane preserves every bond length and angle but
+        # flips the CA stereocentre D -> L. (Peptide-plane atoms O/HN are kept.)
+        if "CB" in known and "N" in known and "CA" in known and "C" in known:
+            ca = known["CA"]
+            vN = known["N"] - ca; vC = known["C"] - ca
+            nrm = np.cross(vN, vC); ln = float(np.linalg.norm(nrm))
+            if ln > 1e-9:
+                nrm = nrm / ln
+                if np.dot(nrm, known["CB"] - ca) < 0.0:   # D -> reflect sidechain
+                    for nm in list(known):
+                        if nm in ("N", "CA", "C", "O", "HN") or nm.startswith(("+", "-")):
+                            continue
+                        known[nm] = known[nm] - 2.0 * np.dot(known[nm] - ca, nrm) * nrm
+
+        for name, pos in known.items():
+            if not name.startswith(("+", "-")):
+                phys[(i, name)] = pos
+    return phys
 
 
 def build_protein_system(ff, snapshot, full_sequence, node_to_res,
@@ -301,10 +348,18 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
                         frac = k / max(n_seg_res - 1, 1)
                         residue_positions[r] = p_start + frac * diff
 
+        # Physically correct positions (IC/NeRF build) for the whole chain,
+        # computed once so every residue's sidechain can reference its
+        # neighbours' backbone (-C / +N). Falls back to per-atom jitter for any
+        # atom without an IC (e.g. terminal-patch atoms).
+        phys_pos = (_build_physical_positions(
+                        residue_positions, full_sequence, n_residues, ff, box,
+                        xpro_cis_fraction, bb_rng)
+                    if physical_backbone else None)
+
         # Instantiate atoms residue by residue
         chain_atom_ids = {}   # (res_idx, atom_name) → global_atom_idx
         prev_c_idx = None
-        prev_perp = None      # parallel-transported backbone perpendicular (per chain)
 
         for res_idx in range(n_residues):
             res_name = full_sequence[res_idx]
@@ -365,24 +420,12 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
             # deterministically; sidechain atoms keep the jitter. When
             # physical_backbone is False the placement is exactly the original
             # (CA at anchor, everything else jittered) -- byte-for-byte.
-            seed_pos = None
-            if physical_backbone:
-                ca_prev = residue_positions.get(res_idx - 1)
-                ca_next = residue_positions.get(res_idx + 1)
-                tangent = _tangent(ca_prev, center, ca_next)
-                prev_perp = _transport_perp(prev_perp, tangent)
-                cis_n = (res_name == "PRO" and xpro_cis_fraction > 0.0
-                         and bb_rng.random() < xpro_cis_fraction)
-                seed_pos = _seed_backbone_positions(
-                    center, ca_prev, ca_next, tangent, prev_perp, box, cis_n=cis_n)
-                seed_pos["CA"] = center
-
             for atom_name, (atype, charge) in atom_list.items():
                 if atom_name.startswith("+") or atom_name.startswith("-"):
                     continue
                 atom_counter += 1
-                if seed_pos is not None and atom_name in seed_pos:
-                    pos = seed_pos[atom_name]
+                if phys_pos is not None and (res_idx, atom_name) in phys_pos:
+                    pos = phys_pos[(res_idx, atom_name)]     # IC-built physical position
                 else:
                     offset = np.zeros(3)
                     if atom_name != "CA":

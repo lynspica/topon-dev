@@ -53,6 +53,60 @@ def find_dihedrals(bonds, atom_idx_set=None):
     return dihedrals
 
 
+def find_omega_dihedrals(atoms, bonds):
+    """Peptide-bond omega dihedrals CA_i-C_i-N_{i+1}-CA_{i+1}, one per peptide
+    bond, as (ca_i, c_i, n_j, ca_j, is_xpro) global atom-id quads. `is_xpro`
+    is True when the C-terminal residue of the bond (the one contributing N) is
+    proline -- those are the bonds allowed a physiological cis population.
+
+    Used to restrain omega during the stage-1..3 minimisation on physical
+    builds (the IC build starts every omega ~cis by construction; the restraint
+    drives them to trans, with a ~5% X-Pro subset held cis).
+    """
+    name = {a.idx: a.name for a in atoms}
+    resname = {a.idx: a.res_name for a in atoms}
+    nbr = defaultdict(list)
+    for i, j in bonds:
+        nbr[i].append(j)
+        nbr[j].append(i)
+
+    def ca_of(x):
+        for y in nbr[x]:
+            if name.get(y) == "CA":
+                return y
+        return None
+
+    quads = []
+    for i, j in bonds:
+        ni, nj = name.get(i), name.get(j)
+        if {ni, nj} != {"C", "N"}:        # the peptide C--N bond
+            continue
+        c = i if ni == "C" else j
+        n = j if ni == "C" else i
+        cai, caj = ca_of(c), ca_of(n)
+        if cai and caj:
+            quads.append((cai, c, n, caj, resname.get(n) == "PRO"))
+    return quads
+
+
+def find_chirality_impropers(atoms, bonds):
+    """CA-stereocentre impropers N-C-CA-CB, one per non-glycine residue, as
+    (n, c, ca, cb) global atom-id quads. This dihedral is +121 deg for L
+    residues (std 4 deg) and would be -121 for D. CHARMM has no CA-chirality
+    improper, so on physical builds we restrain this dihedral to L through the
+    stage-1 soft-min (which otherwise inverts ~20% of centres to D) and release
+    it before stage 2, where the tetrahedral geometry then holds it."""
+    name = {a.idx: a.name for a in atoms}
+    by_res = defaultdict(dict)
+    for a in atoms:
+        by_res[(a.chain_id, a.res_id)][a.name] = a.idx
+    quads = []
+    for res in by_res.values():
+        if all(k in res for k in ("N", "C", "CA", "CB")):
+            quads.append((res["N"], res["C"], res["CA"], res["CB"]))
+    return quads
+
+
 # ── Type map builder ──────────────────────────────────────────────────────────
 
 def build_type_maps(atoms, bonds, angles, dihedrals, impropers, ff=None):
@@ -445,7 +499,8 @@ def write_lammps_groups(filename, atoms, atom_type_map, bond_type_map, angle_typ
 # ── LAMMPS 3-stage input scripts ──────────────────────────────────────────────
 
 def write_lammps_input(base_name, data_file, settings_file, box,
-                       groups_file=None, cmap_file=None):
+                       groups_file=None, cmap_file=None, omega_quads=None,
+                       xpro_cis_fraction=0.0, chirality_quads=None):
     """
     Write three LAMMPS input scripts for staged minimisation + equilibration.
 
@@ -483,6 +538,58 @@ def write_lammps_input(base_name, data_file, settings_file, box,
         cmap_pre  = ""
         cmap_rdat = ""
 
+    # ── Optional omega restraint (physical_backbone builds only) ──────────────
+    # Pin every peptide-bond omega to trans (LAMMPS `fix restrain dihedral` has
+    # its minimum at target+180, so target 0.0 -> 180 deg trans) through the
+    # stage-1 soft-min expansion, then release before stage 2. Written to a
+    # side include so stage1.in stays readable; when omega_quads is None both
+    # blocks are empty and stage1.in is byte-identical to the legacy script.
+    omega_fix = ""
+    omega_unfix = ""
+    if omega_quads:
+        # LAMMPS `fix restrain dihedral` has its minimum at target+180, so
+        # target 0 -> 180 deg (trans), target 180 -> 0 deg (cis). Drive every
+        # bond trans, except a random ~xpro_cis_fraction of the X-Pro bonds cis.
+        # Chirality impropers N-C-CA-CB are held at L (dihedral 121 -> target
+        # 121-180 = -59) so the soft-min can't invert the CA stereocentres.
+        import random as _random
+        rng = _random.Random(20260714)
+        n_cis = 0
+        specs = []
+        for q in omega_quads:
+            a, b, c, dd = q[0], q[1], q[2], q[3]
+            is_xpro = q[4] if len(q) > 4 else False
+            cis = is_xpro and xpro_cis_fraction > 0.0 and rng.random() < xpro_cis_fraction
+            n_cis += cis
+            specs.append((a, b, c, dd, 180.0 if cis else 0.0))
+        n_chir = 0
+        for q in (chirality_quads or []):
+            specs.append((q[0], q[1], q[2], q[3], -59.0))   # L-chirality
+            n_chir += 1
+        omega_base = os.path.basename(base_name) + ".in.omega"
+        chunk = 1200
+        fix_names = []
+        blocks = []
+        for gi in range(0, len(specs), chunk):
+            fn = f"omega{gi // chunk}"
+            fix_names.append(fn)
+            grp = specs[gi:gi + chunk]
+            lines = [f"fix {fn} all restrain &"]
+            for k, (a, b, c, dd, tgt) in enumerate(grp):
+                cont = " &" if k < len(grp) - 1 else ""
+                lines.append(f"  dihedral {a} {b} {c} {dd} 80.0 80.0 {tgt}{cont}")
+            blocks.append("\n".join(lines))
+        with open(os.path.join(relax_dir, omega_base), "w", encoding="utf-8") as of:
+            of.write(f"# Backbone restraints (K=80 kcal/mol/rad^2). LAMMPS restrain "
+                     f"min is at target+180, so omega 0=>trans, 180=>cis; "
+                     f"chirality target -59 => 121 deg = L.\n"
+                     f"# omega: {len(omega_quads)-n_cis} trans + {n_cis} cis (X-Pro); "
+                     f"chirality: {n_chir} L. Released before each output step.\n"
+                     + "\n".join(blocks) + "\n")
+        omega_fix = (f"\n# Restrain peptide omega to trans during the soft-min "
+                     f"expansion (physical_backbone).\ninclude         {omega_base}\n")
+        omega_unfix = "".join(f"unfix           {n}\n" for n in fix_names)
+
     # ── Stage 1: Soft minimisation ────────────────────────────────────────────
     with open(f"{stage_prefix}_stage1.in", "w", encoding='utf-8') as f:
         f.write(f"""\
@@ -506,7 +613,7 @@ include         {s}
 special_bonds   charmm
 neighbor        2.0 bin
 neigh_modify    every 1 delay 0 check yes
-
+{omega_fix}
 # ── Switch to soft potential (disable long-range electrostatics) ──────────────
 kspace_style    none
 pair_style      soft 1.0
@@ -536,7 +643,7 @@ unfix           soft_push
 fix             soft_push all adapt 1 pair soft a * * v_prefactor
 minimize        1.0e-4 1.0e-6 1000 10000
 unfix           soft_push
-
+{omega_unfix}
 write_data      system_after_soft.data
 write_restart   1.restart
 """)
@@ -558,7 +665,7 @@ improper_style  harmonic
 pair_style      soft 1.0
 
 {cmap_pre}read_data       system_after_soft.data{cmap_rdat}
-{grp_line}
+{grp_line}{omega_fix}
 neigh_modify    one 10000
 comm_modify     mode single cutoff 14.0
 
@@ -585,7 +692,7 @@ fix             fxnve all nve/limit 0.1
 run             20000
 unfix           fxnve
 unfix           1
-
+{omega_unfix}
 write_data      system_ramped.data
 write_restart   2.restart
 """)
@@ -613,7 +720,7 @@ pair_style      lj/charmm/coul/long 10.0 12.0
 kspace_style    pppm 1.0e-4
 include         {s}
 special_bonds   charmm
-
+{omega_fix}
 thermo          100
 thermo_style    custom step pe ke etotal evdwl ecoul epair ebond eangle edihed eimp press vol temp
 
@@ -621,7 +728,7 @@ thermo_style    custom step pe ke etotal evdwl ecoul epair ebond eangle edihed e
 min_style       cg
 minimize        1.0e-6 1.0e-8 100000 1000000
 write_data      system_minimized_final.data
-
+{omega_unfix}
 # Short NVT (10 000 steps x 1 fs)
 reset_timestep  0
 variable        T equal 300

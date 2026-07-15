@@ -14,6 +14,25 @@ Newest first.
 
 ---
 
+## 2026-05-20 — CHARMM `--physical-backbone`: IC-built physical structure (correct cis/trans, chirality, impropers)
+
+**Change** [charmm/charmm_ff.py](../topon/protein_network/charmm/charmm_ff.py), [charmm/builder.py](../topon/protein_network/charmm/builder.py), [charmm/lammps_writer.py](../topon/protein_network/charmm/lammps_writer.py), [charmm/build_systems.py](../topon/protein_network/charmm/build_systems.py)
+
+`--physical-backbone` now builds a physically correct starting structure instead of the collapsed jitter:
+
+1. **IC parsing** — `CHARMMForceField` parses the RTF internal-coordinate (IC) tables (370 entries) into `residues[..]["ics"]`.
+2. **NeRF residue build** — `_build_physical_positions` lays the backbone N/CA/C along the (coiled) CA trace at real bond lengths and ~111 deg N-CA-C, then NeRF-builds every remaining atom from the residue's IC table -> ideal bonds/angles, planar impropers, real sidechain rotamers. The IC dihedral signs encode L-chirality; where the lattice trace's hairpins would flip it, the sidechain is reflected across the N-CA-C plane (preserves all bonds/angles, flips D->L) so the build is 100% L.
+3. **Backbone coiling** — `_coil_positions` zig-zags interior residues to ~3.8 A CA-CA (keeping crosslinker Y residues on their nodes), so the structure is real-sized and stage-1 needs no violent expansion.
+4. **Stage-1..3 restraints** — the writer emits `fix restrain` blocks (side include `*.in.omega`) that hold peptide omega trans (LAMMPS restrain min is target+180, so target 0 => 180 deg; a ~`--xpro-cis-fraction` subset of X-Pro targets 180 => cis) and the N-C-CA-CB chirality improper at L (dihedral 121 => target -59), released before each stage's dynamics/output. CHARMM has no CA-chirality improper, so without this the soft-min inverts ~20% of centres to D.
+
+**Why** A physically correct start is the real fix for the cis/trans + chirality + planarity artifacts, versus seeding + hoping (which the soft-min scrambled). Proline-rich resilin makes cis/trans matter: non-Pro must be ~100% trans, X-Pro ~5% cis (folded-protein value).
+
+**Issue / solution** The lattice SAW path has hairpins where a backbone frame is ill-defined, so laying a clean backbone on it flips omega/chirality; and even a physical build gets partly scrambled by stage-1's aggressive soft-min. Resolved by (a) IC build for correct intra-residue geometry + deterministic chirality reflection, (b) coiling for real spacing (gentle minimisation), (c) omega+chirality restraints that protect the barrier-locked DOFs through minimisation and release before dynamics (the real barrier then holds them).
+
+**Validation** natpro 25x18, `--physical-backbone --xpro-cis-fraction 0.05`, through stages 1-3: **non-Pro 0.03% cis, X-Pro 8% cis, 98.9% trans overall, chirality 100% L (4050/4050), bond median 1.23 A**. Default path (no flag) verified **byte-identical** to the original builder (data + stage scripts) and 91 protein_network unit tests pass. Opt-in; nothing about the default CHARMM build changes.
+
+**Follow-up** Supersedes the earlier partial-fix entries (seed+coil, then restraint band-aid). The build follows the coiled lattice trace, so starting phi/psi are lattice-then-relaxed rather than strict PPII (phi/psi are low-barrier and relax freely; only the barrier-locked omega/chirality/impropers are pinned). X-Pro cis drifts ~5%->8% over stages 2-3 (restraint released before dynamics); tighten stabilisation if an exact fraction is needed.
+
 ## 2026-05-20 — CHARMM backbone fix made opt-in (+ coiling); still insufficient
 
 **Change** [charmm/builder.py](../topon/protein_network/charmm/builder.py), [charmm/build_systems.py](../topon/protein_network/charmm/build_systems.py)

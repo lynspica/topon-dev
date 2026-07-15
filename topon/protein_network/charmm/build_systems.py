@@ -43,6 +43,8 @@ from .builder import (
 from .lammps_writer import (
     find_angles,
     find_dihedrals,
+    find_omega_dihedrals,
+    find_chirality_impropers,
     build_type_maps,
     write_lammps_data,
     write_lammps_settings,
@@ -285,6 +287,15 @@ def main():
             groups_file, atoms,
             atom_type_map, bond_type_map, angle_type_map,
         )
+        # physical_backbone: restrain peptide omega (-> trans, +5% X-Pro cis)
+        # and CA chirality (-> L) through the stage-1..3 minimisation so the
+        # soft-min can't scramble the physically-built cis/trans and D/L.
+        omega_quads = chir_quads = None
+        if args.physical_backbone:
+            omega_quads = find_omega_dihedrals(atoms, bonds)
+            chir_quads = find_chirality_impropers(atoms, bonds)
+            print(f"  Restraints: {len(omega_quads)} omega + {len(chir_quads)} "
+                  f"chirality")
         write_lammps_input(
             prefix,
             os.path.basename(data_file),
@@ -292,6 +303,9 @@ def main():
             box,
             groups_file=os.path.basename(groups_file),
             cmap_file=cmap_filename,
+            omega_quads=omega_quads,
+            xpro_cis_fraction=args.xpro_cis_fraction,
+            chirality_quads=chir_quads,
         )
 
         final_charge = sum(a.charge for a in atoms)

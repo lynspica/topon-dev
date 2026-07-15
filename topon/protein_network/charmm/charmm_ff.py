@@ -109,6 +109,7 @@ class CHARMMForceField:
                         "bonds": [],
                         "impropers": [],
                         "deletes": [],
+                        "ics": [],
                         "charge": float(parts[2]) if len(parts) > 2 else 0.0,
                     }
                     if block_type == "RESI":
@@ -133,6 +134,26 @@ class CHARMMForceField:
                 elif parts[0] == "DELETE" and len(parts) >= 3 and current_data:
                     if parts[1] == "ATOM":
                         current_data["deletes"].append(parts[2])
+
+                elif parts[0] == "IC" and current_data and len(parts) >= 10:
+                    # Internal-coordinate entry:
+                    #   IC a1 a2 a3 a4  R(1-2) A(1-2-3) D(1-2-3-4) A(2-3-4) R(3-4)
+                    # A leading '*' on a3 marks an improper IC (a3 central); the
+                    # geometry to place a4 from a1,a2,a3 is the same either way
+                    # (dihedral a1-a2-a3-a4, angle a2-a3-a4, bond a3-a4), so we
+                    # keep the flag only for reference.
+                    a3 = parts[3]
+                    improper = a3.startswith("*")
+                    a3 = a3[1:] if improper else a3
+                    try:
+                        current_data["ics"].append({
+                            "atoms": (parts[1], parts[2], a3, parts[4]),
+                            "r12": float(parts[5]), "a123": float(parts[6]),
+                            "d1234": float(parts[7]), "a234": float(parts[8]),
+                            "r34": float(parts[9]), "improper": improper,
+                        })
+                    except ValueError:
+                        pass
 
     # ── Look-up helpers ───────────────────────────────────────────────────────
 
