@@ -14,6 +14,18 @@ Newest first.
 
 ---
 
+## 2026-05-20 — CHARMM backbone fix made opt-in (+ coiling); still insufficient
+
+**Change** [charmm/builder.py](../topon/protein_network/charmm/builder.py), [charmm/build_systems.py](../topon/protein_network/charmm/build_systems.py)
+
+Gated the trans/L backbone seeding (previous entry) behind a new opt-in `physical_backbone` flag (`build_protein_system(..., physical_backbone=False)`; CLI `--physical-backbone`, `--xpro-cis-fraction`). **Default is now byte-for-byte identical to the original jitter placement** — verified by diffing a default build against the pre-change builder (`git show 8bd6aac`), IDENTICAL. Also added backbone coiling (`_coil_positions`) that, when enabled, zig-zags interior residues to ~3.8 Å CA–CA while keeping crosslinker Y residues exactly on their lattice nodes (a-priori crosslink geometry preserved).
+
+**Why** The prior entry's seeding was (a) an unconditional default change to a builder used across all datasets, and (b) incomplete. Making it opt-in restores a safe default; coiling was the "option 1" attempt at the real fix.
+
+**Issue / solution (STILL INCOMPLETE)** Coiling does **not** make omega survive stage-1. It fixes CA–CA spacing, but every atom is still collapsed (sidechains jittered ~0.3 Å, bond median ~0.65 Å), so stage-1 soft-min must expand the whole structure ~2× and that re-scrambles omega (~36% non-Pro / ~49% X-Pro cis after stage-1). Root cause is whole-structure atomic collapse, not just backbone spacing.
+
+**Follow-up (the actual fix)** Place ALL atoms at real internal-coordinate geometry (CHARMM RTF IC table) so the build is already near-physical and stage-1 only removes minor clashes — a proper atomistic backmapper. Deferred; the opt-in flag + coiling are committed as verified-safe groundwork and to record the diagnosis. 91 protein_network unit tests pass; default path unchanged.
+
 ## 2026-05-20 — CHARMM builder: seed trans peptide bonds + L-chirality (PARTIAL — see caveat)
 
 **Change** [topon/protein_network/charmm/builder.py](../topon/protein_network/charmm/builder.py)

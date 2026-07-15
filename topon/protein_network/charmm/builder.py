@@ -172,9 +172,50 @@ def _seed_backbone_positions(ca, ca_prev, ca_next, tangent, perp, box, cis_n=Fal
     return {"N": N, "C": C, "O": O, "HN": HN, "CB": CB, "HA": HA}
 
 
+_TARGET_CACA_ANG = 3.8   # real peptide CA-CA spacing; coil segments to ~this
+
+
+def _perp_axis(v):
+    """A unit vector perpendicular to v (fixed lab-axis Gram-Schmidt)."""
+    nv = float(np.linalg.norm(v))
+    vh = v / nv if nv > 1e-9 else np.array([1.0, 0.0, 0.0])
+    ref = np.array([0.0, 0.0, 1.0]) if abs(vh[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    e = ref - np.dot(ref, vh) * vh
+    n = float(np.linalg.norm(e))
+    return e / n if n > 1e-9 else np.array([1.0, 0.0, 0.0])
+
+
+def _coil_positions(p_start, diff, n_pts, target):
+    """`n_pts` residue positions from p_start to p_start+diff.
+
+    If the straight-line spacing (segment length / (n_pts-1)) would compress
+    residues below `target`, the INTERIOR points zig-zag off the axis so their
+    spacing is ~target -- decompressing the chain so minimisation needs no
+    violent expansion (which is what scrambled omega/chirality). The two
+    ENDPOINTS stay exactly on the nodes (envelope sin(pi k/(n-1)) = 0 there), so
+    crosslinker Y residues -- always at lattice nodes -- are never moved and the
+    a-priori crosslink geometry is preserved. If the straight span is already
+    long enough, returns the plain linear interpolation.
+    """
+    if n_pts <= 1:
+        return [p_start.copy()]
+    L = float(np.linalg.norm(diff))
+    axial = L / (n_pts - 1)
+    if axial >= target or L < 1e-6:
+        return [p_start + (k / (n_pts - 1)) * diff for k in range(n_pts)]
+    e1 = _perp_axis(diff)
+    amp = 0.5 * float(np.sqrt(max(target * target - axial * axial, 0.0)))
+    out = []
+    for k in range(n_pts):
+        ax = p_start + (k / (n_pts - 1)) * diff
+        env = float(np.sin(np.pi * k / (n_pts - 1)))    # 0 at both endpoints
+        out.append(ax + ((-1) ** k) * amp * env * e1)
+    return out
+
+
 def build_protein_system(ff, snapshot, full_sequence, node_to_res,
-                         lattice_scale=15.0, xpro_cis_fraction=0.0,
-                         backbone_seed=20260714):
+                         lattice_scale=15.0, physical_backbone=False,
+                         xpro_cis_fraction=0.0, backbone_seed=20260714):
     """
     Build the full atomistic (dry) protein system from a BFM topology snapshot.
 
@@ -249,10 +290,16 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
             diff -= box * np.round(diff / box)
 
             n_seg_res = r_end - r_start + 1
-            for k, r in enumerate(range(r_start, r_end + 1)):
-                if r not in residue_positions:
-                    frac = k / max(n_seg_res - 1, 1)
-                    residue_positions[r] = p_start + frac * diff
+            if physical_backbone:
+                seg_pts = _coil_positions(p_start, diff, n_seg_res, _TARGET_CACA_ANG)
+                for k, r in enumerate(range(r_start, r_end + 1)):
+                    if r not in residue_positions:
+                        residue_positions[r] = seg_pts[k]
+            else:
+                for k, r in enumerate(range(r_start, r_end + 1)):
+                    if r not in residue_positions:
+                        frac = k / max(n_seg_res - 1, 1)
+                        residue_positions[r] = p_start + frac * diff
 
         # Instantiate atoms residue by residue
         chain_atom_ids = {}   # (res_idx, atom_name) → global_atom_idx
@@ -311,30 +358,37 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
             for d in deletes:
                 atom_list.pop(d, None)
 
-            # Seed backbone geometry so peptide bonds start TRANS (not the old
-            # random ~50/50) and CB sits on the L-chirality side. Only the
-            # backbone/CB atoms are placed deterministically; remaining
-            # sidechain atoms keep the small random jitter (they have no
-            # barrier-locked isomerism and relax freely during minimisation).
-            ca_prev = residue_positions.get(res_idx - 1)
-            ca_next = residue_positions.get(res_idx + 1)
-            tangent = _tangent(ca_prev, center, ca_next)
-            prev_perp = _transport_perp(prev_perp, tangent)
-            cis_n = (res_name == "PRO" and xpro_cis_fraction > 0.0
-                     and bb_rng.random() < xpro_cis_fraction)
-            seed_pos = _seed_backbone_positions(
-                center, ca_prev, ca_next, tangent, prev_perp, box, cis_n=cis_n)
-            seed_pos["CA"] = center
+            # physical_backbone: seed backbone geometry so peptide bonds start
+            # TRANS and CB sits on the L-chirality side (the default random
+            # jitter falls ~50/50 into cis/trans and D/L, which the omega/
+            # chirality barriers then freeze). Only backbone/CB atoms are placed
+            # deterministically; sidechain atoms keep the jitter. When
+            # physical_backbone is False the placement is exactly the original
+            # (CA at anchor, everything else jittered) -- byte-for-byte.
+            seed_pos = None
+            if physical_backbone:
+                ca_prev = residue_positions.get(res_idx - 1)
+                ca_next = residue_positions.get(res_idx + 1)
+                tangent = _tangent(ca_prev, center, ca_next)
+                prev_perp = _transport_perp(prev_perp, tangent)
+                cis_n = (res_name == "PRO" and xpro_cis_fraction > 0.0
+                         and bb_rng.random() < xpro_cis_fraction)
+                seed_pos = _seed_backbone_positions(
+                    center, ca_prev, ca_next, tangent, prev_perp, box, cis_n=cis_n)
+                seed_pos["CA"] = center
 
             for atom_name, (atype, charge) in atom_list.items():
                 if atom_name.startswith("+") or atom_name.startswith("-"):
                     continue
                 atom_counter += 1
-                if atom_name in seed_pos:
+                if seed_pos is not None and atom_name in seed_pos:
                     pos = seed_pos[atom_name]
                 else:
-                    rng = np.random.default_rng(seed=atom_counter)
-                    pos = center + rng.uniform(-0.3, 0.3, 3)
+                    offset = np.zeros(3)
+                    if atom_name != "CA":
+                        rng = np.random.default_rng(seed=atom_counter)
+                        offset = rng.uniform(-0.3, 0.3, 3)
+                    pos = center + offset
 
                 a = Atom(
                     idx=atom_counter,

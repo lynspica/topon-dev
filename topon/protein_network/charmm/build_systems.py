@@ -97,6 +97,20 @@ def parse_args():
                         "(not MPI-safe). Default: emit 10-column image flags "
                         "and drop winding crosslinks (MPI-safe).")
     p.set_defaults(image_flags=True)
+    p.add_argument("--physical-backbone", dest="physical_backbone",
+                   action="store_true",
+                   help="Seed physically correct backbone geometry: trans "
+                        "peptide bonds (omega ~180), L-chirality, and coiled "
+                        "residue placement at ~3.8 A CA-CA so minimisation "
+                        "needs no violent expansion (which otherwise scrambles "
+                        "cis/trans + chirality). Default off = legacy jitter "
+                        "placement (unchanged byte-for-byte).")
+    p.add_argument("--xpro-cis-fraction", dest="xpro_cis_fraction", type=float,
+                   default=0.0,
+                   help="With --physical-backbone, fraction of X-Pro peptide "
+                        "bonds to seed cis (physiological ~0.1-0.2; default 0 = "
+                        "all trans).")
+    p.set_defaults(physical_backbone=False)
     return p.parse_args()
 
 
@@ -145,7 +159,9 @@ def main():
     Nx = snapshot["Nx"]
     dry_scale = args.lattice_scale or 15.0
     dry_atoms, dry_bonds, dry_impropers, dry_box, xlinks = build_protein_system(
-        ff, snapshot, full_seq, node_to_res, lattice_scale=dry_scale
+        ff, snapshot, full_seq, node_to_res, lattice_scale=dry_scale,
+        physical_backbone=args.physical_backbone,
+        xpro_cis_fraction=args.xpro_cis_fraction,
     )
     print(f"    Atoms: {len(dry_atoms)} | Bonds: {len(dry_bonds)} | "
           f"Crosslinks: {len(xlinks)}")
@@ -176,7 +192,9 @@ def main():
         print(f"  Lattice scale: {scale:.3f} A/unit | box ~= {Nx*scale:.1f}^3 A")
 
         atoms, bonds, impropers, box, xlinks_wc = build_protein_system(
-            ff, snapshot, full_seq, node_to_res, lattice_scale=scale
+            ff, snapshot, full_seq, node_to_res, lattice_scale=scale,
+            physical_backbone=args.physical_backbone,
+            xpro_cis_fraction=args.xpro_cis_fraction,
         )
         add_water_and_ions(
             atoms, bonds, box,
