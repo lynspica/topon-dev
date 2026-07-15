@@ -14,6 +14,18 @@ Newest first.
 
 ---
 
+## 2026-05-20 — CHARMM builder: seed trans peptide bonds + L-chirality (PARTIAL — see caveat)
+
+**Change** [topon/protein_network/charmm/builder.py](../topon/protein_network/charmm/builder.py)
+
+Replaced the random ±0.3 Å jitter backbone placement with deterministic geometry: `_seed_backbone_positions` places N/C/O/HN/CB/HA so every peptide bond starts **trans** (omega ~180°) and CB sits on a uniform **L-chirality** side, using a parallel-transported perpendicular frame (`_transport_perp`) and offsets scaled to the local CA–CA spacing. New `build_protein_system` params `xpro_cis_fraction` (default 0.0 = all-trans; set e.g. 0.15 to seed a physiological X-Pro cis population) and `backbone_seed`. Remaining sidechain atoms keep the small jitter (no barrier-locked isomerism).
+
+**Why** A friend flagged cis/trans, which matters for these proline-rich resilin sequences. Measured on the shipped systems: **non-Pro peptide bonds ~12% cis** (physical <0.1%) and **X-Pro ~43–51% cis** (physical ~10–30%) — a random coin flip, because the old jitter let minimisation fall ~50/50 into the cis/trans basins and the ~20 kcal/mol omega barrier then freezes it. The jitter also gave ~50/50 D/L CA chirality (a second frozen artifact).
+
+**Issue / solution (INCOMPLETE)** The seeding is correct **at build time** — verified on a raw 25×18 build: 0.00% cis on both X-Pro and non-Pro, 100% clean trans. **But it does not survive stage-1.** Root cause: the builder's lattice interpolation over-compresses the chain ~2× (built bonds ~0.65 Å, CA–CA ~1.4 Å vs real 3.8 Å), so stage-1 `pair_style soft` must violently expand the structure ~2×, and that expansion flips omega/chirality back across their barriers (after stage-1: ~47% X-Pro / ~36% non-Pro cis). So the real disease is the over-compressed placement, not just the initial isomer.
+
+**Follow-up (the actual fix)** Trace the backbone at real ~3.8 Å CA–CA contour length between lattice nodes (mild coiling to fit) so minimisation needs no violent expansion and the seeded trans/L survives — or add omega+chirality `fix restrain` during stage-1 (avoided here: calibrated stage script). Committed as-is because the build-time seeding is correct and necessary groundwork, and to record the diagnosis. The shipped in-situ crosslinking runs are unaffected (kept as an experiment with the known artifact).
+
 ## 2026-05-20 — BFM `crosslink_method="none"`: uncrosslinked snapshots for in-situ crosslinking
 
 **Change** [topon/protein_network/bfm.py](../topon/protein_network/bfm.py)

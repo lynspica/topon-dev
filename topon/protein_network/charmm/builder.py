@@ -92,8 +92,89 @@ def _estimate_protein_mass(atoms):
 
 # ── Main system builder ────────────────────────────────────────────────────────
 
+# --- Backbone seeding geometry ------------------------------------------------
+# The initial atom placement only needs to seed the correct energy BASIN;
+# LAMMPS stage-1 minimisation expands these small offsets to true CHARMM bond
+# lengths. What the old random ±0.3 A jitter got WRONG is the peptide-bond
+# omega dihedral (CA_i-C_i-N_{i+1}-CA_{i+1}): from a random start the minimiser
+# fell ~50/50 into the cis and trans basins (and the ~20 kcal/mol omega barrier
+# is never crossed afterwards), giving ~12% cis on non-proline bonds (physical
+# ~0%) and ~50% cis on X-Pro (physical ~10-30%). These offsets instead seed
+# every peptide bond TRANS by construction, and CB on the L-chirality side.
+def _tangent(ca_prev, ca_this, ca_next):
+    """Unit chain tangent at a residue (central difference of CA neighbours)."""
+    if ca_prev is not None and ca_next is not None:
+        t = ca_next - ca_prev
+    elif ca_next is not None:
+        t = ca_next - ca_this
+    elif ca_prev is not None:
+        t = ca_this - ca_prev
+    else:
+        t = np.array([1.0, 0.0, 0.0])
+    n = float(np.linalg.norm(t))
+    return t / n if n > 1e-6 else np.array([1.0, 0.0, 0.0])
+
+
+def _transport_perp(prev_perp, t):
+    """Perpendicular to tangent `t`, PARALLEL-TRANSPORTED from prev_perp so it
+    varies smoothly residue-to-residue (no flips at chain bends). Seeding the
+    first residue from a fixed lab axis. This smoothness is what lets the +p on
+    C_i and -p on N_{i+1} stay genuinely opposite in space -> reliable trans
+    even where the lattice chain path curves sharply."""
+    if prev_perp is None:
+        ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+        p = ref - np.dot(ref, t) * t
+    else:
+        p = prev_perp - np.dot(prev_perp, t) * t   # project onto plane ⊥ t
+        if float(np.linalg.norm(p)) < 1e-3:        # prev_perp ~parallel to t
+            ref = np.array([0.0, 0.0, 1.0]) if abs(t[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+            p = ref - np.dot(ref, t) * t
+    return p / (float(np.linalg.norm(p)) + 1e-12)
+
+
+def _seed_backbone_positions(ca, ca_prev, ca_next, tangent, perp, box, cis_n=False):
+    """Deterministic seed positions for N, CA, C, O, HN, CB, HA of one residue.
+
+    C points toward the next CA and N toward the previous CA (their actual
+    minimum-image directions), each offset by a distance SCALED to the local
+    CA-CA spacing so the seed never overwhelms compressed regions. C is bumped
+    +perp and N is bumped -perp (opposite sides) so the peptide bond
+    C_{i-1}--N_i starts TRANS (omega ~180). `cis_n` flips this residue's N to
+    +perp -> that one bond becomes cis (used to seed an X-Pro cis fraction).
+
+    CB/HA are placed along +/-q where q = tangent x perp is the CONSISTENT
+    third frame axis (both tangent and perp vary smoothly along the chain, and
+    N/C lie in the tangent-perp plane so q is free). CB always on +q -> uniform
+    L-chirality (sign verified by measurement; the old random jitter gave ~50/50
+    D/L). Signs verified by measurement.
+    """
+    def mi(v):
+        return v - box * np.round(v / box)
+
+    d_next = mi(ca_next - ca) if ca_next is not None else None
+    d_prev = mi(ca_prev - ca) if ca_prev is not None else None
+    ln = float(np.linalg.norm(d_next)) if d_next is not None else 0.0
+    lp = float(np.linalg.norm(d_prev)) if d_prev is not None else 0.0
+    u_next = d_next / ln if ln > 1e-6 else (-(d_prev / lp) if lp > 1e-6 else np.array([1.0, 0.0, 0.0]))
+    u_prev = d_prev / lp if lp > 1e-6 else -u_next
+    sp = np.median([x for x in (ln, lp) if x > 1e-6]) if (ln > 1e-6 or lp > 1e-6) else 1.5
+    a = min(0.75, 0.40 * sp)                  # along-chain offset, spacing-scaled
+    b = min(0.50, 0.35 * sp)                  # perpendicular bump, spacing-scaled
+
+    C = ca + a * u_next + b * perp
+    N = ca + a * u_prev + (b if cis_n else -b) * perp
+    O = C + 0.5 * u_next + 0.4 * perp
+    HN = ca + 0.5 * u_prev - 0.4 * perp
+    q = np.cross(tangent, perp)               # consistent 3rd axis (N,C are in t-perp plane)
+    nq = float(np.linalg.norm(q)); q = q / nq if nq > 1e-6 else np.cross(u_next, perp)
+    CB = ca + 0.75 * q - 0.25 * perp          # +q -> uniform L-chirality (verified)
+    HA = ca - 0.75 * q - 0.25 * perp
+    return {"N": N, "C": C, "O": O, "HN": HN, "CB": CB, "HA": HA}
+
+
 def build_protein_system(ff, snapshot, full_sequence, node_to_res,
-                         lattice_scale=15.0):
+                         lattice_scale=15.0, xpro_cis_fraction=0.0,
+                         backbone_seed=20260714):
     """
     Build the full atomistic (dry) protein system from a BFM topology snapshot.
 
@@ -136,6 +217,8 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
 
     atom_counter = 0
     global_res_counter = 0
+    # Deterministic RNG for the optional X-Pro cis seeding (0.0 -> all trans).
+    bb_rng = np.random.default_rng(backbone_seed)
 
     # (chain_id, node_idx_in_chain, atom_name) → global atom idx
     node_atom_lookup = {}
@@ -174,6 +257,7 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
         # Instantiate atoms residue by residue
         chain_atom_ids = {}   # (res_idx, atom_name) → global_atom_idx
         prev_c_idx = None
+        prev_perp = None      # parallel-transported backbone perpendicular (per chain)
 
         for res_idx in range(n_residues):
             res_name = full_sequence[res_idx]
@@ -227,14 +311,30 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
             for d in deletes:
                 atom_list.pop(d, None)
 
+            # Seed backbone geometry so peptide bonds start TRANS (not the old
+            # random ~50/50) and CB sits on the L-chirality side. Only the
+            # backbone/CB atoms are placed deterministically; remaining
+            # sidechain atoms keep the small random jitter (they have no
+            # barrier-locked isomerism and relax freely during minimisation).
+            ca_prev = residue_positions.get(res_idx - 1)
+            ca_next = residue_positions.get(res_idx + 1)
+            tangent = _tangent(ca_prev, center, ca_next)
+            prev_perp = _transport_perp(prev_perp, tangent)
+            cis_n = (res_name == "PRO" and xpro_cis_fraction > 0.0
+                     and bb_rng.random() < xpro_cis_fraction)
+            seed_pos = _seed_backbone_positions(
+                center, ca_prev, ca_next, tangent, prev_perp, box, cis_n=cis_n)
+            seed_pos["CA"] = center
+
             for atom_name, (atype, charge) in atom_list.items():
                 if atom_name.startswith("+") or atom_name.startswith("-"):
                     continue
                 atom_counter += 1
-                offset = np.zeros(3)
-                if atom_name != "CA":
+                if atom_name in seed_pos:
+                    pos = seed_pos[atom_name]
+                else:
                     rng = np.random.default_rng(seed=atom_counter)
-                    offset = rng.uniform(-0.3, 0.3, 3)
+                    pos = center + rng.uniform(-0.3, 0.3, 3)
 
                 a = Atom(
                     idx=atom_counter,
@@ -244,7 +344,7 @@ def build_protein_system(ff, snapshot, full_sequence, node_to_res,
                     res_name=res_name,
                     res_id=global_res_counter,
                     chain_id=chain_id,
-                    pos=center + offset,
+                    pos=pos,
                     mol_id=chain_id + 1,
                 )
                 atoms.append(a)
