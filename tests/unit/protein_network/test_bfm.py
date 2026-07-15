@@ -268,3 +268,48 @@ def test_winding_safe_matches_adjacent_on_no_winding_seed():
             "with zero winding-rejections, winding_safe should produce "
             "an identical reaction list to the adjacent method"
         )
+
+
+def test_crosslink_method_none_emits_single_uncrosslinked_snapshot():
+    """`crosslink_method="none"` must skip crosslinking entirely and emit one
+    conv=0 snapshot labelled `uncrosslinked` with an empty reaction list."""
+    topo = bfm.generate_topology(
+        n_chains=4, n_repeats=6, segs_per_block=3, y_offset_in_block=1,
+        equil_steps=20_000, crosslink_method="none", seed=501, verbose=False,
+    )
+    snaps = topo["snapshots"]
+    assert len(snaps) == 1
+    snap = snaps[0]
+    assert snap["label"] == "uncrosslinked"
+    assert snap["conv"] == 0.0
+    assert snap["reactions"] == []
+    assert topo["config"]["crosslink_method"] == "none"
+    # schema parity with the crosslinked methods
+    for key in ("chains", "crosslinker_positions", "Nx", "Ny", "Nz"):
+        assert key in snap
+
+
+def test_crosslink_method_none_leaves_every_y_node_on_its_own_site():
+    """The CHARMM builder infers a crosslink from two Y nodes sharing a lattice
+    site (the BFM merges a reacted pair onto one site). An uncrosslinked
+    snapshot must therefore have NO duplicated site at all -- otherwise the
+    builder would silently stitch a CE2-CE2 bond, or leave two tyrosines
+    superimposed at r~0.
+    """
+    topo = bfm.generate_topology(
+        n_chains=4, n_repeats=6, segs_per_block=3, y_offset_in_block=1,
+        equil_steps=20_000, crosslink_method="none", seed=7, verbose=False,
+    )
+    snap = topo["snapshots"][0]
+    y_pos = set(snap["crosslinker_positions"])
+
+    all_sites, y_sites = [], []
+    for chain in snap["chains"]:
+        for ni, flat in enumerate(chain):
+            all_sites.append(flat)
+            if ni in y_pos:
+                y_sites.append(flat)
+
+    assert len(all_sites) == len(set(all_sites)), "lattice site double-occupied"
+    assert len(y_sites) == len(set(y_sites)), "two Y nodes share a site"
+    assert len(y_sites) == 4 * 6, "expected one Y per repeat per chain"

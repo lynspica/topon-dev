@@ -925,7 +925,9 @@ def generate_topology(
             print(f"[BFM]   Acceptance rate: {acc:.3f}")
 
     if verbose:
-        if crosslink_method == "distance":
+        if crosslink_method == "none":
+            method_label = "disabled (uncrosslinked melt)"
+        elif crosslink_method == "distance":
             method_label = "distance-based (alt)"
         elif crosslink_method == "winding_safe":
             method_label = "lattice-adjacent + winding-cycle rejection"
@@ -933,7 +935,17 @@ def generate_topology(
             method_label = "lattice-adjacent"
         print(f"[BFM] Crosslinking ({method_label}) ...")
 
-    if crosslink_method == "distance":
+    if crosslink_method == "none":
+        # Uncrosslinked melt: emit the equilibrated chains as a single conv=0
+        # snapshot with no reactions. No Y node is ever merged onto another
+        # chain's lattice site, so downstream builders see 4 (or n_chains)
+        # independent molecules. This is the starting state for in-situ
+        # crosslinking (e.g. LAMMPS `fix bond/react`), as opposed to the
+        # a-priori crosslinked snapshots the other methods produce.
+        snapshots = [_make_snapshot(
+            "uncrosslinked", 0.0, chains, y_positions, [], Nx, Ny, Nz,
+        )]
+    elif crosslink_method == "distance":
         if lattice_scale_ang is None:
             lattice_scale_ang = 27.0  # MARTINI default; pass explicitly for atomistic CHARMM
             if verbose:

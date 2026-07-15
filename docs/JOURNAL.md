@@ -14,6 +14,34 @@ Newest first.
 
 ---
 
+## 2026-05-20 — BFM `crosslink_method="none"`: uncrosslinked snapshots for in-situ crosslinking
+
+**Change** [topon/protein_network/bfm.py](../topon/protein_network/bfm.py)
+
+New opt-in `crosslink_method="none"` in `generate_topology`. It equilibrates the chains as usual, then emits a **single conv=0 snapshot labelled `uncrosslinked`** with `reactions=[]`, skipping the crosslink loop and the candidate search entirely. Existing methods (`adjacent`, `winding_safe`, `distance`) and their snapshot labels are untouched, so no existing topology JSON changes.
+
+**Why** To start an atomistic simulation from *uncrosslinked* protein chains in water and form the dityrosine crosslinks **during** the run (LAMMPS `fix bond/react`), rather than stitching them a priori at build time. The user wanted "the same system but without crosslinks" for a 90 wt% resilin solution.
+
+**Issue / solution** The obvious route — reuse an existing snapshot and skip the crosslink bonds — is wrong, and the reason is subtle. The CHARMM builder never reads `snapshot["reactions"]`; it infers a crosslink wherever **two Y nodes share a lattice site**, because the BFM *merges* a reacted tyrosine pair onto one site. So on a `gel_point` snapshot, "just don't bond them" would leave pairs of tyrosine residues sitting at r≈0 — a catastrophic overlap. What is actually needed is a snapshot in which no merge has happened. BFM emits none: the first snapshot is `gel_point`, and even `pre_gel_conversions=[0.0]` fires *inside* the reaction loop, i.e. after the first merge. Hence the dedicated method.
+
+Conversely, **no CHARMM-builder change was needed**: BFM chains are self-avoiding walks with full excluded volume (single-occupancy `occupied` set), so on an unreacted snapshot no site is ever double-occupied, and `build_protein_system` finds zero crosslinks, applies no DITY patch, and deletes no HE2 — every tyrosine comes out intact. `gen_topology.py` asserts this (no duplicate lattice sites, and in particular no duplicate Y sites).
+
+**Validation** natpro `GGRPSDSYGAPGGGN`, 4 chains × 6 repeats, 90 wt% water: 52,160 atoms, 0 crosslinks, 0 DEFAULT parameters, net charge 0.0000 e, all 24 tyrosines with HE2 present. LAMMPS stages 1/2/3 all run clean (final PE −178,112 kcal/mol, T 299.5 K, P ≈ 5.5 atm, ρ ≈ 1.04 g/cm³, no lost atoms). Image flags stay **on** here (10-column, MPI-safe) — with zero crosslinks there are no winding cycles, so the priority-MST drops nothing.
+
+A `fix bond/react` implementation of `PRES DITY` (CE2–CE2 bond, both HE2 deleted, CE2 → `CG2R67`) was built on top and validated: the reaction fires and the product stoichiometry is exact (atoms −2, bonds −1, angles 0, dihedrals +4, CG2R67 +2, Δcharge 0). The new bond relaxes 6.88 Å → 1.573 Å (r₀ = 1.490). All 18 new interaction types resolve to real CGenFF parameters through `CHARMMForceField` — a direct dividend of the wildcard/bidirectional lookup fixes. Lives outside the repo at `E:/PhD/Proteins/charmm_uncrosslinked/` (see its README).
+
+**Tests** Two new cases in [tests/unit/protein_network/test_bfm.py](../tests/unit/protein_network/test_bfm.py): the `none` method emits exactly one conv=0 `uncrosslinked` snapshot with `reactions=[]` and full schema parity; and every Y node sits on its own lattice site (the invariant the builder's crosslink inference depends on). Full `tests/unit/protein_network/` passes (91).
+
+**Follow-up**
+- The template edge must be **CA, not CB**: DITY shifts CB/HB1/HB2 charges by −0.002 e per tyrosine, and `fix bond/react` cannot recharge an edge atom, so cutting at CB strands +0.004 e per crosslink (two tyrosines). With CA as edge, charge is conserved exactly.
+- **Ring symmetry is expected, not a bug:** CD1/CD2, CE1/CE2, HD1/HD2, HE1/HE2 share types and charges, so the ring template has an automorphism and bond/react may map template-CE2 onto a real CE1. Since CG is ring C1 and CZ (OH) is C4, both CE1 and CE2 are ortho carbons and dityrosine is the 3,3′-biaryl — the linkage is identical either way (the validated crosslink was in fact CE2–CE1).
+- At 90 wt% no tyrosine pair is within a physical (3–5 Å) reaction window — closest pair 6.88 Å, and *intra*-chain. A 50 ps run at `rmax = 4.0 Å` formed **0 crosslinks** (stable throughout; the closest pair even drifted apart to 8.56 Å). In-situ network formation is encounter-limited; it will need lower water content, much longer runs, more chains, or enhanced sampling.
+- The **inter-chain** path was subsequently exercised (`interchain_check.in`, `rmax = 11.9 Å`): chains 1 and 2 crosslinked, bond r = 1.493 Å (r₀ = 1.490), stoichiometry exact. Two `rmax` constraints emerged: (i) `rmax` may not exceed the pairwise cutoff (12 Å) because bond/react draws candidates from the pair neighbor list; (ii) a large `rmax` needs a long `stabilize_steps` — the default 60 steps at xmax 0.03 Å only allows 1.8 Å of travel, so a ~12 Å-stretched new bond is released to the thermostat and ejects an atom ("Bond atoms missing"); `stabilize_steps 1000` fixes it.
+- **Diagnostic note:** when a crosslink joins two chains, bond/react *merges their molecule IDs*. Classify intra- vs inter-chain from the **pre**-reaction molecule IDs; the product always looks intra-chain.
+- `run_protein_network` already forwards `crosslink_method` ([workflow.py](../topon/protein_network/workflow.py) L34/L113), but its default `snapshot_label="gel_point"` does not exist on the `none` path — it only resolves via the `snapshot_fallback_index` branch. Worth defaulting the label per method. Not exposed on the `bfm` CLI yet.
+
+---
+
 ## 2026-05-20 (ultimate fix) — physical geometry + correct exclusions: topon output now runs in GROMACS at 20 fs
 
 **Change** Three coordinated source fixes that eliminate the overlap-launch crash at its origin (rather than capping it at run time), in [topon/protein_network/builder.py](../topon/protein_network/builder.py), [template_builder.py](../topon/protein_network/template_builder.py), [lammps_writer.py](../topon/protein_network/lammps_writer.py):
