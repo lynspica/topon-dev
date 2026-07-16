@@ -405,6 +405,69 @@ def load_graphml(
     return G, dims
 
 
+def _sc_positions_from_ids(
+    xl_ids: list[int],
+    box: np.ndarray,
+    node_features: np.ndarray,
+    node_ids: np.ndarray,
+    edge_index: np.ndarray,
+    edge_type: np.ndarray,
+    n_polymer: int,
+) -> Optional[dict[int, tuple[float, float, float]]]:
+    """Reconstruct simple-cubic lattice coords from node ids + box.
+
+    The C generator lays SC sites out as ``id = x + y*Nx + z*Nx*Ny`` with
+    ``coords = (x, y, z)``; ``write_npz`` stores ``box = [0, Nx, 0, Ny,
+    0, Nz]``. Inverting is therefore exact -- but only if the graph
+    really came from an SC lattice, so we verify: every chain must join
+    two sites that are nearest neighbours under periodic boundaries.
+
+    Returns ``{node_id: (x, y, z)}``, or ``None`` when the box is
+    unusable, an id falls outside the lattice, or the neighbour check
+    fails (e.g. a BCC/FCC/Diamond graph, or a non-lattice topology).
+    """
+    if box is None or box.size != 6 or bool(np.isnan(box).any()):
+        return None
+    Nx, Ny, Nz = int(round(float(box[1]))), int(round(float(box[3]))), int(round(float(box[5])))
+    if min(Nx, Ny, Nz) <= 0:
+        return None
+    n_sites = Nx * Ny * Nz
+    if not xl_ids or max(xl_ids) >= n_sites or min(xl_ids) < 0:
+        return None
+
+    pos = {
+        i: (float(i % Nx), float((i // Nx) % Ny), float(i // (Nx * Ny)))
+        for i in xl_ids
+    }
+
+    # Validate: each chain's two junctions must be lattice neighbours.
+    from collections import defaultdict
+    chain_to_xl: dict[int, set[int]] = defaultdict(set)
+    chem = edge_index[:, edge_type == 0]
+    for k in range(chem.shape[1]):
+        a, b = int(chem[0, k]), int(chem[1, k])
+        if a < n_polymer <= b:
+            chain_to_xl[a].add(int(node_ids[b]))
+        elif b < n_polymer <= a:
+            chain_to_xl[b].add(int(node_ids[a]))
+    checked = 0
+    for xls in chain_to_xl.values():
+        if len(xls) != 2:
+            continue
+        p, q = (pos[i] for i in xls)
+        dims_ = (Nx, Ny, Nz)
+        dist = 0.0
+        for ax in range(3):
+            d = abs(p[ax] - q[ax])
+            dist += min(d, dims_[ax] - d)
+        if abs(dist - 1.0) > 1e-6:
+            return None                      # not an SC nearest-neighbour graph
+        checked += 1
+    if checked == 0:
+        return None
+    return pos
+
+
 def load_npz(
     path: Union[str, Path],
 ) -> tuple[nx.MultiGraph, Optional[np.ndarray]]:
@@ -429,20 +492,52 @@ def load_npz(
     n_crosslinker = int(data["n_crosslinker"])
 
     # Feature columns (must match npz_writer._FEATURE_COLUMNS):
-    #   [type, length, contour_length, rg, COMX, COMY, COMZ, node_degree]
+    #   v1: [type, length, contour_length, rg, COMX, COMY, COMZ, node_degree]
+    #   v2: [type, length, contour_length, rg, COMX, COMY, COMZ,
+    #        chem_degree, phys_degree, frac_ext]
+    # In v2 the COM columns are deliberately NaN (they are conformation
+    # outputs, filled in after a LAMMPS run -- not known at generation
+    # time). The downstream chemistry/conformation stages nevertheless
+    # need a 3-D embedding of the junctions, so when COM is NaN we
+    # reconstruct the ORIGINAL LATTICE COORDINATES from node_ids + box.
+    #
+    # The C generator numbers simple-cubic sites as
+    #     id = x + y*Nx + z*Nx*Ny        coords = (x, y, z)
+    # and write_npz stores box = [0, Nx, 0, Ny, 0, Nz], so the mapping
+    # inverts exactly. ``_sc_positions_from_ids`` validates the result
+    # (every chain must join two lattice neighbours) and returns None if
+    # the graph is not an SC lattice, in which case COM/NaN is kept.
     polymer_attrs: dict[int, dict] = {}
     crosslink_attrs: dict[int, dict] = {}
 
     for i in range(n_polymer):
         nid = int(node_ids[i])
         polymer_attrs[nid] = {"length": int(node_features[i, 1])}
+
+    xl_ids = [int(node_ids[i]) for i in range(n_polymer, n_polymer + n_crosslinker)]
+    com_is_nan = (
+        n_crosslinker > 0
+        and bool(np.isnan(node_features[n_polymer:, 4:7]).all())
+    )
+    recovered = (
+        _sc_positions_from_ids(xl_ids, box, node_features, node_ids,
+                               edge_index, edge_type, n_polymer)
+        if com_is_nan else None
+    )
+    if com_is_nan and recovered is None:
+        print("  WARNING: COM columns are NaN and lattice positions could "
+              "not be reconstructed; junction coordinates will be NaN and "
+              "any downstream conformation/LAMMPS build will be invalid.")
+
     for i in range(n_polymer, n_polymer + n_crosslinker):
         nid = int(node_ids[i])
-        crosslink_attrs[nid] = {
-            "COMX": float(node_features[i, 4]),
-            "COMY": float(node_features[i, 5]),
-            "COMZ": float(node_features[i, 6]),
-        }
+        if recovered is not None:
+            cx, cy, cz = recovered[nid]
+        else:
+            cx = float(node_features[i, 4])
+            cy = float(node_features[i, 5])
+            cz = float(node_features[i, 6])
+        crosslink_attrs[nid] = {"COMX": cx, "COMY": cy, "COMZ": cz}
 
     # Edges are stored bi-directionally; reduce to unordered pairs.
     #
