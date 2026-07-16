@@ -65,6 +65,28 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 Notable changes are documented in reverse chronological order.
 
+### [V37] — 2026-05-20 — In-situ crosslinking + physically correct CHARMM builds
+
+#### Added
+- **`bfm.generate_topology(crosslink_method="none")`** — emits a single conv=0 snapshot labelled `uncrosslinked` (`reactions=[]`), skipping the crosslink loop and candidate search. The starting point for **in-situ** crosslinking: form dityrosine bonds *during* MD (LAMMPS `fix bond/react`) rather than a priori at build time. No CHARMM-builder change was needed — the builder infers a crosslink only where two Y nodes share a lattice site, and BFM's excluded volume guarantees none do on an unreacted snapshot. Existing methods and snapshot labels are untouched.
+- **`charmm/build_systems.py --physical-backbone` / `--xpro-cis-fraction`** (opt-in) — build physically correct starting geometry:
+  - `charmm_ff.py` parses the RTF internal-coordinate (IC) tables (370 entries) into `residues[..]["ics"]`.
+  - `builder._build_physical_positions` lays backbone N/CA/C along the (coiled) CA trace at real bond lengths + ~111° N–CA–C, then NeRF-builds every remaining atom from the residue's IC table → ideal bonds/angles, planar impropers, real sidechain rotamers. Sidechains are reflected across the N–CA–C plane where the lattice's hairpins would flip chirality → **100 % L**.
+  - `builder._coil_positions` decompresses interior residues to ~3.8 Å CA–CA (crosslinker Y residues stay on their lattice nodes, so a-priori crosslink geometry is preserved), so stage-1 needs no violent expansion.
+  - `lammps_writer.find_omega_dihedrals` / `find_chirality_impropers` + a stage-1..3 `fix restrain` side-include (`*.in.omega`) holding peptide omega trans (minus an `--xpro-cis-fraction` X-Pro subset) and the N–C–CA–CB chirality improper at L, released before each stage's dynamics. CHARMM has no CA-chirality improper, so without this the soft-min inverts ~20 % of centres to D.
+- **`charmm/build_systems.py --no-image-flags`** — legacy 7-column Atoms, keeping all crosslinks (exact topology, single-rank only). Default emits 10-column image flags via a priority-weighted MST and drops only winding-cycle crosslinks (MPI-safe).
+- **NPZ node-feature schema v2** (`writers/npz_writer.py`, `SCHEMA_VERSION = 2`) — 8 → 10 columns: `node_degree` split into `chem_degree` / `phys_degree`, new `frac_ext`, and the conformation-derived columns (`contour_length`, `rg`, `COMX/Y/Z`, `frac_ext`) are NaN at write time (they are filled in by the downstream LAMMPS run, not the topology generator).
+
+#### Fixed
+- **CHARMM36m `(DEFAULT)` parameter injection** (`charmm_ff.py`, `charmm/builder.py`, `charmm/lammps_writer.py`) — five force-field-correctness bugs that silently substituted generic parameters: dihedral wildcard fallback (`X t2 t3 X`), bidirectional improper lookup (central atom first *or* last), N-terminal proline patch (`PROP`, not `NTER`), multi-term proper dihedrals (101/575 keys were truncated to their first Fourier term), and HIS → HSD remap (bare `HIS` is not in the RTF and was silently dropped, fusing its neighbours). After the fixes both resilin sequences regenerate with **0 DEFAULTs and net charge exactly 0.0000**.
+- **`writers/npz_writer.py` `edge_index`** — remap from the original sparse/offset ID space to 0-based row positions into `node_features` (PyG requirement; raw IDs exceeded N and triggered out-of-bounds).
+- **`topology/loader.py` `load_npz`** — reconstruct the original simple-cubic lattice coordinates from `node_ids` + `box` when the v2 COM columns are NaN (validated: every chain must join two lattice neighbours under PBC; returns NaN + a warning for non-SC graphs rather than a silently invalid build).
+- **`conformation/manager.py`** — initialise `moved_count` before the loop (`max_iters=0` no longer raises `UnboundLocalError`).
+
+#### Notes
+- The `--physical-backbone` path is **opt-in**; the default CHARMM build is verified byte-for-byte identical to the previous builder (data + stage scripts).
+- Stage 1 is serial by design (`pair_style soft 1.0` → ~3 Å comm cutoff < ~5.5 Å longest bond); stages 2/3 are MPI-safe. See [USAGE.md](USAGE.md) §4.1.
+
 ### [V36] — 2026-05-07 — MARTINI 3 protein-network generator (topro)
 
 #### Added

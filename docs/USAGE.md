@@ -475,6 +475,76 @@ mpirun -np <N> lmp -in protein_network_stage1.in
 - Kroon et al., *eLife* 2024, 10.7554/elife.90627.2
 - Grunewald et al., *Nature Communications* 2022, 10.1038/s41467-021-27627-4
 
+#### CHARMM36m atomistic builder
+
+`topon.protein_network.charmm` is the **all-atom** alternative to the MARTINI path
+above: same BFM topology JSON, same sequence string, but ~250 atoms per 15-residue
+block instead of ~28 beads, with the CHARMM36m force field (`lj/charmm/coul/long`,
+PPPM, CMAP, TIP3P water + NaCl).
+
+```bash
+python -m topon.protein_network.charmm.build_systems \
+    --topology topo.json --snapshot gel_point \
+    --block_seq GGRPSDSYGAPGGGN --n_repeats 18 \
+    --water_contents 0,35,55,65,75 \
+    --output runs/resilin_atomistic/
+```
+
+Writes one `w<XX>/` per water content, each with `protein_network.data`,
+`.in.settings`, `.in.groups`, `charmm36m.cmap`, and `relaxation/protein_network_stage{1,2,3}.in`.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--topology` | *required* | BFM topology JSON (from `bfm.generate_topology`) |
+| `--snapshot` | `gel_point` | Snapshot label or integer index |
+| `--block_seq` | `GGRPSDSYGAPGGGN` | One-letter repeat block |
+| `--n_repeats` | *from topology* | Override repeats per chain |
+| `--water_contents` | `0,35,55,65,75` | Comma-separated water **weight percent** values |
+| `--salt_conc` | `0.15` | Background NaCl (mol/L) |
+| `--target_density` | `0.85` | Initial density (g/cm³) used to size the box |
+| `--lattice_scale` | auto | Å per BFM unit (auto-sized from `--target_density`) |
+| `--no-image-flags` | off | Emit legacy **7-column** Atoms and keep **all** crosslinks (no winding drops). Exact topology, but **single-rank only**. Default emits 10-column image flags and drops winding-cycle crosslinks (MPI-safe). |
+| `--physical-backbone` | off | Build physically correct geometry — see below |
+| `--xpro-cis-fraction` | `0.0` | With `--physical-backbone`, fraction of X-Pro peptide bonds seeded **cis** (~`0.05` = the folded-protein value, i.e. 95–96 % trans) |
+
+**Stage 1 must run serial.** It switches to `pair_style soft 1.0`, giving a ~3 Å
+communication cutoff — shorter than the ~5.5 Å longest bond — so under MPI domain
+decomposition a bond straddling a domain boundary loses its partner
+(*"Bond atom missing in image check"*). Run stage 1 on one rank; stages 2/3 are
+MPI-safe (stage 2 sets `comm_modify cutoff 14`):
+
+```bash
+cd <out>/w55/relaxation/
+mpirun -n 1  lmp -in protein_network_stage1.in      # serial by design
+mpirun -n 104 lmp -in protein_network_stage2.in
+mpirun -n 104 lmp -in protein_network_stage3.in     # -> ../system_equilibrated.data
+```
+
+**`--physical-backbone`** (opt-in; the default placement is unchanged). The default
+builder drops each residue's atoms at its lattice anchor with a small random jitter
+and lets minimisation sort out the geometry. That leaves the *barrier-locked*
+degrees of freedom to chance: minimisation falls ~50/50 into the cis and trans
+basins, and the ~20 kcal/mol omega barrier then freezes the result — measured
+~12 % cis on non-proline peptide bonds (physical: <0.1 %) and ~50/50 D/L CA
+chirality. With the flag, every atom is placed from the CHARMM RTF internal
+-coordinate tables (real bonds/angles, planar impropers, real rotamers, 100 % L
+-chirality), the backbone is coiled to ~3.8 Å CA–CA so minimisation needs no
+violent expansion, and the writer adds `fix restrain` blocks that hold omega trans
+(minus the `--xpro-cis-fraction` X-Pro subset) and the CA chirality improper at L
+through stages 1–3, released before each stage's dynamics.
+
+Verified on a 25 × 18 natpro system through stages 1–3: **non-Pro 0.03 % cis,
+X-Pro 8 % cis, 98.9 % trans overall, chirality 100 % L, bond median 1.23 Å.**
+
+**Crosslink methods** (`bfm.generate_topology(crosslink_method=...)`, API-only):
+
+| Value | Meaning |
+|---|---|
+| `"adjacent"` (default) | Lattice-adjacent Y pairs react; snapshots at the gel point and beyond |
+| `"winding_safe"` | Same, but rejects crosslinks that would close a periodic winding cycle → the writer drops **zero** bonds |
+| `"distance"` | Distance-based candidate search (honours `pre_gel_conversions`) |
+| `"none"` | **No crosslinking.** Emits a single conv=0 snapshot labelled `uncrosslinked` with `reactions=[]`. The starting point for **in-situ** crosslinking (form the dityrosine bonds during MD with LAMMPS `fix bond/react`) rather than stitching them at build time. |
+
 ### 4.2 simbox — molecule packing
 
 `topon.simbox` packs individual molecules into a periodic simulation box and emits LAMMPS input scripts for crosslinking studies. Independent of the polymer-network pipeline.
