@@ -1,0 +1,47 @@
+# topon logo: KG minimisation + short equilibration
+# Every bead is identical physics -- the letters are only a COLOURING, nothing
+# holds them in shape. Frames are dumped so the trajectory can be animated.
+units           lj
+atom_style      molecular
+boundary        p p p
+read_data       kg_logo.data
+
+# --- soft push-off: the built lattice has overlaps at 0.97 sigma spacing ---
+pair_style      soft 1.12246
+pair_coeff      * * 0.0
+bond_style      harmonic
+bond_coeff      1 100.0 0.97
+neighbor        0.4 bin
+neigh_modify    every 1 delay 0 check yes
+
+variable        pre equal ramp(0,30)
+fix             push all adapt 1 pair soft a * * v_pre
+dump            d1 all custom 40 traj.lammpstrj id type x y z
+dump_modify     d1 sort id
+thermo          50
+thermo_style    custom step temp pe ebond epair press
+
+min_style       cg
+minimize        1e-4 1e-6 400 4000
+unfix           push
+
+# --- real KG: FENE + WCA ------------------------------------------------
+pair_style      lj/cut 1.12246
+pair_coeff      * * 1.0 1.0 1.12246
+pair_modify     shift yes
+bond_style      fene
+bond_coeff      1 30.0 1.5 1.0 1.0
+special_bonds   fene
+
+minimize        1e-4 1e-6 600 6000
+
+# --- short equilibration (Langevin NVT) ---------------------------------
+velocity        all create 0.4 4928459 dist gaussian
+fix             1 all nve/limit 0.05
+fix             2 all langevin 0.4 0.4 1.0 90210
+timestep        0.004
+run             4000
+unfix           1
+unfix           2
+write_data      kg_relaxed.data nocoeff
+print           "trajectory complete"
