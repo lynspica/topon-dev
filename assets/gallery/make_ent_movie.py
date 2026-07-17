@@ -39,9 +39,12 @@ FRAMES.mkdir(parents=True, exist_ok=True)
 
 NAME = "entangled_grafted"
 PANEL = 560            # render size of each panel
-KEEP = 4.6             # zoom crop radius (sigma)
-RAD_FULL, BW_FULL = 0.11, 0.13
-RAD_ZOOM, BW_ZOOM = 0.11, 0.13
+KEEP = 5.2             # zoom crop radius (sigma)
+# Thin bonds + small grey beads make the matrix a faint web; the entangled pair
+# is a bold string of large gold/violet beads, so it stays readable even once the
+# network melts to a dense KG melt and would otherwise bury a single chain.
+RAD_FULL, BW_FULL = 0.10, 0.055
+RAD_ZOOM, BW_ZOOM = 0.11, 0.07
 GIF_MS = 91            # ~0.66x speed
 FPS = 13
 N_TRANSITION, N_LEADIN, N_TAIL = 26, 3, 8
@@ -127,9 +130,9 @@ def paint_fn(nodes, pa, pb, fgrafts, rad, pair_scale, dim_rest=False):
         ident = np.array(data.particles["Particle Identifier"])
         n = data.particles.count
         col = np.tile(np.array(FAINT), (n, 1))
-        r = np.full(n, rad * (0.7 if dim_rest else 1.0))
+        r = np.full(n, rad * (0.5 if dim_rest else 0.85))
         mg = np.isin(ident, g_arr)
-        col[mg], r[mg] = TEAL, rad * 1.1          # the entanglement's side chains
+        col[mg], r[mg] = TEAL, rad * 1.35         # the entanglement's side chains
         ma, mb = np.isin(ident, a_arr), np.isin(ident, b_arr)
         col[ma], col[mb] = ENT_GOLD, VIOLET
         r[ma | mb] = rad * pair_scale
@@ -212,7 +215,7 @@ def main():
     full.modifiers.append(WrapPeriodicImagesModifier())
     full.modifiers.append(rebuild_bond_pbc)
     full.modifiers.append(paint_fn(nodes, pa, pb, fgrafts, RAD_FULL,
-                                   pair_scale=2.6))
+                                   pair_scale=3.0))
     full.add_to_scene()
     df0 = full.compute(0)
     df0.particles.bonds.vis.width = BW_FULL
@@ -229,7 +232,7 @@ def main():
     zoom.modifiers.append(WrapPeriodicImagesModifier())
     zoom.modifiers.append(rebuild_bond_pbc)
     zoom.modifiers.append(paint_fn(nodes, pa, pb, fgrafts, RAD_ZOOM,
-                                   pair_scale=2.0, dim_rest=True))
+                                   pair_scale=2.6, dim_rest=True))
 
     def crop(frame, data, c=boxc, r=KEEP):
         d = np.linalg.norm(np.array(data.particles.positions) - c, axis=1)
@@ -261,19 +264,12 @@ def main():
         full_im = Image.open(pf).convert("RGB")
         zoom_im = Image.open(pz).convert("RGB")
 
-        # locator box on the full panel, at the pair's projected position
-        df = full.compute(f)
-        ident = np.array(df.particles["Particle Identifier"])
-        p = np.array(df.particles.positions)
-        fp = p[np.isin(ident, focus)]
-        d = (fp - fp[0]) @ inv.T
-        d -= np.round(d)
-        C = fp[0] + (d @ cell.T).mean(0)
-        px, py = project(C, vpf, PANEL)
-        r = 78
-        ImageDraw.Draw(full_im).rectangle([px - r, py - r, px + r, py + r],
-                                          outline=LOC, width=4)
-        # matching box on the zoom panel
+        # locator box on the full panel -- fixed, since the pair is centred every
+        # frame -- and a matching border on the zoom panel it expands into.
+        r = 82
+        ImageDraw.Draw(full_im).rectangle(
+            [loc_px - r, loc_py - r, loc_px + r, loc_py + r],
+            outline=LOC, width=4)
         ImageDraw.Draw(zoom_im).rectangle([2, 2, PANEL - 3, PANEL - 3],
                                           outline=LOC, width=5)
 

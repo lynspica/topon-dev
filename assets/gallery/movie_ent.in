@@ -1,0 +1,52 @@
+# Entanglement movie: start from the PRISTINE 03_Conformation lattice (the tight
+# 0.39-sigma crossing the stills show), not 1.restart -- stage 1's soft push has
+# already loosened it to 1.0 sigma. Same ramped-soft-push inflation as movie_cg.
+units           lj
+atom_style      full
+boundary        p p p
+comm_modify     mode single cutoff 5.0
+bond_style      harmonic
+angle_style     harmonic
+pair_style      lj/cut 2.5
+special_bonds   lj 0.0 1.0 1.0
+
+read_data       ../03_Conformation/system_relaxed.data
+include         ../02_Chemistry/system.in.settings
+include         ../02_Chemistry/system.groups
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+bond_style      harmonic
+bond_coeff      1 466.1 0.97
+angle_style     harmonic
+angle_coeff     1 466.1 180.0
+
+# --- Phase A: ramped soft-push inflation, dump EVERY step ---
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+reset_timestep  0
+dump            dA all custom 4 infl.lammpstrj id type x y z
+dump_modify     dA sort id first yes
+variable        pf equal "ramp(0, 30)"
+fix             push all adapt 1 pair soft a * * v_pf
+fix             a all nve/limit 0.05
+run             400
+unfix           push
+unfix           a
+undump          dA
+
+# --- Phase B: real LJ excluded volume + NVT tail, coarse dump ---
+pair_style      lj/cut 2.5
+pair_coeff      * * 1.0 1.0 2.5
+reset_timestep  0
+dump            dB all custom 60 therm.lammpstrj id type x y z
+dump_modify     dB sort id first yes
+variable        s equal "ramp(0.02, 1.0)"
+fix             ad all adapt 1 pair lj/cut epsilon * * v_s
+fix             b all nve/limit 0.08
+run             600
+unfix           ad
+unfix           b
+fix             c all nvt temp 1.0 1.0 1.0
+run             600
+unfix           c

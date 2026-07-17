@@ -32,11 +32,11 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V41** | 2026-07-17 | Two-panel **entanglement animation** (`assets/gallery/anim/ent_arc.{gif,mp4}`, `make_ent_movie.py`) — one entanglement shown in the full network and zoomed in a box, both relaxing lattice → equilibrated. All arc animations slowed to ~0.66×. |
 | **V40** | 2026-07-17 | `topology/generator_python.py` (+ `generator_python_diamond.py`) — fail fast on unreachable `degree_distribution` targets. An `e:N` above the lattice's edge count (e.g. `e:128` on an 81-edge 3×3×3 SC), or a per-degree target above the node count / max degree, now raises a clear `ValueError` instead of churning through doomed trials. 11 unit tests added. |
-| **V39** | 2026-07-17 | Arc **animations** for the gallery — `assets/gallery/anim/{cg,atom}_arc.{gif,mp4}`, real MD trajectories (lattice → minimised → equilibrated) as boomerang loops. 3-colour entanglement rule across the panels. |
+| **V39** | 2026-07-17 | Arc **animations** for the gallery — real MD trajectories (lattice → minimised → equilibrated) as boomerang loops, one builder `make_arc_movie.py`. |
 | **V38** | 2026-07-16 | Showcase **gallery** (`assets/gallery/`, eleven panels on strict-sculpted heterogeneous networks) + README rewrite. |
 | **V37** | 2026-05-20 | In-situ crosslinking (`bfm.generate_topology(crosslink_method="none")`) + opt-in physically-correct CHARMM builds (`--physical-backbone`). NPZ node-feature schema v2. Five CHARMM36m parameter-injection fixes. |
-| **V36** | 2026-05-07 | `topon/protein_network/` — MARTINI 3 protein-network generator (sequence → LAMMPS), the implementation behind **topro**. Peer of `simbox`/`singlechain`; does not plug into `Pipeline`. 65 unit-test assertions + 1 regression test added. |
 
 ---
 
@@ -61,9 +61,42 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V40)
+## 4. Changelog (V1 – V41)
 
 Notable changes are documented in reverse chronological order.
+
+### [V41] — 2026-07-17 — Two-panel entanglement animation + slower arcs
+
+#### Added
+- **`assets/gallery/anim/ent_arc.{gif,mp4}`** + `make_ent_movie.py`,
+  `movie_ent.in` — a **single entanglement** shown two ways at once, both playing
+  the lattice → minimised → equilibrated arc: LEFT the full sculpted network with
+  that one entanglement's two chains picked out (gold, violet) and its own side
+  chains teal, everything else faint grey, a locator box around it; RIGHT that
+  region zoomed in a box, the crop following the pair's centroid. `movie_ent.in`
+  reads the pristine `03_Conformation` lattice (not `1.restart`, whose soft push
+  has already loosened the 0.39 σ crossing to ~1.0 σ) so frame 0 is the tight
+  entanglement the stills show.
+
+#### Changed
+- **All four arc GIFs/MP4s slowed to ~0.66× speed** (GIF 60 → 91 ms/frame, MP4
+  20 → 13 fps), rebuilt from cached frames.
+- The README entanglement section leads with the animation; the two stills move
+  below it as the as-built reference.
+
+#### Notes for the record
+- **Colouring the whole network's grafts teal made one entanglement look like
+  many.** The fix (`focus_grafts`) colours *only* the two focus chains and their
+  own ~15 side-chain beads; everything else — all other strands, all other grafts,
+  junctions — is one faint grey. That is what keeps it a *single* entanglement.
+- **The pair sits on a periodic face**, so a wrapped centroid flips between box
+  faces and a locator can't bracket the split pair. Both panels therefore *follow*
+  the pair (recentre its centroid to the box centre each frame); the locator is
+  then fixed at the projected box centre. A perspective `project()` helper
+  (camera read back after `zoom_all`) places it.
+- **A dense KG melt buries any single chain.** Thin bonds + small grey beads make
+  the matrix a faint web while the pair is a bold string of large gold/violet
+  beads, so the entanglement stays readable from lattice through melt.
 
 ### [V40] — 2026-07-17 — Fail fast on unreachable topology targets
 
@@ -73,14 +106,14 @@ Notable changes are documented in reverse chronological order.
 ### [V39] — 2026-07-17 — Arc animations + entanglement colour rule
 
 #### Added
-- **`assets/gallery/anim/{cg,atom}_arc.{gif,mp4}`** — real MD trajectories
-  (lattice → minimised → equilibrated) as seamless boomerang loops, plus vendored
-  `movie_render.py` (trajectory → frames via `LoadTrajectoryModifier`, fixed
-  camera) and `make_gif.py` (frames → GIF + h264 MP4). The README arc section
-  shows the GIFs instead of the three frozen stills.
+- **`assets/gallery/anim/{cg,copoly,atom,ent}_arc.{gif,mp4}`** — real MD
+  trajectories (lattice → minimised → equilibrated) as seamless boomerang loops,
+  ~0.66× speed. The README arc section shows the GIFs instead of the frozen
+  stills. (An initial `movie_render.py` + `make_gif.py` pair was written and then
+  consolidated the same day into the two builders below; those two scripts no
+  longer exist.)
 - **Smooth, high-quality arc animations for all three resolutions**
-  (`movie_cg.in`, `movie_atom.in` + one builder `make_arc_movie.py`, superseding
-  and replacing `make_cg_movie.py`/`movie_render.py`/`make_gif.py`). The
+  (`movie_cg.in`, `movie_atom.in` + one builder `make_arc_movie.py`). The
   lattice→melt transition completes inside a single `minimize` under the
   production decks, so a fixed-interval dump jump-cuts it. The movie decks inflate
   the lattice under a ramped soft push with bounded dynamics (`nve/limit`), dumped

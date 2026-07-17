@@ -95,14 +95,25 @@ See <a href="docs/JOURNAL.md">JOURNAL</a>.</sub>
 
 ### Entanglements and side chains
 
+A single entanglement, watched through the MD arc. **Left:** the whole network,
+with that one entanglement's two chains picked out (gold, violet) and its own side
+chains teal — everything else faint grey. **Right:** the boxed region zoomed in,
+the crop following the pair. Both play lattice → minimised → equilibrated together.
+
+<p align="center">
+  <img src="assets/gallery/anim/ent_arc.gif" alt="One entanglement in the full network and zoomed in a box, both relaxing from lattice to equilibrated melt" width="720">
+</p>
+
+<sub>The two chains leave their lattice edges and cross (closest approach ≈ 0.4&nbsp;σ), then relax into interlocked coils as the network melts — you can follow the hooked pair the whole way. Ask for 12 entanglements and exactly 24 strands bow off the lattice (two per entanglement, since the assignment stage won't reuse an edge). Grafts are DP&nbsp;5. Higher-quality <a href="assets/gallery/anim/ent_arc.mp4">MP4</a>.</sub>
+
 <table>
 <tr>
 <td width="55%"><img src="assets/gallery/ent_full.png" alt="Network with entangled strands highlighted in gold"></td>
 <td width="45%"><img src="assets/gallery/ent_zoom.png" alt="Close-up of two entangled strands crossing"></td>
 </tr>
 <tr>
-<td><b>The whole network</b><br><sub>Ask for 12 entanglements and <b>24 strands</b> bow off the lattice (gold) — two per entanglement, since the assignment stage refuses to reuse an edge. The other 226 stay dead straight: bow 0.00. Teal = grafted side chains, DP&nbsp;5 (259 of them).</sub></td>
-<td><b>One pair, close up</b><br><sub>The two partners (gold, violet) leave their own lattice edges, neck together and cross — closest approach <b>0.39&nbsp;σ</b>. Neither is a lattice edge any more; that is the kink.</sub></td>
+<td><b>The as-built lattice</b><br><sub>The same entanglement on the as-built lattice, before MD: the two partners (gold, violet) bow off their edges to cross, the rest of the sculpted network dead straight.</sub></td>
+<td><b>The crossing, close up</b><br><sub>Closest approach <b>0.39&nbsp;σ</b> — neither strand is a lattice edge any more. That is the kink the animation then relaxes.</sub></td>
 </tr>
 </table>
 

@@ -14,6 +14,43 @@ Newest first.
 
 ---
 
+## 2026-07-17 — Two-panel single-entanglement animation
+
+**Change:** Added `assets/gallery/anim/ent_arc.{gif,mp4}` — one entanglement shown
+two ways in one animation, both playing lattice → minimised → equilibrated: LEFT
+the full sculpted network with that entanglement's two chains gold/violet, its own
+side chains teal, everything else faint grey, and a locator box around it; RIGHT
+the region zoomed in a box, the crop following the pair. Builder
+`make_ent_movie.py`, LAMMPS deck `movie_ent.in`. Slowed all four arc animations to
+~0.66× (GIF 91 ms/frame, MP4 13 fps). README entanglement section now leads with
+the animation, the two stills below it as the as-built reference.
+
+**Why:** The user wanted to see a single entanglement in context AND up close, and
+watch it relax/equilibrate — "the full lattice, with 1 entanglement, and a zoomed
+in version of entanglement in a box, and both frames move, min and equil."
+
+**Issue / solution — three that each read wrong before the fix:**
+1. **Teal grafts network-wide read as *many* highlighted spots.** Colouring every
+   graft teal lit up the whole network. `focus_grafts()` now colours only the two
+   focus chains and their ~15 own side-chain beads; all else is one faint grey, so
+   it is unmistakably *one* entanglement.
+2. **The pair straddles a periodic face**, so a wrapped centroid flips between the
+   top and bottom box faces frame to frame and no locator box can bracket the
+   split pair. Both panels now *follow* the pair (recentre its centroid to the box
+   centre each frame), so it is always whole and central; the locator is then
+   fixed, at the projected box centre (a small perspective `project()` helper
+   reads the camera back after `zoom_all`).
+3. **A dense KG melt buries a single chain.** Made the matrix a faint thin web
+   (small grey beads, 0.055–0.07 σ bonds) and the pair a bold string of large
+   gold/violet beads, so the entanglement stays legible from lattice to melt.
+
+Also: `movie_ent.in` reads the pristine `03_Conformation` lattice rather than
+`1.restart` — CG stage 1's soft push has already loosened the tight 0.39 σ crossing
+to ~1.0 σ, so starting from the restart would miss the tight entanglement the
+stills show.
+
+---
+
 ## 2026-07-17 — Topology generators: fail fast on unreachable `degree_distribution` targets
 
 **Change** [topon/topology/generator_python.py](../topon/topology/generator_python.py) and [topon/topology/generator_python_diamond.py](../topon/topology/generator_python_diamond.py) — both `generate()` methods now call a new `_validate_targets_reachable(base_graph)` immediately after building the base lattice and before the trial loop. It raises a clear `ValueError` when the requested `degree_distribution` can never be reached by sculpting: an `e:N` edge target above the lattice's edge count, a per-degree `d:N` count above the node count, or a target degree above the lattice's maximum node degree. Bounds are read from the *actual constructed graph* (not a `3·nx·ny·nz` formula). Added 11 unit tests (`tests/unit/topology/test_topology.py` +5; new `test_topology_diamond.py` +6 — the diamond generator previously had none).

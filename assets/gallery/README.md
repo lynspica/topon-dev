@@ -1,12 +1,12 @@
 # The gallery
 
-Two arc **animations** (CG and atomistic, `anim/`) plus eleven **stills** for the
-repo README, in three sections: the lattice → minimised → equilibrated arc, the
-copolymer sequences, and entanglements + side chains. **Every panel sits on a
-strict-sculpted, heterogeneous network** (junction functionality 2–6, mean 4.0),
-not a perfect lattice — that is the whole point. Nothing was built for the
-picture, and every number in the captions was measured back out of the file it
-shows.
+Four arc **animations** (`anim/` — CG, copolymer, atomistic, and a two-panel
+entanglement) plus eleven **stills** for the repo README, in three sections: the
+lattice → minimised → equilibrated arc, the copolymer sequences, and
+entanglements + side chains. **Every panel sits on a strict-sculpted,
+heterogeneous network** (junction functionality 2–6, mean 4.0), not a perfect
+lattice — that is the whole point. Nothing was built for the picture, and every
+number in the captions was measured back out of the file it shows.
 
 ## Rebuilding
 
@@ -18,21 +18,33 @@ python gen_systems.py       # sculpt_250, copoly_*, entangled_grafted, atom_scul
 # 2. render the stills
 "C:/v/ovito/Scripts/python.exe" render_gallery.py     # or: <panel> [<panel> ...]
 
-# 3. the three arc animations (lattice -> non-ideal melt). Each needs a dedicated
-#    movie run, then one builder assembles the GIF + MP4:
-#      cg / copoly  -> movie_cg.in   (copoly first needs `lmp minimize_1_serial.in`
-#                                      for its 1.restart)
+# 3. arc animations. Each needs a dedicated movie run, then a builder:
+#      cg / copoly  -> movie_cg.in   (copoly + ent first need `lmp minimize_1_serial.in`)
 #      atom         -> movie_atom.in
+#      ent          -> movie_ent.in  (reads the pristine 03_Conformation lattice)
 cp movie_cg.in   $TOPON_GALLERY_SYSTEMS/sculpt_250/sculpt_250/04_Simulation/
 cp movie_cg.in   $TOPON_GALLERY_SYSTEMS/copoly_block/copoly_block/04_Simulation/
 cp movie_atom.in $TOPON_GALLERY_SYSTEMS/atom_sculpt/atom_sculpt/04_Simulation/
+cp movie_ent.in  $TOPON_GALLERY_SYSTEMS/entangled_grafted/entangled_grafted/04_Simulation/
 # ... run each deck with lmp in its 04_Simulation dir (stage 1 SERIAL where needed) ...
 "C:/v/ovito/Scripts/python.exe" make_arc_movie.py     # cg copoly atom -> anim/*.{gif,mp4}
+"C:/v/ovito/Scripts/python.exe" make_ent_movie.py     # two-panel ent   -> anim/ent_arc.{gif,mp4}
 ```
 
 `gen_systems.py` sits beside this file — a thin driver over
-`topon.config.load_config` + `topon.pipeline.Pipeline`. The entanglement panel
-shows the lattice state and never touches LAMMPS.
+`topon.config.load_config` + `topon.pipeline.Pipeline`.
+
+**The entanglement animation (`make_ent_movie.py`)** is two synchronized panels:
+the full network with ONE entanglement highlighted (two chains gold/violet, their
+own side chains teal, everything else faint grey, a locator box around them) and
+that region zoomed in a box, the crop following the pair. Three things it gets
+right that the obvious version gets wrong: (a) only the two focus chains and their
+own grafts are coloured — teal across the whole network made one entanglement look
+like many; (b) both panels *follow* the pair, because it straddles a periodic face
+and a wrapped centroid otherwise flips between box faces; (c) the matrix is a faint
+thin web and the pair a bold string of big beads, so it stays legible once the
+network melts. `movie_ent.in` starts from the pristine `03_Conformation` lattice,
+not `1.restart` (whose soft push has already loosened the 0.39 σ crossing).
 
 **The animations are real MD trajectories, not morphs.** A LAMMPS `dump` writes
 positions but not bonds, so the movie loads the `03_Conformation` data file for
