@@ -55,3 +55,7 @@ _tmp_*
 
 # Claude harness state
 .claude/scheduled_tasks.lock
+
+# gallery render transients (systems + movie frames; scripts default here)
+assets/gallery/systems/
+assets/gallery/_frames/

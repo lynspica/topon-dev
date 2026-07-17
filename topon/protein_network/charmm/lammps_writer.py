@@ -554,14 +554,20 @@ def write_lammps_input(base_name, data_file, settings_file, box,
         # 121-180 = -59) so the soft-min can't invert the CA stereocentres.
         import random as _random
         rng = _random.Random(20260714)
-        n_cis = 0
+        # Pick EXACTLY round(n_xpro * fraction) X-Pro bonds to seed cis, rather
+        # than an independent coin-flip per bond. The restraint now holds omega
+        # through the dynamics, so the seeded count IS the final ratio -- a
+        # binomial draw would leave it to sampling noise (900 flips at p=0.05
+        # gave 53 cis => 94.1% trans instead of the intended 95.0%), and would
+        # differ per system for no physical reason.
+        xpro_idx = [i for i, q in enumerate(omega_quads) if len(q) > 4 and q[4]]
+        n_want = int(round(len(xpro_idx) * xpro_cis_fraction)) if xpro_cis_fraction > 0 else 0
+        cis_set = set(rng.sample(xpro_idx, n_want)) if n_want else set()
+        n_cis = len(cis_set)
         specs = []
-        for q in omega_quads:
+        for i, q in enumerate(omega_quads):
             a, b, c, dd = q[0], q[1], q[2], q[3]
-            is_xpro = q[4] if len(q) > 4 else False
-            cis = is_xpro and xpro_cis_fraction > 0.0 and rng.random() < xpro_cis_fraction
-            n_cis += cis
-            specs.append((a, b, c, dd, 180.0 if cis else 0.0))
+            specs.append((a, b, c, dd, 180.0 if i in cis_set else 0.0))
         n_chir = 0
         for q in (chirality_quads or []):
             specs.append((q[0], q[1], q[2], q[3], -59.0))   # L-chirality
@@ -589,6 +595,16 @@ def write_lammps_input(base_name, data_file, settings_file, box,
         omega_fix = (f"\n# Restrain peptide omega to trans during the soft-min "
                      f"expansion (physical_backbone).\ninclude         {omega_base}\n")
         omega_unfix = "".join(f"unfix           {n}\n" for n in fix_names)
+        # Companion unfix include, so downstream scripts that are not generated
+        # here (the densification anneal, the crosslink cycles) can hold the
+        # same restraints through their dynamics and release them before output.
+        # Those runs are much longer than the stages (0.3 ns anneal at 355 K,
+        # ~600 ps of cycles), so leaving them unrestrained is what lets the
+        # seeded X-Pro cis fraction drift.
+        unfix_base = os.path.basename(base_name) + ".in.omega_unfix"
+        with open(os.path.join(relax_dir, unfix_base), "w", encoding="utf-8") as uf:
+            uf.write("# Release the omega/chirality restraints (see .in.omega).\n"
+                     + omega_unfix)
 
     # ── Stage 1: Soft minimisation ────────────────────────────────────────────
     with open(f"{stage_prefix}_stage1.in", "w", encoding='utf-8') as f:
@@ -728,7 +744,7 @@ thermo_style    custom step pe ke etotal evdwl ecoul epair ebond eangle edihed e
 min_style       cg
 minimize        1.0e-6 1.0e-8 100000 1000000
 write_data      system_minimized_final.data
-{omega_unfix}
+
 # Short NVT (10 000 steps x 1 fs)
 reset_timestep  0
 variable        T equal 300
@@ -743,7 +759,7 @@ write_data      after_nvt.data
 fix             1 all npt temp ${{T}} ${{T}} 100.0 iso 1.0 1.0 1000.0
 run             10000
 unfix           1
-
+{omega_unfix}
 write_data      ../system_equilibrated.data
 print "All stages complete."
 """)

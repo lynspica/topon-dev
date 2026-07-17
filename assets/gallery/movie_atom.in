@@ -1,0 +1,50 @@
+# Atomistic movie: smooth lattice -> non-ideal melt, densely sampled.
+# Starts from the 03_Conformation LATTICE (bonds ~0.44 A). Inflates under a
+# ramped soft push with bounded dynamics, dumped every step, then a short LJ+NVT
+# tail. Coulomb/PPPM are omitted (visualisation): the geometry is set by bonds,
+# angles and excluded volume, and dropping kspace keeps the melt stable and fast.
+units           real
+atom_style      full
+boundary        p p p
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  cvff
+special_bonds   dreiding
+pair_style      lj/cut 10.0
+
+read_data       ../03_Conformation/system_relaxed.data
+include         ../02_Chemistry/system.in.settings
+include         ../02_Chemistry/system.groups
+neighbor        2.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+# --- Phase A: ramped soft-push inflation, dump EVERY step ---
+pair_style      soft 1.0
+pair_coeff      * * 0.0
+reset_timestep  0
+timestep        1.0
+dump            dA all custom 1 infl.lammpstrj id type x y z
+dump_modify     dA sort id first yes
+variable        pf equal "ramp(0, 25)"
+fix             push all adapt 1 pair soft a * * v_pf
+fix             a all nve/limit 0.06
+run             700
+unfix           push
+unfix           a
+undump          dA
+
+# --- Phase B: real LJ excluded volume (epsilon ramp) + NVT tail, coarse dump ---
+pair_style      lj/cut 10.0
+reset_timestep  0
+dump            dB all custom 15 therm.lammpstrj id type x y z
+dump_modify     dB sort id first yes
+variable        s equal "ramp(0.05, 1.0)"
+fix             ad all adapt 1 pair lj/cut epsilon * * v_s
+fix             b all nve/limit 0.1
+run             600
+unfix           ad
+unfix           b
+fix             c all nvt temp 300.0 300.0 100.0
+run             600
+unfix           c

@@ -14,6 +14,319 @@ Newest first.
 
 ---
 
+## 2026-07-17 — Smooth arc animations for all three (CG, copolymer, atomistic), one builder
+
+**Change:** Extended the smooth-arc treatment to the copolymer and atomistic
+resolutions and consolidated the movie code into a single builder,
+`make_arc_movie.py` (+ two LAMMPS decks, `movie_cg.in` and `movie_atom.in`).
+Retired the now-superseded `make_cg_movie.py`, `movie_render.py`, `make_gif.py`.
+The README arc row shows the smooth CG + atomistic GIFs; the copolymer section
+gains a block-copolymer arc GIF (A/B halves preserved through the melt).
+
+- **`cg`** `sculpt_250`, single colour, disorder-paced (as before).
+- **`copoly`** `copoly_block`, A = red / B = blue + dark junctions (matching the
+  stills), disorder-paced. Needed its `1.restart` first (`lmp
+  minimize_1_serial.in`; CG stage 1 is a no-op, so the restart ≈ lattice), then
+  reused `movie_cg.in`. Largest per-frame visual gap 0.018.
+- **`atom`** `atom_sculpt`, element colours, **displacement-paced**.
+
+**Why:** "we can do it for atomistic and copolymer as well maybe?"
+
+**Issue / solution:**
+- **Atomistic can't reuse `movie_cg.in`.** Its `1.restart` is *post-expansion*
+  (stage 1 already inflated the bonds to 1.09 Å), so the movie must start from the
+  `03_Conformation` lattice. `movie_atom.in` reads the lattice data + DREIDING
+  settings and inflates under a ramped soft push. The ramped soft push alone
+  carries the whole atomistic arc — bonds 0.44 → 1.12 Å *and* continued coiling
+  (mean displacement rising to 3.5 Å) — so it needs no LJ/NVT tail. Coulomb/PPPM
+  are dropped for the movie (geometry is set by bonds/angles/excluded volume;
+  keeps it fast and stable).
+- **The disorder metric doesn't suit atomistic.** Methyl C–H bonds point every
+  which way even on the lattice, so bond-orientation disorder has a large,
+  roughly-constant baseline that washes out the signal. Switched atomistic to
+  **mean minimum-image displacement from the lattice**, which rises cleanly from 0
+  through the whole arc. `make_arc_movie.py` picks the metric per system.
+- **Two `fix adapt` / pair-style mistakes on the atomistic tail** (before dropping
+  the tail): `fix adapt … scale $(v_s) pair …` is not valid syntax (it's `pair
+  lj/cut epsilon * * v_s`), and switching `pair_style` clears the pair coeffs
+  ("Pair style not yet initialized"). Both moot once the tail was removed.
+- **GIF weight:** the atomistic melt is high-entropy (10 896 small atoms), so its
+  GIF is trimmed to 420 px / 80 colours (~3.4 MB) via a per-system override; CG
+  and copolymer stay 460 px / 96 colours (~3.3–3.8 MB). Full-quality MP4s
+  (0.6–0.95 MB) accompany all three.
+
+**Follow-up:** `make_arc_movie.py cg` reproduces the CG GIF bit-for-bit from the
+same trajectory, confirming the consolidation; the three retired scripts are gone.
+
+---
+
+## 2026-07-17 — Smooth CG arc animation (dedicated inflation run + disorder-paced sampling)
+
+**Change:** Replaced the CG arc GIF/MP4 with a smooth, densely-sampled, higher-
+quality version (`assets/gallery/anim/cg_arc.{gif,mp4}`, same paths). Added
+`movie_cg.in` (a dedicated LAMMPS movie run) and `make_cg_movie.py` (select +
+render + assemble). Atomistic was left as-is — the request was CG only.
+
+**Why:** The first CG GIF had a jump-cut: the lattice→melt transition was one
+frame. Feedback: "the transition is not smooth, sample the transition from
+lattice to nonideal structure more, also higher quality."
+
+**Issue / solution:**
+- **The transition completes inside a single `minimize`.** Under the production
+  stage 2 the median bond jumps 0.17 → 1.00 between the step-0 and step-500 dumps
+  — 65 of 67 frames were static jiggle at ~0.97. A fixed-interval dump cannot
+  catch it.
+- **The bonds don't drive the expansion; excluded volume does.** A symmetric
+  compressed lattice is force-balanced (each bead pulled equally both ways), so
+  pure NVE from the lattice doesn't move — my first attempt stayed at 0.17 for 70
+  steps, then LJ blasted it open in one step. `movie_cg.in` inflates by ramping a
+  *soft* prefactor (0→~26) under `nve/limit`, dumping every step, so the strands
+  open smoothly (largest per-frame bond change 0.06, not 0.83).
+- **Bond length is the wrong progress axis for pacing.** It saturates at ~0.92
+  while the strands keep coiling into the melt, so selecting evenly in bond length
+  still jump-cut at the inflation→coiling boundary. `make_cg_movie.py` selects
+  frames evenly in a **bond-orientation-disorder** metric (`1 − ⟨max axis
+  component / |bond|⟩`, 0 on the axis-aligned lattice, rising through inflation
+  *and* coiling) — largest per-frame visual gap dropped to **0.011**.
+- **FENE snaps freshly-inflated bonds.** Switching to FENE after the rough
+  inflation stretched bonds past R0=1.5 → "Bad FENE bond". The movie keeps
+  harmonic bonds + LJ excluded volume for the melt tail (visually identical; the
+  production run uses FENE for correct KG thermodynamics, not needed for a
+  picture).
+- **Quality:** 660 px render / 16 AO samples; GIF 460 px / 96 colours (~3.8 MB);
+  MP4 660 px CRF 28 (~0.66 MB). Seamless boomerang (last→0 pixel diff 0.3 vs
+  ~24 interior).
+
+**Follow-up:** the atomistic GIF is still the older, coarser
+`movie_render.py`/`make_gif.py` output; give it the same treatment if a smooth
+atomistic arc is wanted later.
+
+---
+
+## 2026-07-17 — Arc animations (GIF + MP4) and a 3-colour entanglement rule
+
+**Change:** Added two arc **animations** to the gallery — `anim/cg_arc.{gif,mp4}`
+and `anim/atom_arc.{gif,mp4}` — each a real MD trajectory of a network going
+lattice → minimised → equilibrated, as a seamless boomerang loop. The main
+README's arc section now shows the GIFs in place of the three frozen stills.
+Vendored `movie_render.py` (trajectory → frames) and `make_gif.py`
+(frames → GIF/MP4). Recoloured the entanglement panels to a **3-colour rule**
+(user request): one entanglement's two chains in two distinct colours (gold,
+violet), the entire rest of the network in a single third colour — same scheme in
+both the full-network and zoom views, dropping the old all-strands-gold + teal
+grafts. The CG arc is likewise now a single colour (junctions by size, not
+colour), since topological colouring is reserved for the entanglement case;
+chemistry colouring (copolymer A/B, atomistic elements) is kept.
+
+**Why:** The GIFs answer the request directly ("gifs of atomistic and cg, from
+lattice to minimized to equilibrated") and show the arc far better than three
+stills. The colour discipline keeps the eye on the one thing each panel is about.
+
+**Issue / solution:**
+- **The dumps have no bond topology.** A LAMMPS custom `dump` writes positions,
+  not bonds, so the trajectory frames would render as beads with no strands.
+  `LoadTrajectoryModifier` fixes this: load the `03_Conformation` `.data` file for
+  topology + bonds, update coordinates per frame by atom id.
+- **Where the expansion happens differs by resolution.** For CG, stage 1 is a
+  no-op (bonds stay 0.17 σ) and the lattice→melt jump is the stage-2 LJ ramp — so
+  dumping stages 2–3 captures it. For **atomistic**, stage 1's staged soft-pushes
+  already expand the bonds 0.44 → 1.09 Å, so dumping only stages 2–3 gave a movie
+  with no lattice and no expansion (every frame a settled cloud). Fixed by
+  instrumenting stage 1 too and prepending the pristine `03_Conformation` lattice
+  as frame 0 (stage 1's first dump is already partly moved).
+- **`reset_timestep` aborts with an active dump** ("Cannot reset timestep with
+  active dump"). Both stage-3 decks and atom stage 1 hit it; the instrumenter now
+  inserts `undump mv` before any `reset_timestep`, and the CG stage-3 dump is
+  injected *after* the reset so it still captures the NVT equilibration.
+- **GIF size.** A dense KG melt is high-entropy and a palette bands it badly.
+  Boomerang also doubles the stored frames. Kept the GIF to 24 subsampled frames
+  at 380 px / 64 colours (~2.3 MB) and shipped a full-frame h264 MP4 (~1.2–1.7 MB,
+  CRF 30) alongside for slides — same dual-format approach as the header logo.
+
+**Follow-up:** the transient render dirs (`assets/gallery/{systems,_frames}/`,
+where the scripts default when `TOPON_GALLERY_SYSTEMS`/`TOPON_GALLERY_FRAMES` are
+unset) are gitignored. The six frozen arc stills are kept on disk (documented in
+`assets/gallery/README.md`) but no longer embedded in the main README.
+
+---
+
+## 2026-07-16 — Gallery rebuilt on heterogeneous (strict-sculpted) networks
+
+**Change:** Restructured [`assets/gallery/`](../assets/gallery/) around topon's
+actual message. Two framings, in sequence: first *everything is placed on a
+lattice and MD makes it physical*; then, on feedback that a perfect cubic grid
+looks nothing like a real network, **every panel was moved onto a strict-sculpted
+heterogeneous network** — junction functionality 2–6, mean 4.0, a tetrafunctional
+crosslinked network — via `degree_distribution = "e:N"`. Eleven panels in three
+sections: the lattice → minimised → equilibrated arc at both resolutions (CG
+`sculpt_250`; atomistic `atom_sculpt`, both generated fresh and run through
+LAMMPS), the copolymer sequences (sculpted 4×4×4), and entanglements + side chains
+(sculpted 5×5×5). No `tests/output/` golden is used any more. Dropped the
+single-chain panel (not network generation). Added `gen_systems.py` beside
+`render_gallery.py` so the whole gallery is reproducible from the topon API.
+
+**Why:** The first gallery was a feature zoo of whatever the goldens happened to
+contain. The lattice construction is the thing topon actually does, and the
+bond-length arc (CG **0.20 → 0.96 → 0.97 σ**; atomistic **0.45 → 1.09 → 1.12 Å**,
+145 bonds strained past 1.3×r₀ → 0, NPT box 89.7 → 89.8 Å) tells that story in numbers
+as well as pictures.
+
+**Issue / solution — rendering the systems turned up two real generator bugs that
+a code-read audit had marked VERIFIED:**
+
+1. **Every CG `minimize` is a no-op.** `writers/lammps_inputs.py` hardcodes
+   `etol=1.0e-4`, but LAMMPS tests |ΔE|/(|E₁|+|E₂|) and the CG system's E ≈ 3.9e6
+   makes the first line search score ~4e-7 — so each `minimize` stops after **1
+   iteration**. `system_after_soft` has moved a maximum of **2e-4 σ** from the
+   as-built lattice: even the soft push-off does nothing. All of the
+   0.198 → 0.963 relaxation comes from the `run 20000` NVE ramp in stage 2, which
+   ends at T = 18.4 — so that state is "pushed off and ramped", not "minimised",
+   and the panel is captioned accordingly. The atomistic writer uses `etol=1e-8`
+   and works. Found only because the CG "after minimisation" panel was
+   pixel-for-pixel the as-built one.
+2. **`arrangement: "gradient"` ignores the requested composition.** In
+   `chemistry/sequences.py`, `w = max(0, 1 - |t - pivot| * n)` scales the
+   triangular window by `n`, so overlap requires `2/n > 1/(n-1)` ⟺ n > 2. With two
+   monomers the ranges [0, 0.5] and [0.5, 1] merely touch, exactly one monomer has
+   weight at every position, and the `random.choices` draw is deterministic.
+   `weights.append(w * f)` cannot save it — multiplying by the fraction cannot
+   change *which* weight is zero — so every composition comes out 50:50 (ask
+   A=0.1, get A=0.50 across 200 seeds). At equal fractions and even DP that split
+   is byte-identical to `block`; at odd DP the midpoint bead hits the
+   `sum(weights)==0` fallback and matches only ~half the time. It blends only for
+   n ≥ 3, which is why reading the code does not catch it. No gradient panel; the
+   README no longer claims it works.
+3. **20% of bonds were rendering as stubs.** The as-built lattice puts nodes at
+   x=0 — exactly *on* the periodic face — and the conformation jitter (±1e-4) then
+   throws neighbouring beads to opposite sides when wrapped. 2 761 of 7 625 beads
+   sat within 0.01 of a face; **1 596 of 7 875 bonds** spanned the box and were
+   drawn as two stubs. Whole strands came out dashed, which read as "the beads are
+   too small" — no radius would have fixed it. `half_cell_offset()` moves the
+   planes into the interior and leaves the **75** genuinely periodic bonds a 5×5×5
+   lattice must have (25 crossing edges per axis × 3).
+
+**Noted but NOT established:** the `v21_cg_combined` golden *looks* stale — 190
+bonds at 7.45 σ (=√3 × its 4.2996 spacing) plus 10 at 10.53 σ, bead-ends pinned to
+lattice nodes, nothing like fresh output. But it *loads* a 210-edge sculpted graph
+(degrees 0–4) rather than generating a 375-edge lattice, and its config no longer
+exists, so it cannot be re-run for a controlled comparison. The solid part is that
+the bead-spacing formula moved `a/dp` → `a/(dp+1)`. An earlier draft of this entry
+tied the staleness to `test_reproducible_with_seed` failing — that was wrong: the
+test dies on the missing config, and only ever compared atom counts between two
+fresh runs.
+
+And one bug in my own analysis, worth recording because it nearly shipped a false
+caption: the chain-walker stopped at any degree-3 bead — which is exactly a
+backbone bead carrying a graft — and so split single chains into fragments that
+then looked like two chains "0.40 σ apart" when they were *the same beads*.
+Peeling degree-1 non-junction beads strips the side chains first; the walker then
+returns **375 chains of exactly 20 beads, no bead used twice** = exactly the 375
+edges of a 5×5×5 SC lattice. Only after that fix is the entanglement claim real:
+ask for 12 and exactly 24 strands bow > 1 σ (both partners), the other 351 measure
+0.00, and the no-entanglement control gives 0 of 375.
+
+And a fourth, found while restyling: **the "dotted" look the panels first had was
+not a style problem — 20% of the bonds were genuinely missing.** The as-built
+lattice puts nodes at x=0, exactly on the periodic face; the ±1e-4 conformation
+jitter then sends neighbouring beads to opposite sides on wrap. 1 596 of 7 875
+bonds (5×5×5) were drawn as two stubs at opposite faces. No bead radius fixes
+that; `half_cell_offset()` shifts the planes inside and the strands render solid.
+The lesson is in `assets/gallery/README.md`: measure before restyling.
+
+Earlier the same day, a first pass rewrote `README.md` around a six-panel gallery
+built from the goldens; the sections below record what that pass found and fixed,
+most of which still stands (the clone URL, the CHARMM36m builder, the feature-list
+corrections).
+
+**Why:** The README undersold the package and, in places, misdescribed it. An
+`investigator` audit of every claim found the clone URL pointed at
+`lynspica/topon.git`, which does not exist (the remotes are `topon-dev` and
+`keten-group/topon`), and that the CHARMM36m atomistic protein builder — RTF IC
+tables, NeRF placement, L-chirality, omega/X-Pro cis control — was invisible in
+the README despite being the most substantial thing in the repo.
+
+**Issue / solution:** Five separate ways to ship a picture that lies, all caught
+by measuring instead of eyeballing (full detail in `assets/gallery/README.md`):
+
+1. *Type IDs are not portable.* A fixed `1=Si 2=O 3=C 4=N 5=H` palette painted
+   every **hydrogen** blue-as-nitrogen in `atomistic_combined` (where `4=H`) and
+   **carbon** gold-as-silicon in `fpdms_dp100_toluene` (where `1=C, 4=Si, 5=F`).
+   Two of four atomistic panels were chemically mislabelled. Palette now keys off
+   each file's own mass table.
+2. *Wrapping breaks bonds.* `WrapPeriodicImagesModifier` moves positions but
+   leaves OVITO's load-time per-bond PBC shifts stale — it **tripled** the stray
+   bonds in `cg_combined` (405 → 1 182). `rebuild_bond_pbc` must follow every
+   wrap; with it, poss/simbox/protein reach zero strays.
+3. *Image flags are not trustworthy.* Unwrapping the DP100 chain by its stored
+   flags left 106 of 1 627 bonds broken (longest 90 Å) — worse than not
+   unwrapping. Walking the bond graph gives 0 broken, longest 1.81 Å. An
+   assertion now fails the render rather than ship the starburst.
+4. *Counting bonds cannot detect crosslinking.* v2.9 has 1 933 bonds before and
+   after: each epoxide–amine event breaks one C–O and forms one C–N. Diffing bond
+   *sets* gives the exact 5 sites, matching `REACTION_DETAILS.md`.
+5. *`03_Conformation` is a collapsed scaffold, not a structure* — median bond
+   0.21 σ vs a KG equilibrium of ~1.00, 200 bonds past 3× the median. It renders
+   as a crisp lattice only because the artifacts are drawn small. `cg_network`
+   now uses the MD-relaxed `04_Simulation` state; `atomistic` stays at
+   `03_Conformation` and is captioned "as built".
+
+Also corrected a **factual error this repo introduced last session**:
+`assets/logo/README.md` claimed nothing in the pipeline realises kink geometry.
+It does — `pipeline.py:489` (CG) and `:589` (atomistic) call
+`calculate_entangled_kink`. What is actually broken is narrower and is now
+recorded there: `params` and `num_entanglements` are never passed, so `KinkParams`
+is silently ignored (its schema defaults coincide with the hardcoded ones, hiding
+it) and multi-entanglement geometry is never realised.
+
+A second `investigator` pass over the finished README caught six more claims —
+worth recording, because five were things I believed rather than measured:
+
+- **The dityrosine `fix bond/react` bullet described code that is not in this
+  repo.** There is no `*dity*` file under version control; the only `bond/react`
+  templates are simbox's epoxy-amine. topon places dityrosine as *build-time*
+  harmonic SC4–SC4 bonds (`protein_network/builder.py:489`, 0.270 nm). The
+  in-situ work lives at `E:/PhD/Proteins/charmm_insitu/`.
+- **"BFM / bond-fluctuation" is not BFM.** `bfm.py` is a 6-neighbour cubic lattice
+  with one monomer per site and fixed bond length 1; real BFM (Carmesin–Kremer
+  1988) is a 2×2×2 cube per monomer with 108 bond vectors. Nothing fluctuates.
+  Its own line 1 says "6-neighbour cubic-lattice", disagreeing with its filename.
+- **The kinks are applied in the *chemistry* stage, not conformation.**
+  `pipeline.py:489`/`:589` sit inside `_run_chemistry_stage` (303–686);
+  `_run_conformation_stage` (688–709) only displaces/noises/resolves overlaps.
+  (This also contradicts CLAUDE.md's module table, which says chemistry does *not*
+  generate coordinates.)
+- **`--physical-backbone` is opt-in, default OFF** — the bullet promised a
+  physical backbone while the default ships seeded jitter.
+- **v40 has 9 dityrosine bonds, not 8**: 8 inter-chain + 1 intra-chain. "8" is
+  right only as *inter-chain* crosslinks; ⟨k⟩ = 2.00 and single-component both
+  hold exactly.
+- `pytest -m fast` takes ~13–22 s, not the ~5 s claimed here, in
+  `pyproject.toml:79`, `tests/conftest.py:9` and CLAUDE.md.
+
+**Follow-up:**
+
+1. **The regression tier is red, and was already red at `fa86928` before this
+   work** (9 failed / 3 errors / 14 skipped locally; docs-only changes cannot
+   affect it). `poss_100 test_system_data_identical` fails with a coordinate
+   mismatch on all 10 470 atoms; the cg/atomistic byte tests *skip* because
+   `examples/config_*_combined.json` no longer exists. **CLAUDE.md's writer rule
+   — "run `pytest tests/regression/` — confirm passing" — is currently
+   unsatisfiable.** This needs to be fixed or the rule restated.
+2. **`tests/output/` is gitignored** (`.gitignore:48`), so the goldens are
+   local-only: a fresh clone skips the regression tier and cannot rebuild the
+   gallery. Worth deciding deliberately — it is invisible today.
+3. Claims dropped from the README because the code does not support them:
+   `lattice_type` accepts only SC/BCC/FCC (the diamond generator is unreachable
+   from a config, and `generator_python.py:18` still claims "only SC");
+   `.graphml`/`.npz` load only via the Python API, not `ExistingFilesConfig`;
+   `defects.secondary_loops` is validated but never injected, and what topon calls
+   a *primary* loop is a *secondary* loop in the literature — the same object
+   `analysis/report.py` calls secondary. BCC/FCC have no test coverage.
+4. `speed_logs/benchmark.md` claims the Python port matches C "bit-for-bit" while
+   every C row in it reads "TBD", and no C source is in the repo.
+
+---
+
 ## 2026-05-20 — CHARMM `--physical-backbone`: IC-built physical structure (correct cis/trans, chirality, impropers)
 
 **Change** [charmm/charmm_ff.py](../topon/protein_network/charmm/charmm_ff.py), [charmm/builder.py](../topon/protein_network/charmm/builder.py), [charmm/lammps_writer.py](../topon/protein_network/charmm/lammps_writer.py), [charmm/build_systems.py](../topon/protein_network/charmm/build_systems.py)

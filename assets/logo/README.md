@@ -73,8 +73,18 @@ repo's social-preview card, which never animates.
   has two correctly-wound contours (outer CW, counter CCW), yet
   `contains_point` is `True` at the hole's centre. `glyph_contains()` tests each
   contour and XORs (even-odd rule) so the holes are excluded.
-* `KinkParams` (`overshoot`, `z_amp`, `sigma`) is defined in
-  `topon/config/schema.py` and the entanglement stage marks `entangled_with` on
-  the graph, but **nothing in the pipeline turns that into geometry today** —
-  `chemistry/builder.py` only counts the pairs. `make_logo_data.py` is currently
-  the only code that realises the kink.
+* **`KinkParams` never reaches the kink.** The pipeline *does* realise kink
+  geometry — `pipeline.py:489` (CG) and `:589` (atomistic) call
+  `calculate_entangled_kink` — but they pass only `start_pos`, `end_pos`,
+  `num_atoms`, `orientation_vec`, `z_phase`. `params` is never passed, so
+  `network_helpers.py` falls back to its hardcoded `0.2 / 0.5 / 0.15`, and
+  `assignment.entanglements.get_kink_params()` has zero callers. Those hardcoded
+  values happen to equal `KinkParams`' schema defaults, which is why nothing
+  looks wrong until you set a non-default and watch it be ignored.
+  `num_entanglements` is likewise never passed, so the multi-lobe path in
+  `network_helpers.py:53` is dead and `entanglement_count` survives only as
+  metadata in the GraphML/NPZ writers.
+  (An earlier revision of this file claimed the pipeline realises no kink
+  geometry at all and that `make_logo_data.py` was the only code that did. That
+  was wrong — `chemistry/builder.py` only counts pairs, but Stage 4 in
+  `pipeline.py` does the displacement.)
