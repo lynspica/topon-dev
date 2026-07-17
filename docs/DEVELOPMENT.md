@@ -32,11 +32,11 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V40** | 2026-07-17 | `topology/generator_python.py` (+ `generator_python_diamond.py`) — fail fast on unreachable `degree_distribution` targets. An `e:N` above the lattice's edge count (e.g. `e:128` on an 81-edge 3×3×3 SC), or a per-degree target above the node count / max degree, now raises a clear `ValueError` instead of churning through doomed trials. 11 unit tests added. |
+| **V39** | 2026-07-17 | Arc **animations** for the gallery — `assets/gallery/anim/{cg,atom}_arc.{gif,mp4}`, real MD trajectories (lattice → minimised → equilibrated) as boomerang loops. 3-colour entanglement rule across the panels. |
+| **V38** | 2026-07-16 | Showcase **gallery** (`assets/gallery/`, eleven panels on strict-sculpted heterogeneous networks) + README rewrite. |
+| **V37** | 2026-05-20 | In-situ crosslinking (`bfm.generate_topology(crosslink_method="none")`) + opt-in physically-correct CHARMM builds (`--physical-backbone`). NPZ node-feature schema v2. Five CHARMM36m parameter-injection fixes. |
 | **V36** | 2026-05-07 | `topon/protein_network/` — MARTINI 3 protein-network generator (sequence → LAMMPS), the implementation behind **topro**. Peer of `simbox`/`singlechain`; does not plug into `Pipeline`. 65 unit-test assertions + 1 regression test added. |
-| **V35** | 2026-05-01 | Critical peroxide-bond fix in `chemistry/builder.py`. Resolved §P0-1 of the solubility-downstream issue list. Reference outputs under `tests/output/solvent_effects/{PDMS,PTFPMS}/` will diff after this change. |
-| **V34** | 2026-03 | Multi-solvent mixtures in `singlechain/`. HSP solubility module (`singlechain/solubility.py`). Better head/tail detection for non-Si polymers (EPDM, PIB, FKM, NBR). |
-| **V33** | 2026-03 | Package hardening + single-chain. BCC/FCC lattices wired in Python generator. Grafts and copolymers in `AssignmentManager`. `topon simbox` / `topon analyze` / `topon chain` CLIs. `CLAUDE.md` written. |
-| **V32** | 2026-03 | simbox v3 — full LAMMPS data + input script generation for crosslinking studies; POSS sweeps with 7 compositions. |
 
 ---
 
@@ -61,9 +61,14 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V39)
+## 4. Changelog (V1 – V40)
 
 Notable changes are documented in reverse chronological order.
+
+### [V40] — 2026-07-17 — Fail fast on unreachable topology targets
+
+#### Fixed
+- **`topology/generator_python.py` + `topology/generator_python_diamond.py` — an unreachable `degree_distribution` now raises instead of hanging.** Both generators validate the requested target against the freshly-built lattice *before* the trial loop (new `_validate_targets_reachable`). Sculpting only ever *removes* edges, so the full lattice is a hard ceiling: an over-target request such as `e:128` on a 3×3×3 SC lattice (81 edges) used to churn through hundreds of thousands of doomed trials with no output — indistinguishable from a hang. It now raises a `ValueError` naming both numbers (e.g. `"degree_distribution e:128 exceeds the 81 edges of a 3x3x3 SC lattice; sculpting only removes edges…"`). The same guard rejects per-degree targets that exceed the node count (`d:N` with `N > nodes`) or ask for a degree above the lattice's maximum (`d > max degree`). Bounds are read from the constructed graph, not a `3·nx·ny·nz` formula, so periodic-boundary edge collapse on tiny lattices (a 2×2×2 SC has 12 edges, not 24) is handled correctly. Reachable targets (`e:81`, `e:70`, `0:2`, empty) are unchanged. 11 unit tests added under `tests/unit/topology/` (the diamond generator previously had none). The archived reference C generator (`generator_serial_debug11.c`, `~/topon_archive/`) and the gitignored experimental `internal/…/generator_serial_diamond.c` share the pattern but are out of the tracked tree and untouched.
 
 ### [V39] — 2026-07-17 — Arc animations + entanglement colour rule
 

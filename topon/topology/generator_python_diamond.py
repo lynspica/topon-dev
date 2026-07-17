@@ -262,6 +262,55 @@ class DiamondTopologyGenerator:
                 d = int(d_str.replace("d", ""))
                 self.target_counts[d] = int(n_str)
 
+    def _lattice_label(self) -> str:
+        """Human-readable "<nx>x<ny>x<nz> Diamond" tag for error messages."""
+        return f"{self.dims[0]}x{self.dims[1]}x{self.dims[2]} {self.lattice_type}"
+
+    def _validate_targets_reachable(self, base_graph: nx.Graph) -> None:
+        """Fail fast when the requested ``degree_distribution`` can't be met.
+
+        Sculpting only ever REMOVES edges, so the freshly-built lattice is a
+        hard ceiling: its edge count bounds any ``e:N`` target and its maximum
+        node degree bounds any per-degree ``d:N`` target. Without this guard an
+        over-target request grinds through every trial (each one doomed) before
+        giving up, which looks like a hang. Bounds are read from the actual
+        constructed graph, not a formula, so periodic-boundary edge collapse on
+        tiny lattices is handled. Mirrors
+        ``PythonTopologyGenerator._validate_targets_reachable``.
+        """
+        base_edges = base_graph.number_of_edges()
+        base_nodes = base_graph.number_of_nodes()
+        label = self._lattice_label()
+
+        # --- e:N  (total edge-count target) ---
+        if self.target_edge_count != -1 and self.target_edge_count > base_edges:
+            raise ValueError(
+                f"degree_distribution e:{self.target_edge_count} exceeds the "
+                f"{base_edges} edges of a {label} lattice; sculpting only "
+                f"removes edges, so this target is unreachable."
+            )
+
+        # --- d:N  (per-degree targets; 0 = forbidden, -2 = unspecified) ---
+        if self.target_counts:
+            max_base_degree = max((d for _, d in base_graph.degree()), default=0)
+            for degree, count in list(self.target_counts.items()):
+                if count <= 0:
+                    continue
+                if count > base_nodes:
+                    raise ValueError(
+                        f"degree_distribution {degree}:{count} exceeds the "
+                        f"{base_nodes} nodes of a {label} lattice; a lattice "
+                        f"cannot hold more nodes of degree {degree} than it "
+                        f"has nodes, so this target is unreachable."
+                    )
+                if degree > max_base_degree:
+                    raise ValueError(
+                        f"degree_distribution {degree}:{count} requires degree-"
+                        f"{degree} nodes, but the maximum degree in a {label} "
+                        f"lattice is {max_base_degree}; sculpting only removes "
+                        f"edges, so this target is unreachable."
+                    )
+
     def generate(self, trials: int = 1, max_saves: int = 1,
                  time_limit: float | None = None) -> list[nx.Graph]:
         """Build the base Diamond lattice and run ``run_single_trial``.
@@ -271,6 +320,9 @@ class DiamondTopologyGenerator:
         4-regular network."
         """
         base = create_diamond_lattice(*self.dims)
+        # Reject structurally-unreachable targets before churning through
+        # trials (sculpting only removes edges).
+        self._validate_targets_reachable(base)
 
         # Short-circuit: empty constraint set + no edge target.
         if (

@@ -91,3 +91,58 @@ def test_connectivity_check():
     # Disconnected (1 is separate from 2-3)
     assert gen._is_subgraph_connected(g, status) == False
 
+
+# ---------------------------------------------------------------------------
+# Unreachable-target validation (fail fast instead of churning through trials)
+# ---------------------------------------------------------------------------
+
+def test_over_target_edge_count_raises_fast(small_lattice_config):
+    """e:N above the base lattice's edge count must fail fast, not hang.
+
+    A 3x3x3 SC lattice has only 81 edges. Sculpting only ever removes edges,
+    so e:128 is structurally unreachable and used to make generate() grind
+    through hundreds of thousands of doomed trials. The time_limit is a
+    belt-and-suspenders guard: the raise happens before the trial loop, so a
+    future regression fails this test in seconds rather than hanging CI.
+    """
+    config = small_lattice_config._replace(degree_distribution="e:128")
+    gen = PythonTopologyGenerator(config)
+    with pytest.raises(ValueError, match=r"e:128 exceeds the 81 edges"):
+        gen.generate(trials=1_000_000, time_limit=5)
+
+
+def test_edge_count_target_at_capacity_ok(small_lattice_config):
+    """e:N equal to the full lattice edge count is reachable (boundary)."""
+    config = small_lattice_config._replace(degree_distribution="e:81")
+    gen = PythonTopologyGenerator(config)
+    graphs = gen.generate(trials=5)
+    assert len(graphs) > 0
+    assert graphs[0].number_of_edges() == 81
+
+
+def test_reachable_edge_count_target_ok(small_lattice_config):
+    """e:N below the full lattice edge count still sculpts to exactly N edges."""
+    config = small_lattice_config._replace(degree_distribution="e:70")
+    gen = PythonTopologyGenerator(config)
+    graphs = gen.generate(trials=50)
+    assert len(graphs) > 0
+    assert graphs[0].number_of_edges() == 70
+
+
+def test_over_target_per_degree_count_raises(small_lattice_config):
+    """A per-degree target asking for more nodes than exist fails fast."""
+    # 3x3x3 SC has only 27 nodes; 100 nodes of degree 3 is impossible.
+    config = small_lattice_config._replace(degree_distribution="3:100")
+    gen = PythonTopologyGenerator(config)
+    with pytest.raises(ValueError, match=r"3:100 exceeds the 27 nodes"):
+        gen.generate(trials=1_000_000, time_limit=5)
+
+
+def test_over_target_per_degree_degree_raises(small_lattice_config):
+    """A per-degree target above the lattice's maximum degree fails fast."""
+    # SC max degree is 6; requesting degree-7 nodes is unreachable by sculpting.
+    config = small_lattice_config._replace(degree_distribution="7:5")
+    gen = PythonTopologyGenerator(config)
+    with pytest.raises(ValueError, match=r"maximum degree in a 3x3x3 SC lattice is 6"):
+        gen.generate(trials=1_000_000, time_limit=5)
+

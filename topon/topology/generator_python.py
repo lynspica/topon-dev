@@ -58,15 +58,78 @@ class PythonTopologyGenerator:
                 d_str, n_str = part.split(':')
                 d = int(d_str.replace('d', '')) # Handle "d3" or "3"
                 self.target_counts[d] = int(n_str)
-        
+
+    def _lattice_label(self):
+        """Human-readable "<nx>x<ny>x<nz> <TYPE>" tag for error messages."""
+        return f"{self.dims[0]}x{self.dims[1]}x{self.dims[2]} {self.lattice_type}"
+
+    def _validate_targets_reachable(self, base_graph):
+        """Fail fast when the requested ``degree_distribution`` can never be met.
+
+        Sculpting only ever REMOVES edges from the freshly-built lattice, so
+        that full lattice is a hard ceiling: its edge count bounds any ``e:N``
+        target and its maximum node degree bounds any per-degree ``d:N`` target.
+        Without this guard an over-target request makes :meth:`generate` grind
+        through every trial (each one doomed) before giving up — for a large
+        ``trials`` count that looks like an indefinite hang. Bounds are read
+        from the actual constructed graph, not a ``3*nx*ny*nz`` formula, so
+        periodic-boundary edge collapse on tiny lattices (e.g. a 2x2x2 SC has
+        12 edges, not 24) is accounted for.
+
+        Raises
+        ------
+        ValueError
+            If the target edge count exceeds the lattice's edges, or a
+            per-degree target asks for more nodes than exist or for a degree
+            higher than any node in the base lattice.
+        """
+        base_edges = base_graph.number_of_edges()
+        base_nodes = base_graph.number_of_nodes()
+        label = self._lattice_label()
+
+        # --- e:N  (total edge-count target) ---
+        if self.target_edge_count != -1 and self.target_edge_count > base_edges:
+            raise ValueError(
+                f"degree_distribution e:{self.target_edge_count} exceeds the "
+                f"{base_edges} edges of a {label} lattice; sculpting only "
+                f"removes edges, so this target is unreachable."
+            )
+
+        # --- d:N  (per-degree targets) ---
+        # target_counts is a defaultdict; iterate a snapshot of only the
+        # explicitly-parsed entries. count == 0 means "forbidden" (reachable)
+        # and the -2 sentinel means "unspecified"; both are skipped.
+        if self.target_counts:
+            max_base_degree = max((d for _, d in base_graph.degree()), default=0)
+            for degree, count in list(self.target_counts.items()):
+                if count <= 0:
+                    continue
+                if count > base_nodes:
+                    raise ValueError(
+                        f"degree_distribution {degree}:{count} exceeds the "
+                        f"{base_nodes} nodes of a {label} lattice; a lattice "
+                        f"cannot hold more nodes of degree {degree} than it has "
+                        f"nodes, so this target is unreachable."
+                    )
+                if degree > max_base_degree:
+                    raise ValueError(
+                        f"degree_distribution {degree}:{count} requires degree-"
+                        f"{degree} nodes, but the maximum degree in a {label} "
+                        f"lattice is {max_base_degree}; sculpting only removes "
+                        f"edges, so this target is unreachable."
+                    )
+
     def generate(self, trials=1, max_saves=1, time_limit=None):
         """
         Run multiple trials to generate a valid network.
         Returns a list of successful graphs (networkx.Graph objects).
         """
         successful_graphs = []
-        
+
         base_graph = self._create_lattice(self.dims, self.lattice_type)
+        # Reject structurally-unreachable targets before churning through
+        # trials (sculpting only removes edges — see _validate_targets_reachable).
+        self._validate_targets_reachable(base_graph)
         print(f"DEBUG: Entering generate loop (trials={trials})")
         
         start_time = time.time()

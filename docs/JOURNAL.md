@@ -14,6 +14,14 @@ Newest first.
 
 ---
 
+## 2026-07-17 — Topology generators: fail fast on unreachable `degree_distribution` targets
+
+**Change** [topon/topology/generator_python.py](../topon/topology/generator_python.py) and [topon/topology/generator_python_diamond.py](../topon/topology/generator_python_diamond.py) — both `generate()` methods now call a new `_validate_targets_reachable(base_graph)` immediately after building the base lattice and before the trial loop. It raises a clear `ValueError` when the requested `degree_distribution` can never be reached by sculpting: an `e:N` edge target above the lattice's edge count, a per-degree `d:N` count above the node count, or a target degree above the lattice's maximum node degree. Bounds are read from the *actual constructed graph* (not a `3·nx·ny·nz` formula). Added 11 unit tests (`tests/unit/topology/test_topology.py` +5; new `test_topology_diamond.py` +6 — the diamond generator previously had none).
+
+**Why** Sculpting only ever *removes* edges from the full lattice, so any edge target above the freshly-built lattice's edge count is structurally impossible. Previously such a request — e.g. `e:128` on a 3×3×3 SC lattice, which has only 81 edges — made `generate(trials=1_000_000)` grind through hundreds of thousands of doomed trials with no output, indistinguishable from a hang. Found while building `assets/gallery/`: a sculpted 3×3×3 atomistic system was accidentally requested with `e:128` and the generator hung.
+
+**Issue / solution** The guard must not reject *reachable* targets. Reading the constructed graph's real edge/degree counts (rather than the `3·nx·ny·nz` closed form) is essential: a 2×2×2 SC lattice collapses under PBC to 12 edges / max-degree 3, not the formula's 24 / 6, so a formula-based bound would misjudge valid targets. The `e:N` bound uses strict `>`, so the boundary case `e:81` (the full lattice) stays reachable. `DiamondTopologyGenerator` shared the identical latent hang and got the same guard. Two C generators share the pattern but are out of the tracked tree and untouched: the reference `generator_serial_debug11.c` lives in `~/topon_archive/` (CLAUDE.md forbids re-import), and `internal/generators_experimental/generator_serial_diamond.c` is under the gitignored `internal/`. Verified: `e:128` / `3:100` / `7:5` raise in <1 ms; reachable targets and the empty default still succeed. Gated on `pytest -m fast` (184 passed) + the new targeted tests.
+
 ## 2026-07-17 — Smooth arc animations for all three (CG, copolymer, atomistic), one builder
 
 **Change:** Extended the smooth-arc treatment to the copolymer and atomistic
