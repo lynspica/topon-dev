@@ -14,40 +14,82 @@ Newest first.
 
 ---
 
+## 2026-07-17 — Entanglement kink: `KinkParams` and `entanglement_count` now reach the geometry
+
+**Change** [topon/pipeline.py](../topon/pipeline.py) (CG stage 4 and the atomistic
+path) and [topon/workflows/cg_network.py](../topon/workflows/cg_network.py) now
+pass `params=` and `num_entanglements=` into `calculate_entangled_kink`.
+
+**Why** Both were previously omitted, so `network_helpers.calculate_entangled_kink`
+fell back to hardcoded `overshoot/z_amp/sigma = 0.2/0.5/0.15` and its multi-lobe
+branch (`N = max(1, round(num_entanglements))`) was unreachable. Configuring
+`assignment.entanglements.kink_params` did nothing, and `entanglement_count`
+survived only as GraphML/NPZ metadata. The bug was invisible because the hardcoded
+triple happens to equal `KinkParams`' schema defaults — it only showed if you set a
+non-default value and watched it be ignored.
+
+**Issue / solution** Verified the fix does not move existing output: passing the
+schema defaults reproduces the old hardcoded path exactly (all kink coordinates
+`allclose`), so any run that does not set `kink_params` is byte-identical.
+`num_entanglements=3` now produces a genuinely different, multi-lobe path. 184 fast
+tests pass.
+
+---
+
 ## 2026-07-17 — Two-panel single-entanglement animation
 
 **Change:** Added `assets/gallery/anim/ent_arc.{gif,mp4}` — one entanglement shown
 two ways in one animation, both playing lattice → minimised → equilibrated: LEFT
-the full sculpted network with that entanglement's two chains gold/violet, its own
-side chains teal, everything else faint grey, and a locator box around it; RIGHT
-the region zoomed in a box, the crop following the pair. Builder
+the full sculpted network with that entanglement highlighted and a locator box
+around it; RIGHT that box zoomed in. **Three colours only** — chain A gold, chain B
+violet (each *including its own side chains*), everything else faint grey. Builder
 `make_ent_movie.py`, LAMMPS deck `movie_ent.in`. Slowed all four arc animations to
 ~0.66× (GIF 91 ms/frame, MP4 13 fps). README entanglement section now leads with
 the animation, the two stills below it as the as-built reference.
 
 **Why:** The user wanted to see a single entanglement in context AND up close, and
 watch it relax/equilibrate — "the full lattice, with 1 entanglement, and a zoomed
-in version of entanglement in a box, and both frames move, min and equil."
+in version of entanglement in a box, and both frames move, min and equil." A first
+cut drew a 4th colour (teal grafts) and used a fixed crop; the user came back: "I
+cannot identify the entanglement in its lattice form easily … cannot understand
+what happens … what is with dark green color, thought we had 3 colors … what about
+side groups?" This entry is the corrected version.
 
-**Issue / solution — three that each read wrong before the fix:**
-1. **Teal grafts network-wide read as *many* highlighted spots.** Colouring every
-   graft teal lit up the whole network. `focus_grafts()` now colours only the two
-   focus chains and their ~15 own side-chain beads; all else is one faint grey, so
-   it is unmistakably *one* entanglement.
-2. **The pair straddles a periodic face**, so a wrapped centroid flips between the
-   top and bottom box faces frame to frame and no locator box can bracket the
-   split pair. Both panels now *follow* the pair (recentre its centroid to the box
-   centre each frame), so it is always whole and central; the locator is then
-   fixed, at the projected box centre (a small perspective `project()` helper
-   reads the camera back after `zoom_all`).
-3. **A dense KG melt buries a single chain.** Made the matrix a faint thin web
-   (small grey beads, 0.055–0.07 σ bonds) and the pair a bold string of large
-   gold/violet beads, so the entanglement stays legible from lattice to melt.
+**Issue / solution — five, each of which read wrong before the fix:**
+1. **A 4th colour (teal grafts) broke the 3-colour rule.** Side chains now inherit
+   their parent chain's colour — chain A's grafts gold, chain B's grafts violet —
+   so it is exactly three colours *and* the side groups are visibly part of each
+   chain (`chain_grafts()` returns per-chain graft sets).
+2. **Couldn't identify it on the lattice / understand the change**, because a
+   fixed crop was wrong for a pair that grows ~2.5 σ (tight crossing) → ~8 σ (melt
+   coil): it shrank the lattice to a dot and clipped the melt. The zoom is now
+   **adaptive** — crop radius and camera FOV track the pair's own 88th-percentile
+   extent per frame (lightly smoothed), so it fills the panel at every stage; the
+   locator box grows to match. Plus the boomerang **holds** ~1 s on the lattice
+   and the melt so the before/after register.
+3. **Colouring every graft network-wide made one entanglement look like many** —
+   only the two focus chains and their own grafts carry colour now.
+4. **The pair straddles a periodic face**, so a wrapped centroid flips between box
+   faces. Both panels *follow* the pair (recentre its centroid to the box centre
+   each frame); the locator's centre is then fixed (perspective `project()` helper,
+   camera read back after `zoom_all`, gives pixels-per-σ for its size).
+5. **A dense KG melt buries a single chain** — faint thin-web matrix, bold
+   big-bead pair.
 
 Also: `movie_ent.in` reads the pristine `03_Conformation` lattice rather than
 `1.restart` — CG stage 1's soft push has already loosened the tight 0.39 σ crossing
 to ~1.0 σ, so starting from the restart would miss the tight entanglement the
 stills show.
+
+**Follow-up (same day): graft showcase animation.** The user then asked "where is
+the graft gif?" — the entanglement arc shows grafts only as branches on the two
+focus chains, not the side chains as a subject. Added `assets/gallery/anim/
+graft_arc.{gif,mp4}`: a new `grafted` system (4×4×4 sculpted to 128 edges, graft
+density 0.12 × DP 6 = 292 side chains ≈ 40% of the beads, no entanglements),
+backbone blue, side chains teal, junctions dark, relaxing lattice → melt via the
+standard `movie_cg.in` + `make_arc_movie.py` path (new `graft` paint mode). The
+side chains read as short teal branches sticking off the taut lattice strands, and
+coil in with the backbone while staying distinct.
 
 ---
 

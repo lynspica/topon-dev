@@ -266,12 +266,15 @@ def run(
             if np.linalg.norm(orient_vec) < 0.01:
                 orient_vec = perp_unit
 
+            ent_count = data.get("entanglement_count", 1)
             kink_dict = calculate_entangled_kink(
                 start_pos=np.zeros(3),
                 end_pos=mic,
                 num_atoms=len(atoms) + 2,
+                params=(ent_conf_dict.get("kink_params") or {}),
                 orientation_vec=orient_vec,
                 z_phase=1.0,
+                num_entanglements=ent_count,
             )
             full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
             backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]

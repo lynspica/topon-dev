@@ -486,12 +486,15 @@ class Pipeline:
                     orient_vec = p_mid_wrapped - my_mid
                     if np.linalg.norm(orient_vec) < 0.01:
                         orient_vec = perp_unit
+                    ent_count = data.get("entanglement_count", 1)
                     kink_dict = calculate_entangled_kink(
                         start_pos=np.zeros(3),
                         end_pos=mic,
                         num_atoms=len(atoms) + 2,
+                        params=self.config.assignment.entanglements.kink_params.model_dump(),
                         orientation_vec=orient_vec,
                         z_phase=1.0,
+                        num_entanglements=ent_count,
                     )
                     full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
                     backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
@@ -586,12 +589,15 @@ class Pipeline:
                     if np.linalg.norm(orient_vec) < 0.01:
                         orient_vec = perp_unit
 
+                    ent_count = data.get("entanglement_count", 1)
                     kink_dict = calculate_entangled_kink(
                         start_pos=np.zeros(3),
                         end_pos=mic,
                         num_atoms=len(atoms) + 2,  # N+2 fix (v21.1)
+                        params=self.config.assignment.entanglements.kink_params.model_dump(),
                         orientation_vec=orient_vec,
                         z_phase=1.0,
+                        num_entanglements=ent_count,
                     )
                     full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
                     backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]

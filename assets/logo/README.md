@@ -73,18 +73,16 @@ repo's social-preview card, which never animates.
   has two correctly-wound contours (outer CW, counter CCW), yet
   `contains_point` is `True` at the hole's centre. `glyph_contains()` tests each
   contour and XORs (even-odd rule) so the holes are excluded.
-* **`KinkParams` never reaches the kink.** The pipeline *does* realise kink
-  geometry — `pipeline.py:489` (CG) and `:589` (atomistic) call
-  `calculate_entangled_kink` — but they pass only `start_pos`, `end_pos`,
-  `num_atoms`, `orientation_vec`, `z_phase`. `params` is never passed, so
-  `network_helpers.py` falls back to its hardcoded `0.2 / 0.5 / 0.15`, and
-  `assignment.entanglements.get_kink_params()` has zero callers. Those hardcoded
-  values happen to equal `KinkParams`' schema defaults, which is why nothing
-  looks wrong until you set a non-default and watch it be ignored.
-  `num_entanglements` is likewise never passed, so the multi-lobe path in
-  `network_helpers.py:53` is dead and `entanglement_count` survives only as
-  metadata in the GraphML/NPZ writers.
-  (An earlier revision of this file claimed the pipeline realises no kink
+* **`KinkParams` used to be ignored — fixed.** For a long time `pipeline.py`
+  called `calculate_entangled_kink` without `params` or `num_entanglements`, so
+  the helper fell back to its hardcoded `0.2 / 0.5 / 0.15` and the multi-lobe
+  path was dead. It was invisible because those hardcoded values happen to equal
+  `KinkParams`' schema defaults — you only saw it by setting a non-default and
+  watching it be ignored. Both are now threaded through (`pipeline.py` CG and
+  atomistic, plus `workflows/cg_network.py`), so `kink_params` and
+  `entanglement_count` reach the geometry. Passing the schema defaults reproduces
+  the old output exactly, so existing runs are unchanged.
+  (An earlier revision of this file claimed the pipeline realised no kink
   geometry at all and that `make_logo_data.py` was the only code that did. That
   was wrong — `chemistry/builder.py` only counts pairs, but Stage 4 in
   `pipeline.py` does the displacement.)
