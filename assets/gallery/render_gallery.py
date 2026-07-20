@@ -167,6 +167,36 @@ PANELS = {
 }
 
 
+def hq_renderer():
+    """The gallery's high-quality Tachyon settings.
+
+    Pair with SUPERSAMPLE: render at SUPERSAMPLE x the final size and downscale
+    with LANCZOS. That is the single biggest quality win -- true anti-aliasing on
+    every sphere and cylinder silhouette, which Tachyon's own AA only partly
+    gives. Costs ~5x the render time per frame (0.4s -> 2.3s at 560px), which is
+    irrelevant for a 30-frame demo.
+    """
+    return TachyonRenderer(
+        ambient_occlusion=True, ambient_occlusion_samples=26,
+        ambient_occlusion_brightness=0.85,
+        antialiasing=True, antialiasing_samples=10,
+        direct_light=True, direct_light_intensity=0.95,
+        shadows=True)
+
+
+SUPERSAMPLE = 2
+
+
+def render_hq(vp, path, size, renderer=None, **kw):
+    """Render supersampled, then downscale to `size` (a (w, h) tuple)."""
+    from PIL import Image
+    w, h = size
+    vp.render_image(filename=str(path), size=(w * SUPERSAMPLE, h * SUPERSAMPLE),
+                    background=(1, 1, 1), renderer=renderer or hq_renderer(),
+                    **kw)
+    Image.open(path).convert("RGB").resize((w, h), Image.LANCZOS).save(path)
+
+
 def median_bond(data):
     topo = np.array(data.particles.bonds.topology)
     p = np.array(data.particles.positions)

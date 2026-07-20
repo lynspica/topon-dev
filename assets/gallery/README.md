@@ -1,8 +1,8 @@
 # The gallery
 
-Four arc **animations** (`anim/` — CG, copolymer, atomistic, and a two-panel
-entanglement) plus eleven **stills** for the repo README, in three sections: the
-lattice → minimised → equilibrated arc, the copolymer sequences, and
+Five arc **animations** (`anim/` — CG, copolymer, atomistic, a graft showcase, and
+a two-panel entanglement) plus eleven **stills** for the repo README, in three
+sections: the lattice → minimised → equilibrated arc, the copolymer sequences, and
 entanglements + side chains. **Every panel sits on a strict-sculpted,
 heterogeneous network** (junction functionality 2–6, mean 4.0), not a perfect
 lattice — that is the whole point. Nothing was built for the picture, and every
@@ -19,32 +19,48 @@ python gen_systems.py       # sculpt_250, copoly_*, entangled_grafted, atom_scul
 "C:/v/ovito/Scripts/python.exe" render_gallery.py     # or: <panel> [<panel> ...]
 
 # 3. arc animations. Each needs a dedicated movie run, then a builder:
-#      cg / copoly  -> movie_cg.in   (copoly + ent first need `lmp minimize_1_serial.in`)
-#      atom         -> movie_atom.in
-#      ent          -> movie_ent.in  (reads the pristine 03_Conformation lattice)
+#      cg / copoly / graft  -> movie_cg.in  (copoly/graft/ent first need
+#                                             `lmp minimize_1_serial.in` for 1.restart)
+#      atom                 -> movie_atom.in
+#      ent                  -> movie_ent.in (reads the pristine 03_Conformation lattice)
 cp movie_cg.in   $TOPON_GALLERY_SYSTEMS/sculpt_250/sculpt_250/04_Simulation/
 cp movie_cg.in   $TOPON_GALLERY_SYSTEMS/copoly_block/copoly_block/04_Simulation/
+cp movie_cg.in   $TOPON_GALLERY_SYSTEMS/grafted/grafted/04_Simulation/
 cp movie_atom.in $TOPON_GALLERY_SYSTEMS/atom_sculpt/atom_sculpt/04_Simulation/
 cp movie_ent.in  $TOPON_GALLERY_SYSTEMS/entangled_grafted/entangled_grafted/04_Simulation/
 # ... run each deck with lmp in its 04_Simulation dir (stage 1 SERIAL where needed) ...
-"C:/v/ovito/Scripts/python.exe" make_arc_movie.py     # cg copoly atom -> anim/*.{gif,mp4}
-"C:/v/ovito/Scripts/python.exe" make_ent_movie.py     # two-panel ent   -> anim/ent_arc.{gif,mp4}
+"C:/v/ovito/Scripts/python.exe" make_arc_movie.py     # cg copoly atom graft -> anim/*.{gif,mp4}
+"C:/v/ovito/Scripts/python.exe" make_ent_movie.py     # two-panel ent        -> anim/ent_arc.{gif,mp4}
 ```
 
 `gen_systems.py` sits beside this file — a thin driver over
 `topon.config.load_config` + `topon.pipeline.Pipeline`.
 
 **The entanglement animation (`make_ent_movie.py`)** is two synchronized panels:
-the full network with ONE entanglement highlighted (two chains gold/violet, their
-own side chains teal, everything else faint grey, a locator box around them) and
-that region zoomed in a box, the crop following the pair. Three things it gets
-right that the obvious version gets wrong: (a) only the two focus chains and their
-own grafts are coloured — teal across the whole network made one entanglement look
-like many; (b) both panels *follow* the pair, because it straddles a periodic face
-and a wrapped centroid otherwise flips between box faces; (c) the matrix is a faint
-thin web and the pair a bold string of big beads, so it stays legible once the
-network melts. `movie_ent.in` starts from the pristine `03_Conformation` lattice,
-not `1.restart` (whose soft push has already loosened the 0.39 σ crossing).
+the full network with ONE entanglement highlighted and a box around it, and that
+box zoomed in. **Exactly three colours**: chain A gold, chain B violet (each
+*including its own side chains*, which read as gold/violet branches — not a fourth
+colour), everything else faint grey. Five things it gets right that the obvious
+version gets wrong:
+- **Only the two focus chains and their own grafts are coloured.** Colouring every
+  graft teal, or every entangled strand gold, made one entanglement look like many.
+- **Side chains inherit their parent chain's colour**, so a side group is visibly
+  part of chain A or B — three colours, and the grafts are still findable.
+- **Both panels *follow* the pair** (recentre its centroid to the box centre each
+  frame), because the tight crossing sits on a periodic face and a wrapped centroid
+  otherwise flips between box faces frame to frame.
+- **The zoom is adaptive.** The pair grows from ~2.5 σ (tight lattice crossing) to
+  ~8 σ (spread melt coil); a fixed crop would shrink the lattice to a dot or clip
+  the melt. The crop radius and camera zoom track the pair's own extent per frame,
+  so it fills the panel throughout — and the locator box on the full panel grows to
+  match. `project()` (a small perspective helper, camera read back after
+  `zoom_all`) places and sizes the box.
+- **A dense KG melt buries a single chain**, so the matrix is a faint thin web and
+  the pair a bold string of big beads, and the boomerang **holds** on the lattice
+  and the melt so the "before"/"after" register instead of blurring past.
+
+`movie_ent.in` starts from the pristine `03_Conformation` lattice, not `1.restart`
+(whose soft push has already loosened the 0.39 σ crossing to ~1 σ).
 
 **The animations are real MD trajectories, not morphs.** A LAMMPS `dump` writes
 positions but not bonds, so the movie loads the `03_Conformation` data file for
@@ -79,7 +95,7 @@ excluded volume).
 
 ## Provenance
 
-Everything is **generated fresh** — no `tests/output/` golden is used. The three
+Everything is **generated fresh** — no `tests/output/` golden is used. The five
 arc animations are run through LAMMPS locally (via the movie decks); the still
 panels are `03_Conformation` (lattice) state only.
 
@@ -88,7 +104,9 @@ panels are `03_Conformation` (lattice) state only.
 | CG arc (GIF) | `sculpt_250` — 5×5×5 SC sculpted 375 → 250 edges | yes (`movie_cg.in`) |
 | atomistic arc (GIF) | `atom_sculpt` — 3×3×3 PDMS sculpted 81 → 54 edges | yes (`movie_atom.in`) |
 | copolymer arc (GIF) + stills | `copoly_*` — 4×4×4 sculpted 192 → 128 edges | GIF yes (`movie_cg.in`); stills no |
-| entanglements (stills) | `entangled_grafted` — 5×5×5 sculpted to 250 edges, 12 entanglements + grafts | no |
+| graft arc (GIF) | `grafted` — 4×4×4 sculpted to 128 edges, 292 side chains DP 6 (~40% of beads) | yes (`movie_cg.in`) |
+| entanglement arc (GIF) | `entangled_grafted` — 5×5×5 sculpted to 250 edges, 12 entanglements + grafts | yes (`movie_ent.in`) |
+| entanglement stills | `entangled_grafted` (as above) | no |
 
 The earlier `v21_*` goldens are **not** used. The atomistic one is a perfect grid;
 the CG one is stale — its `03_Conformation` carries 200 bonds far past the median

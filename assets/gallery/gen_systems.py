@@ -70,6 +70,12 @@ CONFIGS = {
         "grafts": {"enabled": True, "per_edge_type": {
             "A": {"graft_density": 0.05, "side_chain_dp": 5,
                   "side_chain_monomer": "G"}}}}),
+    # Graft showcase: a smaller 4x4x4 sculpt (clearer than the 5x5x5) with DENSE
+    # side chains, so the grafts are the star of the animation. No entanglements.
+    "grafted": cg("4x4x4", 128, {
+        "grafts": {"enabled": True, "per_edge_type": {
+            "A": {"graft_density": 0.12, "side_chain_dp": 6,
+                  "side_chain_monomer": "G"}}}}),
     # Atomistic arc: 3x3x3 PDMS sculpted 81 -> 54. NOTE e:54, not e:128 -- a
     # 3x3x3 SC has only 81 edges, so a larger target never terminates.
     "atom_sculpt": {

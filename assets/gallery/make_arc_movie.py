@@ -58,11 +58,12 @@ CONFIG = {
     # size/palette is heavy; trim it here (the MP4 stays full quality).
     "atom":   dict(system="atom_sculpt",  paint="elements", metric="disp",
                    rad=0.34, bw=0.0, gif_size=420, gif_colors=80),
-    # Zoom into ONE entanglement as it relaxes: the two entangled chains in two
-    # distinct colours, all grafts teal, the rest of the network grey. The crop
-    # follows the pair's centroid every frame so it stays framed as it coils.
-    "ent":    dict(system="entangled_grafted", paint="ent", metric="disorder",
-                   rad=0.09, bw=0.09, zoom=True, keep=4.6),
+    # Grafts are the star: a dense-side-chain 4x4x4 sculpt, backbone blue, side
+    # chains teal, junctions dark. The whole network relaxes lattice -> melt.
+    "graft":  dict(system="grafted",      paint="graft",    metric="disorder",
+                   rad=0.11, bw=0.15),
+    # (The single-entanglement animation lives in the dedicated make_ent_movie.py,
+    #  which needs its two-panel + adaptive-zoom + locator machinery.)
 }
 
 RENDER = 660
@@ -152,6 +153,24 @@ def make_paint(cfg, ref, nodes, rad, pair=None):
             ma, mb = np.isin(ident, a_arr), np.isin(ident, b_arr)
             col[ma], col[mb] = ENT_GOLD, VIOLET
             r[ma | mb] = rad * 1.7                 # the two entangled strands
+            data.particles_.create_property("Color", data=col)
+            data.particles_.create_property("Radius", data=r)
+        return paint
+
+    if cfg["paint"] == "graft":
+        # Grafts are the star: backbone blue, side chains (type 3) teal so they
+        # pop, junctions dark. Graft beads a touch smaller than the backbone so
+        # the branches read as side chains, not a second backbone.
+        def paint(frame, data):
+            ident = np.array(data.particles["Particle Identifier"])
+            t = np.array(data.particles["Particle Type"])
+            n = data.particles.count
+            col = np.tile(np.array(B_BLUE), (n, 1))
+            r = np.full(n, rad)
+            mg = t == 3
+            col[mg], r[mg] = TEAL, rad * 0.85
+            isnode = np.isin(ident, node_arr)
+            col[isnode], r[isnode] = JUNCT, rad * 2.2
             data.particles_.create_property("Color", data=col)
             data.particles_.create_property("Radius", data=r)
         return paint
