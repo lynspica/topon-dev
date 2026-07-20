@@ -32,7 +32,8 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
-| **V41** | 2026-07-17 | Two-panel **entanglement animation** (`assets/gallery/anim/ent_arc.{gif,mp4}`, `make_ent_movie.py`) — one entanglement shown in the full network and zoomed in a box, both relaxing lattice → equilibrated. All arc animations slowed to ~0.66×. |
+| **V42** | 2026-07-17 | **README rewritten** around the algorithm and arc animations; "Sub-systems" dropped, protein path (topro) given its own section with MARTINI 3 + CHARMM36m worked examples. Six false claims caught and fixed pre-commit. |
+| **V41** | 2026-07-17 | **Entanglement + graft animations** — two-panel single-entanglement (`ent_arc`, `make_ent_movie.py`) and a graft showcase (`graft_arc`, new `grafted` system). All arc animations slowed to ~0.66×. |
 | **V40** | 2026-07-17 | `topology/generator_python.py` (+ `generator_python_diamond.py`) — fail fast on unreachable `degree_distribution` targets. An `e:N` above the lattice's edge count (e.g. `e:128` on an 81-edge 3×3×3 SC), or a per-degree target above the node count / max degree, now raises a clear `ValueError` instead of churning through doomed trials. 11 unit tests added. |
 | **V39** | 2026-07-17 | Arc **animations** for the gallery — real MD trajectories (lattice → minimised → equilibrated) as boomerang loops, one builder `make_arc_movie.py`. |
 | **V38** | 2026-07-16 | Showcase **gallery** (`assets/gallery/`, eleven panels on strict-sculpted heterogeneous networks) + README rewrite. |
@@ -61,22 +62,56 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V41)
+## 4. Changelog (V1 – V42)
 
 Notable changes are documented in reverse chronological order.
 
-### [V41] — 2026-07-17 — Two-panel entanglement animation + slower arcs
+### [V42] — 2026-07-17 — README rewritten around the animations
+
+#### Changed
+- **`README.md`** rewritten: plainer prose, led by the algorithm and arc
+  animations rather than a feature list. Dropped the "Sub-systems" section
+  (simbox, singlechain) — the protein path is presented as topro, in its own
+  section, with MARTINI 3 and CHARMM36m worked examples that take a sequence and
+  repeat count and produce a solvated, salted network.
+
+#### Fixed (claims an investigator pass caught in the first draft)
+- "POSS **junctions**" → POSS **chain caps**. `diagnostics/rules.py:37` records
+  POSS at degree ≥2 as known bug P1-H; the README was advertising the bug.
+- `--water-density 0.9` → `10`. The flag is beads/nm³ (`water.py:25`, bulk ≈ 10),
+  so 0.9 was ~9% of bulk — the command promised a solvated system and delivered a
+  nearly dry one.
+- "historically called topro" → topro is the *current* name (`topon topro` is a
+  live command, and ARCHITECTURE/AGENTS both use it).
+- The CHARMM example could not be copy-pasted: `--topology` is required and must
+  already exist. Now shown as two commands, with `--output`.
+- "gel point at 0.55" → 0.55 is where the *last* chain joins the cluster; the
+  giant component passes half the chains at ≈0.14. Both are now stated.
+- "about five times too short" scoped to CG (all-atom is 2.5×), and the "(BFM)"
+  initialism dropped — `bfm.py` is a 6-neighbour cubic lattice with one monomer
+  per site, not the Carmesin–Kremer bond-fluctuation model.
+- **`docs/USAGE.md`** — added the `gradient` caveat, which the README states and
+  USAGE previously contradicted.
+
+### [V41] — 2026-07-17 — Entanglement + graft animations, slower arcs
 
 #### Added
+- **`assets/gallery/anim/graft_arc.{gif,mp4}`** — a graft showcase arc: a new
+  `grafted` system (4×4×4 sculpted to 128 edges, 292 side chains of DP 6 ≈ 40% of
+  the beads, no entanglements), backbone blue, side chains teal, junctions dark,
+  relaxing lattice → melt. Added a `graft` paint mode + config to
+  `make_arc_movie.py` (which now covers cg / copoly / atom / graft; the
+  single-entanglement animation stays in its own `make_ent_movie.py`).
 - **`assets/gallery/anim/ent_arc.{gif,mp4}`** + `make_ent_movie.py`,
   `movie_ent.in` — a **single entanglement** shown two ways at once, both playing
   the lattice → minimised → equilibrated arc: LEFT the full sculpted network with
-  that one entanglement's two chains picked out (gold, violet) and its own side
-  chains teal, everything else faint grey, a locator box around it; RIGHT that
-  region zoomed in a box, the crop following the pair's centroid. `movie_ent.in`
-  reads the pristine `03_Conformation` lattice (not `1.restart`, whose soft push
-  has already loosened the 0.39 σ crossing to ~1.0 σ) so frame 0 is the tight
-  entanglement the stills show.
+  that one entanglement highlighted and a locator box around it; RIGHT that box
+  zoomed in. **Exactly three colours**: chain A gold, chain B violet — each
+  *including its own side chains* (gold/violet branches, not a fourth colour) —
+  everything else faint grey. The boomerang **holds** on the lattice and the melt
+  so the "before"/"after" register. `movie_ent.in` reads the pristine
+  `03_Conformation` lattice (not `1.restart`, whose soft push has already loosened
+  the 0.39 σ crossing to ~1.0 σ) so frame 0 is the tight entanglement.
 
 #### Changed
 - **All four arc GIFs/MP4s slowed to ~0.66× speed** (GIF 60 → 91 ms/frame, MP4
@@ -84,19 +119,26 @@ Notable changes are documented in reverse chronological order.
 - The README entanglement section leads with the animation; the two stills move
   below it as the as-built reference.
 
-#### Notes for the record
-- **Colouring the whole network's grafts teal made one entanglement look like
-  many.** The fix (`focus_grafts`) colours *only* the two focus chains and their
-  own ~15 side-chain beads; everything else — all other strands, all other grafts,
-  junctions — is one faint grey. That is what keeps it a *single* entanglement.
+#### Notes for the record — five things the obvious version gets wrong
+- **Colour discipline.** Colouring every graft teal, or every entangled strand
+  gold, made one entanglement read as many. Only the two focus chains and their
+  own grafts carry colour; side chains inherit the parent chain's colour so it
+  stays *three* colours and the side groups are still findable (`chain_grafts`
+  returns per-chain graft sets).
 - **The pair sits on a periodic face**, so a wrapped centroid flips between box
-  faces and a locator can't bracket the split pair. Both panels therefore *follow*
-  the pair (recentre its centroid to the box centre each frame); the locator is
-  then fixed at the projected box centre. A perspective `project()` helper
-  (camera read back after `zoom_all`) places it.
-- **A dense KG melt buries any single chain.** Thin bonds + small grey beads make
-  the matrix a faint web while the pair is a bold string of large gold/violet
-  beads, so the entanglement stays readable from lattice through melt.
+  faces frame to frame. Both panels *follow* the pair (recentre its centroid to
+  the box centre each frame); the locator's centre is then fixed.
+- **The zoom is adaptive.** The pair grows ~2.5 σ → ~8 σ from crossing to melt
+  coil, so a fixed crop shrinks the lattice to a dot or clips the melt. The crop
+  radius and camera FOV track the pair's own 88th-percentile extent per frame
+  (lightly smoothed), so it fills the panel throughout; the locator box on the
+  full panel grows to match (`project()` reads the camera back after `zoom_all`
+  and gives pixels-per-σ).
+- **A dense KG melt buries any single chain**, so the matrix is a faint thin web
+  and the pair a bold string of large beads.
+- **Holds at both ends** turn the arc from a blur into a legible before → morph →
+  after (identical hold frames coalesce under GIF optimisation, so they cost
+  duration, not bytes).
 
 ### [V40] — 2026-07-17 — Fail fast on unreachable topology targets
 

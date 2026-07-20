@@ -1022,6 +1022,10 @@ Or distribution mode (average per chain):
 ```
 
 `arrangement` ∈ `"block"` / `"alternating"` / `"random"` / `"gradient"`.
+> **`gradient` is broken:** it ignores the requested composition and emits a
+> hard 50:50 split (ask for A=0.1 and you still get A=0.50). For two monomers
+> at equal fractions and even DP it is byte-identical to `block`. See
+> [JOURNAL](JOURNAL.md).
 
 ### `chemistry`
 
