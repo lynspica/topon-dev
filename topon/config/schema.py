@@ -27,7 +27,33 @@ class GeneratorConfig(BaseModel):
     """C generator configuration."""
     exe_path: Optional[str] = Field(default=None, description="Path to generator executable")
     lattice_size: str = Field(default="6x6x6", description="Lattice dimensions (e.g., '6x6x6')")
-    lattice_type: Literal["SC", "BCC", "FCC"] = Field(default="SC", description="Lattice type")
+    lattice_type: Literal["SC", "BCC", "FCC", "MIX"] = Field(
+        default="SC",
+        description=(
+            "Lattice type. SC/BCC/FCC are the canonical single lattices. "
+            "MIX overlays their basis sites in one cubic cell using "
+            "`mix_fractions`."
+        ),
+    )
+    mix_fractions: dict[str, float] = Field(
+        default={"SC": 1.0, "BCC": 0.0, "FCC": 0.0},
+        description=(
+            "Sublattice fractions for lattice_type='MIX'. Must sum to 1. "
+            "Every cell carries the corner site all three lattices share; "
+            "BCC contributes its body-centre site with probability "
+            "mix_fractions['BCC'] and FCC each of its three face sites with "
+            "probability mix_fractions['FCC']. The SC entry is the remainder "
+            "(corner only) and so has no site of its own."
+        ),
+    )
+    mix_cutoff: float = Field(
+        default=1.0, gt=0,
+        description=(
+            "Neighbour cutoff for lattice_type='MIX', in cell units. The "
+            "default 1.0 is the simple-cubic nearest-neighbour distance, "
+            "which keeps the always-present corner sublattice connected."
+        ),
+    )
     periodicity: str = Field(default="111", description="Periodicity string (e.g., '111' for all periodic)")
     max_functionality: int = Field(default=6, ge=1, description="Maximum node functionality")
     max_trials: int = Field(default=1000000, ge=1, description="Maximum trials for generator")
@@ -36,6 +62,34 @@ class GeneratorConfig(BaseModel):
         default="0:0,1:0",
         description="Target degree distribution (e.g., '0:15,1:30,3:43')"
     )
+
+    @field_validator("mix_fractions")
+    @classmethod
+    def _check_mix_fractions(cls, v: dict[str, float]) -> dict[str, float]:
+        """Reject fraction sets that cannot describe a lattice.
+
+        Checked here rather than in the generator so a bad config fails at
+        load time, before a long generation run starts.
+        """
+        allowed = {"SC", "BCC", "FCC"}
+        unknown = set(v) - allowed
+        if unknown:
+            raise ValueError(
+                f"mix_fractions has unknown key(s) {sorted(unknown)}; "
+                f"allowed keys are {sorted(allowed)}"
+            )
+        negative = {k: x for k, x in v.items() if x < 0}
+        if negative:
+            raise ValueError(f"mix_fractions must be non-negative, got {negative}")
+        total = sum(v.values())
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(
+                f"mix_fractions must sum to 1, got {total:g} from {v}. "
+                f"The fractions partition the crosslinker population, so a "
+                f"sum below 1 would silently thin the lattice and a sum "
+                f"above 1 would over-fill it."
+            )
+        return v
 
 
 class ExistingFilesConfig(BaseModel):

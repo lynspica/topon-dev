@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
 | **V43** | 2026-08-05 | **Generators record their periodic cell.** `infer_dims_from_graph` used to estimate the box as `max - min + 1`, exact for SC but half a cell too large for BCC/FCC/Diamond, which sent 33% of BCC edges (23% of FCC) to the wrong periodic replica at twice their true bond length. Generators now set `G.graph["box"]`; `.nodes` files carry a `# BOX` header. SC output unchanged. 20 unit tests. |
 | **V42** | 2026-07-17 | **README rewritten** around the algorithm and arc animations; "Sub-systems" dropped, protein path (topro) given its own section with MARTINI 3 + CHARMM36m worked examples. Six false claims caught and fixed pre-commit. |
 | **V41** | 2026-07-17 | **Entanglement + graft animations** — two-panel single-entanglement (`ent_arc`, `make_ent_movie.py`) and a graft showcase (`graft_arc`, new `grafted` system). All arc animations slowed to ~0.66×. |
@@ -63,9 +64,63 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V43)
+## 4. Changelog (V1 – V44)
 
 Notable changes are documented in reverse chronological order.
+
+### [V44] — 2026-08-05 — Mixed SC/BCC/FCC lattices; C generator vendored
+
+#### Added
+- **`lattice_type: "MIX"`** in both generators. All three cubic lattices
+  share the cell corner and each adds sites on top of it, so `MIX` places
+  the corner in every cell, the BCC body centre with probability
+  `mix_fractions["BCC"]` and each of the three FCC face centres with
+  probability `mix_fractions["FCC"]`. The `"SC"` entry is the remainder and
+  places no site of its own, which is what makes the three a partition
+  summing to 1. Expected site count `Nx*Ny*Nz * (1 + f_bcc + 3*f_fcc)`
+  recovers N / 2N / 4N at the pure corners.
+- Edges join every pair within `mix_cutoff` (default 1.0 cell, the
+  simple-cubic nearest-neighbour distance) under the minimum image, since a
+  mixed point set has no single neighbour shell to enumerate.
+- **`topon/topology/csrc/`** — the C generator vendored from
+  `generator_serial_debug11.c` (md5 `83d7f9d3`, the copy present in five
+  archive locations including the most recent). It gained `MIX` and the
+  `# BOX` header from V43. The fractions ride inside the existing
+  `lattice_type` argument as `MIX:<sc>,<bcc>,<fcc>[,<cutoff>]`, so the
+  eight-positional-argument CLI every existing caller and SLURM script
+  writes is unchanged.
+- **40 tests**: `test_mixed_lattice.py` (26) and `test_c_generator.py` (14).
+  The C tests compile the source on the fly and skip without a compiler.
+
+#### Fixed
+- **`topon/topology/csrc/generator.c`** — `target_counts` was sized from a
+  per-lattice constant (`max(max_func, 12)`) but is indexed by node degree
+  in `run_single_trial`. The pure lattices top out at 12 so it exactly
+  fit, but a mixture reaches degree 20 and `mix_cutoff` is user-settable,
+  so no constant is safe. It is now sized from the maximum degree of the
+  graph actually built, which required moving the lattice construction
+  ahead of the argument parsing.
+- `srand` moved above the lattice build so `MIX` can draw its sites. A
+  no-op for SC/BCC/FCC, which consume no randomness while being built.
+- **Heap overflow in `create_mixed_lattice`.** The site scratch buffer was
+  sized at `4 * Ncells`, the FCC site count, but a cell can hold five
+  sites (corner + body + 3 faces). It looks safe on the mean and is not:
+  at `f_bcc=0.1, f_fcc=0.9` roughly 0.2% of 4x4x4 draws exceed `4*N`.
+  Now sized at `5 * Ncells`, with a repeated-draw regression test on that
+  exact mixture.
+
+#### Known, deliberate
+- `MIX` at `{"SC": 1}` reproduces `SC` exactly, down to node ids. It does
+  **not** at the other corners: the cutoff also admits the corner-corner
+  shell, giving 14 neighbours at `{"BCC": 1}` against canonical BCC's 8,
+  and 18 at `{"FCC": 1}` against FCC's 12. The site sets do match. Pinned
+  by `test_mix_bcc_corner_is_not_canonical_bcc`.
+- A body centre and a face centre can sit 0.5 cells apart, half the SC
+  spacing, so at fixed DP the bond length spreads by up to 2x.
+- Two pre-existing C/Python divergences are documented in
+  `topon/topology/csrc/README.md` and left alone: the C honours per-axis
+  periodicity while Python always wraps, and the sculpting degree-2 guard
+  is SC-gated in C but unconditional in Python.
 
 ### [V43] — 2026-08-05 — Generators record their periodic cell
 

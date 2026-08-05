@@ -59,6 +59,15 @@ Generates or loads a NetworkX `MultiGraph`. Nodes are network junctions; edges a
 - `source="generate"` — calls the C generator (`generator.exe`) via `topon.topology.generator.run_generator`, then loads `.nodes`/`.edges` files.
 - `source="load"` — reads existing `.gpickle` or `.nodes`+`.edges` files via `topon.topology.loader.load_graph`.
 
+Lattices: `SC`, `BCC`, `FCC` (fixed neighbour patterns), plus `MIX`, which
+overlays their basis sites in one cubic cell at configurable fractions and
+connects by distance cutoff. The C source lives in
+[`topon/topology/csrc/`](../topon/topology/csrc/) and is the optional fast
+path; the pure-Python generator is the default and needs no compiler. The
+two implement the same algorithm and must be changed together, which
+`tests/unit/topology/test_c_generator.py` checks. They agree on
+distributions, not on individual draws: the C one seeds from the clock.
+
 Produces: `self.graph` (annotated `MultiGraph`) and `self.dims` (box size as `np.ndarray`).
 
 **The periodic cell is recorded, not inferred.** Generators write the exact
@@ -162,7 +171,7 @@ Concise tour of every directory under `topon/`. Every module above the dashed li
 
 | Directory | Files / Subdirs | Role |
 |---|---|---|
-| `topology/` | 4 files + `network/`, `sequence/`, `simple/` (sub-dirs are stubs) | Graph generation and loading. Stage 1. |
+| `topology/` | 4 files + `csrc/` (C generator) + `network/`, `sequence/`, `simple/` (sub-dirs are stubs) | Graph generation and loading. Stage 1. |
 | `analysis/` | 2 files | Read-only graph statistics for the `topon analyze` CLI. **Not used by `Pipeline` stage 2** — that calls `AssignmentManager.analyze()`. |
 | `assignment/` | 8 files | Graph annotation: node/edge types, DP, defects, entanglements, copolymers. Stage 3. |
 | `chemistry/` | 4 files (`builder.py` is most of stage 4); `dreiding/`/`kg/`/`charmm/` are stubs | RDKit Mol construction with 3D coords. Stage 4. |

@@ -39,6 +39,14 @@ class PythonTopologyGenerator:
             getattr(config, 'lattice_source', 'SC'),
         )
         self.max_func = getattr(config, 'max_functionality', getattr(config, 'functionality', 4))
+
+        # Mixed-lattice knobs. Only read when lattice_type == "MIX"; the
+        # defaults reproduce a plain simple-cubic lattice.
+        self.mix_fractions = dict(
+            getattr(config, 'mix_fractions', None)
+            or {"SC": 1.0, "BCC": 0.0, "FCC": 0.0}
+        )
+        self.mix_cutoff = float(getattr(config, 'mix_cutoff', 1.0) or 1.0)
         
         # Parse degree distribution string
         self.target_counts = defaultdict(lambda: -2)  # -2 means not specified
@@ -61,7 +69,14 @@ class PythonTopologyGenerator:
 
     def _lattice_label(self):
         """Human-readable "<nx>x<ny>x<nz> <TYPE>" tag for error messages."""
-        return f"{self.dims[0]}x{self.dims[1]}x{self.dims[2]} {self.lattice_type}"
+        label = f"{self.dims[0]}x{self.dims[1]}x{self.dims[2]} {self.lattice_type}"
+        if self.lattice_type == "MIX":
+            frac = ",".join(
+                f"{k}:{self.mix_fractions.get(k, 0.0):g}"
+                for k in ("SC", "BCC", "FCC")
+            )
+            label += f" ({frac})"
+        return label
 
     def _validate_targets_reachable(self, base_graph):
         """Fail fast when the requested ``degree_distribution`` can never be met.
@@ -163,8 +178,13 @@ class PythonTopologyGenerator:
             return self._create_bcc_lattice(nx_val, ny_val, nz_val)
         elif lattice_type == "FCC":
             return self._create_fcc_lattice(nx_val, ny_val, nz_val)
+        elif lattice_type == "MIX":
+            return self._create_mixed_lattice(nx_val, ny_val, nz_val)
         else:
-            raise NotImplementedError(f"Lattice type {lattice_type} not supported. Use SC, BCC, or FCC.")
+            raise NotImplementedError(
+                f"Lattice type {lattice_type} not supported. "
+                f"Use SC, BCC, FCC, or MIX."
+            )
 
     def _create_sc_lattice(self, nx_val, ny_val, nz_val):
         """Simple Cubic: N nodes, 6 neighbors each (periodic BC)."""
@@ -311,6 +331,95 @@ class PythonTopologyGenerator:
                 vid = coord_map.get((nx_, ny_, nz_))
                 if vid is not None and uid < vid:
                     g.add_edge(uid, vid)
+
+        return g
+
+    def _create_mixed_lattice(self, nx_val, ny_val, nz_val):
+        """Overlay of SC / BCC / FCC basis sites in one cubic cell.
+
+        All three lattices share the cell corner, and each adds its own
+        sites on top of it: BCC one body centre, FCC three face centres.
+        So the corner is placed in every cell, the body centre with
+        probability ``mix_fractions["BCC"]`` and each face centre with
+        probability ``mix_fractions["FCC"]``. The ``"SC"`` fraction is the
+        remainder, contributing no site of its own, which is what makes
+        the three fractions a partition summing to 1.
+
+        Expected site count is ``Nx*Ny*Nz * (1 + f_bcc + 3*f_fcc)``, which
+        recovers the exact counts of the pure lattices: ``N`` for SC,
+        ``2N`` for BCC, ``4N`` for FCC.
+
+        Edges join every pair within ``mix_cutoff`` under the minimum
+        image, rather than the fixed offset patterns the pure builders
+        use, because on a mixed point set there is no single neighbour
+        shell. The 1.0 default is the simple-cubic nearest-neighbour
+        distance, which keeps the always-present corner sublattice
+        connected however few body and face sites are drawn.
+
+        Two consequences worth knowing:
+
+        * ``MIX`` at fractions ``(1, 0, 0)`` reproduces ``SC`` exactly,
+          same node ids, positions and edges. It is **not** true of the
+          other two corners: at ``(0, 1, 0)`` the cutoff also admits the
+          corner-corner shell at 1.0, so nodes carry 14 neighbours rather
+          than BCC's 8, and at ``(0, 0, 1)`` 18 rather than FCC's 12. Use
+          ``lattice_type`` SC / BCC / FCC when the canonical coordination
+          is what you want; ``MIX`` is for genuine mixtures.
+        * Body and face sites can land 0.5 cells apart, closer than any
+          pure lattice's nearest-neighbour distance (SC 1.0, BCC 0.866,
+          FCC 0.707). Since DP is assigned independently of edge length,
+          that widens the spread of bond lengths a strand of given DP is
+          built at.
+        """
+        import numpy as np
+
+        f_bcc = float(self.mix_fractions.get("BCC", 0.0))
+        f_fcc = float(self.mix_fractions.get("FCC", 0.0))
+
+        g = nx.Graph()
+        g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
+        g.graph["mix_fractions"] = dict(self.mix_fractions)
+
+        # Face-centre offsets, in the same XY / XZ / YZ order the pure FCC
+        # builder uses so a fraction of 1.0 gives the same site set.
+        face_offsets = ((0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5))
+
+        positions = []
+        # Cell order matches the SC builder (z outer, then y, then x) so
+        # that fractions (1, 0, 0) yields identical node ids.
+        for k in range(nz_val):
+            for j in range(ny_val):
+                for i in range(nx_val):
+                    positions.append((float(i), float(j), float(k)))
+                    if f_bcc > 0.0 and random.random() < f_bcc:
+                        positions.append((i + 0.5, j + 0.5, k + 0.5))
+                    if f_fcc > 0.0:
+                        for fx, fy, fz in face_offsets:
+                            if random.random() < f_fcc:
+                                positions.append((i + fx, j + fy, k + fz))
+
+        for idx, pos in enumerate(positions):
+            g.add_node(idx, pos=pos)
+
+        # Neighbour search under the minimum image. Blocked rather than
+        # one big (N, N, 3) array so a large lattice does not blow up
+        # memory; N stays in the low thousands for realistic cell counts.
+        pts = np.asarray(positions, dtype=float)
+        box = np.array([nx_val, ny_val, nz_val], dtype=float)
+        cutoff_sq = self.mix_cutoff ** 2
+        n = len(pts)
+        block = 512
+        for start in range(0, n, block):
+            chunk = pts[start:start + block]
+            delta = chunk[:, None, :] - pts[None, :, :]
+            delta -= box * np.round(delta / box)
+            dist_sq = (delta * delta).sum(axis=-1)
+            rows, cols = np.nonzero(
+                (dist_sq <= cutoff_sq + 1e-12) & (dist_sq > 1e-12)
+            )
+            for r, c in zip(rows + start, cols):
+                if r < c:
+                    g.add_edge(int(r), int(c))
 
         return g
 

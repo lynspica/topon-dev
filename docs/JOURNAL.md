@@ -14,6 +14,76 @@ Newest first.
 
 ---
 
+## 2026-08-05 — Mixed SC/BCC/FCC lattices, and the C generator moves into the repo
+
+**Change** `lattice_type: "MIX"` in
+[generator_python.py](../topon/topology/generator_python.py) and in the
+newly vendored [topon/topology/csrc/generator.c](../topon/topology/csrc/generator.c),
+with `mix_fractions` and `mix_cutoff` on `GeneratorConfig`. 40 tests across
+`tests/unit/topology/test_mixed_lattice.py` and `test_c_generator.py`.
+
+**Why** A single lattice offers one edge-length shell, so every strand is
+born at the same junction separation. Overlaying sublattices adds shells
+and smooths the distribution of strand end-to-end distances. Measured on
+4x4x4: SC alone gives one distance (1.0), a 0.2/0.4/0.4 mixture gives four
+(0.5, 0.707, 0.866, 1.0).
+
+**Issue / solution** Three things worth recording.
+
+*Defining the fractions.* The clean formulation turned out to be that all
+three lattices share the cell corner and each adds sites on top of it, so
+the corner goes in every cell, the body centre with probability `f_bcc`,
+each face centre with probability `f_fcc`, and the SC fraction is the
+remainder placing no site of its own. That makes the three a genuine
+partition and recovers N / 2N / 4N sites at the pure corners. Note the
+reference `build_and_check.py` in the network-lattice-realism skill does
+something different: it density-normalises each sublattice and then
+rescales to a common box, which does not preserve the intended crosslink
+density (a 0.2/0.4/0.4 mix there lands at 2.65 points per unit volume
+rather than 1). That formulation was deliberately not copied.
+
+*The pure corners do not all round-trip.* `MIX` connects by distance
+cutoff, so `{"SC": 1}` reproduces `SC` exactly but `{"BCC": 1}` gives 14
+neighbours where canonical BCC has 8, because the 1.0 cutoff also admits
+the corner-corner shell. No single cutoff can reproduce all three (SC
+needs > 1.0, BCC and FCC need < 1.0). Rather than hide a dispatch to the
+dedicated builders and create an invisible discontinuity, `MIX` is one
+uniform rule and the mismatch is pinned by a test.
+
+*Two memory-safety bugs in the C, both from sizing a buffer off a
+plausible-looking constant.* `target_counts` was sized from
+`max(max_func, 12)` but is indexed by node degree inside
+`run_single_trial`. The pure lattices top out at exactly 12 so it fit by
+luck; a mixture reaches 20, and `mix_cutoff` is user-settable so no
+constant is safe. It read out of bounds and every sculpting trial failed.
+Fixed by sizing the array from the maximum degree of the graph actually
+built, which meant moving the lattice construction ahead of the argument
+parsing in `main`.
+
+The second was mine and nearly shipped. `create_mixed_lattice` sized its
+site buffer at `4 * Ncells`, reasoning from FCC's four sites per cell. But
+a cell can hold five (corner + body + 3 faces), and although the *mean*
+stays well under 4 for any valid fraction set, the tail does not: a
+Monte-Carlo check put `f_bcc=0.1, f_fcc=0.9` over `4*N` in 39 of 20000
+draws. Every test passed, because none of them used a mixture that dense.
+Found by re-reading the allocation rather than by a failure, which is the
+argument for sizing buffers off the worst case instead of the expected
+one. Now `5 * Ncells`, with a repeated-draw test on that mixture.
+
+Also found while testing: the C generator fails to sculpt a 4x4x4 SC at
+`max_func=4` where the Python one succeeds. Verified against a pristine
+archive copy, so it predates the vendoring and was left alone.
+
+**Follow-up** The C and Python sculptors still diverge on periodicity (C
+honours `p_dims`, Python always wraps) and on the degree-2 guard
+(SC-gated in C, unconditional in Python). Both are documented in
+`topon/topology/csrc/README.md`. Per the realism analysis the SC/BCC/FCC
+split is a weak, ill-conditioned knob; site jitter and a Gaussian-weighted
+edge rule are what actually move strand statistics, and neither is
+implemented.
+
+---
+
 ## 2026-08-05 — Generators record their periodic cell; BCC/FCC/Diamond boxes were half a cell too large
 
 **Change** The periodic cell is now recorded by the producer and read by

@@ -902,7 +902,9 @@ Top-level sections:
 |---|---|---|---|
 | `exe_path` | string \| null | `null` | Path to `generator.exe`; `null` → use Python generator |
 | `lattice_size` | string | `"6x6x6"` | Lattice dimensions, e.g. `"8x8x8"` |
-| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` | `"SC"` | Lattice type |
+| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` \| `"MIX"` | `"SC"` | Lattice type; `MIX` overlays the three (see below) |
+| `mix_fractions` | object | `{"SC":1,"BCC":0,"FCC":0}` | Sublattice fractions for `MIX`; must sum to 1 |
+| `mix_cutoff` | float | `1.0` | Neighbour cutoff for `MIX`, in cell units |
 | `periodicity` | string | `"111"` | Periodicity per axis (`1`=periodic, `0`=open) |
 | `max_functionality` | int | `6` | Maximum crosslink degree per node |
 | `max_trials` | int | `1000000` | Trials before giving up |
@@ -910,6 +912,52 @@ Top-level sections:
 | `degree_distribution` | string | `"0:0,1:0"` | Target degree distribution |
 
 Degree distribution format: `"d:N"` requires N nodes of degree d; `"e:N"` requires N edges total; omitted degrees are unconstrained. Example: `"0:15,1:30,e:371"`.
+
+##### Mixed lattices (`lattice_type: "MIX"`)
+
+All three cubic lattices share the cell corner and each adds sites on top
+of it: BCC one body centre, FCC three face centres. `MIX` puts the corner
+in every cell, the body centre with probability `mix_fractions.BCC`, and
+each face centre with probability `mix_fractions.FCC`. The `SC` entry is
+the remainder and places no site of its own, which is what makes the
+three a partition summing to 1. Expected site count is
+`Nx*Ny*Nz * (1 + f_bcc + 3*f_fcc)`.
+
+```json
+"generator": {
+  "lattice_size": "6x6x6",
+  "lattice_type": "MIX",
+  "mix_fractions": {"SC": 0.2, "BCC": 0.4, "FCC": 0.4},
+  "max_functionality": 4
+}
+```
+
+The point of mixing is more neighbour distances. A pure SC lattice offers
+a single edge length; the mixture above offers four (0.5, 0.707, 0.866,
+1.0 cell units), which smooths the distribution of strand end-to-end
+distances. Three things to know before using it:
+
+- **`MIX` at `{"SC": 1}` reproduces `SC` exactly**, down to node ids. That
+  is *not* true at the other two corners. `MIX` connects by distance
+  cutoff rather than by a fixed neighbour pattern, so at `{"BCC": 1}` the
+  1.0 cutoff also admits the corner-corner shell and every node carries 14
+  neighbours instead of BCC's 8 (18 instead of 12 at `{"FCC": 1}`). Use
+  `lattice_type: "BCC"` or `"FCC"` when you want the canonical
+  coordination.
+- **Bond lengths spread.** A body centre and a face centre can land 0.5
+  cells apart, half the SC spacing. DP is assigned independently of edge
+  length, so strands of the same DP get built at bond lengths differing by
+  up to 2x. Watch for FENE strain on the long edges.
+- **The split is a coarse dial.** Per the strand-realism analysis the
+  SC/BCC/FCC percentages are a weak, ill-conditioned knob: many splits fit
+  a given target comparably well. Site jitter and a Gaussian-weighted edge
+  rule move the strand statistics much more. Treat the fractions as
+  SC-heavy for short strands shifting toward BCC/FCC as strand length
+  grows, and verify by measurement rather than by tuning percentages.
+
+Lowering `mix_cutoff` below 1.0 drops the corner-corner shell, which
+disconnects the always-present corner sublattice from itself. 1.0 is the
+default for that reason.
 
 #### `topology.existing_files`
 
