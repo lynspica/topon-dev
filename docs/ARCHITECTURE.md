@@ -61,6 +61,20 @@ Generates or loads a NetworkX `MultiGraph`. Nodes are network junctions; edges a
 
 Produces: `self.graph` (annotated `MultiGraph`) and `self.dims` (box size as `np.ndarray`).
 
+**The periodic cell is recorded, not inferred.** Generators write the exact
+repeat distance into `G.graph["box"]`, and `.nodes` files carry it in a
+`# BOX Lx Ly Lz` header. `infer_dims_from_graph` returns that value when it
+is present and only falls back to estimating the cell from the coordinate
+extent (`max - min + 1`) for graphs written before this existed. The estimate
+is exact for SC, whose sites are integer-spaced, but overshoots any lattice
+with fractional basis sites: BCC and FCC body/face sites sit at +0.5 and
+Diamond sites at quarter-cell offsets, so a 4x4x4 BCC or FCC reported 4.5.
+Because `self.dims` is the box every minimum-image calculation uses, that
+overshoot violated the `bond < box/2` invariant in Design Principle 3 and
+sent roughly a third of BCC edges (a quarter of FCC) to the wrong periodic
+replica, where they were built at twice their true bond length. Any new
+lattice with non-integer sites must record its cell for the same reason.
+
 ### Stage 2 — Analysis
 **Module:** `topon/assignment/manager.py:analyze` &nbsp;**Code:** `pipeline.py:146-154`
 
@@ -117,6 +131,17 @@ Conformation defaults (`pipeline.py:47`):
 ```
 
 Output: `<output_dir>/03_Conformation/system_relaxed.data`.
+
+**The simulation box comes from stage 1, not from the coordinates.** Callers
+pass `lattice_box=dims` into `apply_displacements`, giving a box of
+`dims * scale`; only when it is omitted does the manager fall back to
+estimating `(max node coord + 1) * scale` from the `.displace` files. This
+has to match the cell stage 4 used to route chains across the periodic
+boundary. When the two disagree, a chain that wraps under one period lands
+in a box of another and its closing bond is left stretched across the
+system. The two estimates happen to coincide for SC, which is why the
+fallback survived so long, and passing the box also makes the written box
+exactly `volume^(1/3)`, so the target density is hit on every lattice.
 
 ### Stage 6 — Output
 **Module:** `topon/writers/` (`LammpsInputGenerator`) &nbsp;**Code:** `pipeline.py:277-300`

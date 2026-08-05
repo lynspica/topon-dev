@@ -23,10 +23,29 @@ class ConformationManager:
         elif n == 5: return [2, 3, 4]
         else: return [4, 5, 6]
 
-    def apply_displacements(self, base_filename="system.data"):
+    def apply_displacements(self, base_filename="system.data", lattice_box=None):
         """
-        Applies displacements, calculates the IDEAL lattice box, 
+        Applies displacements, calculates the IDEAL lattice box,
         and wraps all coordinates into it.
+
+        Args:
+            base_filename: Data file in 02_Chemistry to displace.
+            lattice_box: True periodic cell in lattice units as
+                ``(Lx, Ly, Lz)``. The simulation box is then
+                ``lattice_box * scale``. When omitted the box falls back
+                to ``(max node coord + 1) * scale``.
+
+        The fallback is exact only when lattice sites are integer-spaced
+        with unit separation, i.e. SC, where the maximum coordinate is
+        ``N-1``. Lattices with fractional basis sites stop short of the
+        cell edge (BCC/FCC body and face sites at +0.5, Diamond at
+        quarter cells), so the fallback overshoots by that offset and a
+        4x4x4 BCC yields 4.5 instead of 4.0.
+
+        Passing the box matters because stage 4 routes chains across the
+        periodic boundary using the graph's cell. If the box written here
+        disagrees, a chain that wraps under one period lands in a box of
+        another and its closing bond is left stretched across the system.
         """
         base_path = os.path.join(self.chem_dir, base_filename)
         print(f"Applying displacements to {base_filename}...")
@@ -103,12 +122,22 @@ class ConformationManager:
                                 lattice_max[dim] = max(lattice_max[dim], val)
 
         # --- CALCULATE IDEAL BOX ---
-        # Box Size = (MaxNodeCoord + 1.0) * Scale
-        # This recovers the 'dims' from the Builder
-        box_x = (lattice_max['x'] + 1.0) * scales['x']
-        box_y = (lattice_max['y'] + 1.0) * scales['y']
-        box_z = (lattice_max['z'] + 1.0) * scales['z']
-        
+        # Preferred: the true periodic cell handed down from the topology
+        # stage. Fallback: (MaxNodeCoord + 1.0), which recovers the cell
+        # only for integer-spaced lattices -- see the docstring.
+        if lattice_box is not None:
+            cell = {axis: float(v) for axis, v in zip("xyz", lattice_box)}
+            box_source = "from topology"
+        else:
+            cell = {axis: lattice_max[axis] + 1.0 for axis in "xyz"}
+            box_source = "estimated from node extents"
+
+        box_x = cell['x'] * scales['x']
+        box_y = cell['y'] * scales['y']
+        box_z = cell['z'] * scales['z']
+
+        print(f"  - Periodic cell (Graph Units): "
+              f"[{cell['x']:.2f}, {cell['y']:.2f}, {cell['z']:.2f}] ({box_source})")
         print(f"  - Detected Lattice Extents (Graph Units): [{lattice_max['x']:.1f}, {lattice_max['y']:.1f}, {lattice_max['z']:.1f}]")
         print(f"  - Set Simulation Box: [{0.0:.2f}, {box_x:.2f}] x [{0.0:.2f}, {box_y:.2f}] x [{0.0:.2f}, {box_z:.2f}]")
 

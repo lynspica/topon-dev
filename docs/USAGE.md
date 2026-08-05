@@ -921,6 +921,30 @@ Provide either `gpickle_file` OR both `nodes_file` + `edges_file`.
 | `edges_file` | string \| null | `null` | Path to `.edges` file |
 | `gpickle_file` | string \| null | `null` | Path to NetworkX `.gpickle` file |
 
+##### `.nodes` file format
+
+Whitespace-separated `NodeID X Y Z Degree`, with `#` starting a comment.
+An optional `# BOX Lx Ly Lz` header records the periodic cell in lattice
+units:
+
+```
+# BOX 6 6 6
+# NodeID X Y Z Degree
+0 0.000000 0.000000 0.000000 3
+1 1.000000 0.000000 0.000000 3
+```
+
+The header is optional and files without it load exactly as before, but
+**write it for any lattice whose sites are not integer-spaced.** Without
+it topon estimates the cell as `max - min + 1` over the coordinates,
+which is exact for SC but overshoots BCC, FCC and Diamond because their
+basis sites sit at fractional offsets and never reach the cell edge. A
+4x4x4 BCC or FCC is estimated at 4.5, and since that value drives every
+minimum-image calculation, about a third of BCC edges (a quarter of FCC)
+get built at twice their true bond length. Anything topon generates
+records the header for you; the caveat applies to hand-written or
+externally-produced files.
+
 ### `assignment`
 
 Controls how graph attributes (types, DP, defects, entanglements, grafts, copolymers) are written before chemistry is built.

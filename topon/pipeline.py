@@ -703,7 +703,12 @@ class Pipeline:
             str(self.config.study.output_dir),
             self.config.study.name,
         )
-        conformed, roles = cm.apply_displacements("system.data")
+        # Hand down the same cell stage 4 routed the chains with, so a
+        # chain that wraps the boundary lands in a box of the same period.
+        conformed, roles = cm.apply_displacements(
+            "system.data",
+            lattice_box=None if self.dims is None else tuple(self.dims),
+        )
         noisy = cm.apply_noise(conformed, magnitude=conf_params["noise_magnitude"])
         cm.resolve_overlaps(
             noisy,

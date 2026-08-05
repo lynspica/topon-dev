@@ -104,8 +104,14 @@ def create_diamond_lattice(Nx: int, Ny: int, Nz: int) -> nx.Graph:
     (so the box spans ``[0, Nx] x [0, Ny] x [0, Nz]``).
 
     Every node has exactly 4 neighbors → ``avg_degree = 4.0``.
+
+    The periodic cell (Nx, Ny, Nz) is recorded on the graph. Diamond
+    basis sites sit at quarter-cell offsets, so the coordinates only
+    reach Nx-0.25 and estimating the box from their extent would
+    overshoot it.
     """
     g = nx.Graph()
+    g.graph["box"] = (float(Nx), float(Ny), float(Nz))
 
     # 8 atoms per conventional unit cell, in (low-res, low-res, low-res)
     # × 4 -> integer high-res coords. The 8 positions are the 4 FCC sites

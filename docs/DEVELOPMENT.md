@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V43** | 2026-08-05 | **Generators record their periodic cell.** `infer_dims_from_graph` used to estimate the box as `max - min + 1`, exact for SC but half a cell too large for BCC/FCC/Diamond, which sent 33% of BCC edges (23% of FCC) to the wrong periodic replica at twice their true bond length. Generators now set `G.graph["box"]`; `.nodes` files carry a `# BOX` header. SC output unchanged. 20 unit tests. |
 | **V42** | 2026-07-17 | **README rewritten** around the algorithm and arc animations; "Sub-systems" dropped, protein path (topro) given its own section with MARTINI 3 + CHARMM36m worked examples. Six false claims caught and fixed pre-commit. |
 | **V41** | 2026-07-17 | **Entanglement + graft animations** — two-panel single-entanglement (`ent_arc`, `make_ent_movie.py`) and a graft showcase (`graft_arc`, new `grafted` system). All arc animations slowed to ~0.66×. |
 | **V40** | 2026-07-17 | `topology/generator_python.py` (+ `generator_python_diamond.py`) — fail fast on unreachable `degree_distribution` targets. An `e:N` above the lattice's edge count (e.g. `e:128` on an 81-edge 3×3×3 SC), or a per-degree target above the node count / max degree, now raises a clear `ValueError` instead of churning through doomed trials. 11 unit tests added. |
@@ -62,9 +63,68 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V42)
+## 4. Changelog (V1 – V43)
 
 Notable changes are documented in reverse chronological order.
+
+### [V43] — 2026-08-05 — Generators record their periodic cell
+
+#### Fixed
+- **`topon/topology/loader.py`** — `infer_dims_from_graph` now returns the
+  cell recorded by the generator in `G.graph["box"]`, falling back to the
+  old `max - min + 1` estimate only when no box is present. The estimate is
+  exact for SC, whose sites are integer-spaced with unit separation, but
+  overshoots every lattice with fractional basis sites: BCC and FCC body and
+  face sites sit at +0.5, Diamond sites at quarter cells, so the coordinates
+  stop short of the cell edge and a 4x4x4 BCC or FCC was reported as 4.5.
+- Because that value is the box for every minimum-image calculation in the
+  pipeline, the overshoot broke the `bond < box/2` invariant of Design
+  Principle 3 and pushed edges onto the wrong periodic replica. Measured on
+  4x4x4: **169 of 512 BCC edges (33%) and 360 of 1536 FCC edges (23%)** were
+  built at exactly twice their true bond length (BCC 1.732 vs 0.866, FCC
+  1.414 vs 0.707). Diamond was affected identically.
+- A box recorded on the graph now also overrides a `dims` stored alongside
+  an older gpickle, which may have come from the estimate.
+- **`topon/conformation/manager.py`** — the box was estimated in a *second*,
+  independent place: stage 5 re-derived it from the `.displace` files as
+  `(max node coord + 1) * scale`. `apply_displacements` gained a
+  `lattice_box` argument, and `pipeline.py` plus both workflows now pass the
+  same `dims` stage 4 routed the chains with. Fixing only the topology side
+  left the two disagreeing (routing on period 4.0, box written at 4.5) and
+  produced **63 bonds up to 14.5 Å** where the unfixed code had none over
+  1.85 Å. As a side effect the box is now `dims * scale = volume^(1/3)`
+  whatever `dims` holds, so the target density is hit exactly on every
+  lattice instead of only on SC.
+
+#### Added
+- **`topon/topology/generator_python.py`**, **`generator_python_diamond.py`** —
+  SC, BCC, FCC and Diamond builders set `G.graph["box"]` to the true lattice
+  repeat. The attribute survives `Graph.copy()` (sculpting), the
+  `nx.MultiGraph` conversion, vacancy removal and pickling.
+- **`.nodes` files** gained an optional `# BOX Lx Ly Lz` header, with
+  `read_box_header` / `format_box_header` to parse and render it and a
+  `save_nodes_edges` writer that emits it. Files without the header load
+  exactly as before.
+- **`tests/unit/topology/test_lattice_box.py`** — 20 tests covering the
+  recorded cell per lattice, uniform nearest-neighbour edge lengths,
+  survival through the pipeline transforms, `.nodes` round-trip, malformed
+  and absent headers, and the gpickle precedence rule. One test pins the
+  old fallback behaviour so a future change to it is visible rather than
+  silent.
+- **`tests/workflows/verify_lattice_box.py`** — end-to-end script that
+  audits all four lattices, then runs the same BCC network through the
+  pipeline twice (with and without the header) and LAMMPS stage-1 minimize.
+
+#### Compatibility
+SC output is unchanged by construction, since both estimates were already
+exact there: on the frozen 5x5x5 sample graph the old `max + 1` and the new
+`dims` are both 5.0. Verified by running `pytest tests/regression/` with the
+change stashed and again with it applied: the per-test status diff is empty
+(43 passed, 8 failed, 14 skipped, 3 errors in both, the failures
+pre-existing). The two reference-generating scripts under `tests/workflows/`
+were left passing no `lattice_box` on purpose, since they regenerate SC
+references where the fallback is exact. The C generator does not yet emit
+the header, so its `.nodes` output still uses the fallback for BCC/FCC.
 
 ### [V42] — 2026-07-17 — README rewritten around the animations
 

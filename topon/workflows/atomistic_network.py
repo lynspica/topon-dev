@@ -381,7 +381,12 @@ def run(
     print("[Stage 3] Conformation embedding...")
 
     cm = ConformationManager(str(output_dir), study_name)
-    conformed, roles = cm.apply_displacements("system.data")
+    # Same cell stage 2 routed the chains with, so boundary-wrapping
+    # chains land in a box of the same period.
+    conformed, roles = cm.apply_displacements(
+        "system.data",
+        lattice_box=None if dims is None else tuple(dims),
+    )
     cm.resolve_overlaps(
         conformed, roles,
         cutoff=config["conformation"]["overlap_cutoff"],

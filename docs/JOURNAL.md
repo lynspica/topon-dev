@@ -14,6 +14,95 @@ Newest first.
 
 ---
 
+## 2026-08-05 — Generators record their periodic cell; BCC/FCC/Diamond boxes were half a cell too large
+
+**Change** The periodic cell is now recorded by the producer and read by
+every consumer, instead of being estimated twice from coordinates.
+
+[topon/topology/generator_python.py](../topon/topology/generator_python.py)
+(SC/BCC/FCC) and [topon/topology/generator_python_diamond.py](../topon/topology/generator_python_diamond.py)
+write the exact lattice repeat into `G.graph["box"]`.
+[topon/topology/loader.py](../topon/topology/loader.py):
+`infer_dims_from_graph` returns that value when present and keeps the old
+`max - min + 1` estimate only as a fallback; `.nodes` files gained an
+optional `# BOX Lx Ly Lz` header with `read_box_header` / `format_box_header`
+to parse and render it and a `save_nodes_edges` writer that emits it; a
+recorded box now also overrides a stale `dims` stored alongside a gpickle.
+
+[topon/conformation/manager.py](../topon/conformation/manager.py):
+`apply_displacements` gained a `lattice_box` argument. Passing it makes the
+simulation box `lattice_box * scale`; omitting it keeps the old
+`(max node coord + 1) * scale`. [pipeline.py](../topon/pipeline.py) and both
+workflows ([cg_network.py](../topon/workflows/cg_network.py),
+[atomistic_network.py](../topon/workflows/atomistic_network.py)) now pass the
+same `dims` that stage 4 routed the chains with.
+
+20 unit tests in `tests/unit/topology/test_lattice_box.py`, plus an
+end-to-end script at `tests/workflows/verify_lattice_box.py`.
+
+**Why** The box is the single value every minimum-image calculation in the
+pipeline depends on (`pipeline.py`, `chemistry/builder.py`,
+`assignment/entanglements.py`), and it was being guessed from the coordinate
+extent. That guess is exact for SC, whose sites are integer-spaced, but
+every other lattice puts basis sites at fractional offsets that stop short
+of the cell edge: BCC/FCC body and face sites at +0.5, Diamond at quarter
+cells. A 4x4x4 BCC or FCC was therefore reported as 4.5.
+
+**Issue / solution** The overshoot was not cosmetic. It broke the
+`bond < box/2` invariant that Design Principle 3 in
+[ARCHITECTURE.md](ARCHITECTURE.md) relies on, so edges started resolving to
+the wrong periodic replica: measured on 4x4x4, **169 of 512 BCC edges (33%),
+360 of 1536 FCC edges (23%) and 180 of 1024 Diamond edges** came out at
+exactly twice their true bond length (BCC 1.732 instead of 0.866, FCC 1.414
+instead of 0.707). Since the fallback is exactly right for SC, the bug was
+invisible on the lattice all the frozen reference outputs were built on.
+
+**The box was estimated in two independent places, and fixing one alone made
+things worse.** Stage 5 re-derived it from the `.displace` files as
+`(max node coord + 1) * scale`, entirely separate from the graph's `dims`.
+The two agreed before only by coincidence. Correcting the topology side
+first left stage 4 routing chains on a period of 4.0 while stage 5 wrote a
+box of period 4.5, so a chain crossing the boundary wrapped to the wrong
+place and its closing bond was left spanning the system: **63 bonds up to
+14.5 Å** where the unfixed code had none over 1.85 Å. Only the end-to-end
+run caught this; every unit test still passed. Threading the same `dims`
+into `apply_displacements` fixed it and, as a side effect, made the box
+`dims * scale = volume^(1/3)` whatever `dims` holds, so the target density
+is now hit exactly on every lattice rather than only on SC.
+
+Final end-to-end on a sculpted BCC 4x4x4 (128 nodes, 206 edges, DP 10,
+atomistic): worst bond drops from 1.623 Å to 1.054 Å against a ~0.47 Å mean,
+no bond over 3 Å either way, LAMMPS stage-1 minimize completes in both. So
+the practical symptom of the original bug was locally over-stretched strands
+and quenched pre-stress on a third of BCC edges, not an outright LAMMPS
+failure, which is why it survived unnoticed.
+
+Verified no behaviour change by running `pytest tests/regression/` with the
+working changes stashed and again with them applied, then diffing the
+per-test status: identical. SC is byte-identical by construction, which
+`test_sc_is_unaffected_by_the_change` pins; on the frozen 5x5x5 sample graph
+the old `max + 1` and the new `dims` are both exactly 5.0. `.nodes` files
+without the header still load through the old path, which is what the frozen
+regression inputs are. The two reference-generating scripts under
+`tests/workflows/` were deliberately left passing no `lattice_box`, since
+they regenerate SC references where the fallback is exact.
+
+Note the reference outputs under `tests/output/` are gitignored, so a fresh
+worktree has to copy them from the main checkout before the regression suite
+means anything; without them most tests fail on missing files rather than on
+content.
+
+**Follow-up** The C generator does not yet emit the header, so its `.nodes`
+output still falls back to the estimate for BCC/FCC. That lands when the C
+source is vendored into the repo. Three pre-existing issues found while
+mapping this and deliberately left alone: `pipeline.py` calls `min(dims)`
+"lattice_spacing" when it holds a box length, `network_helpers.py` does the
+same with `mean(dims)`, and the npz reload path
+(`loader._sc_positions_from_ids`) hard-codes an SC nearest-neighbour check
+so non-SC graphs cannot round-trip through npz.
+
+---
+
 ## 2026-07-17 — Entanglement kink: `KinkParams` and `entanglement_count` now reach the geometry
 
 **Change** [topon/pipeline.py](../topon/pipeline.py) (CG stage 4 and the atomistic

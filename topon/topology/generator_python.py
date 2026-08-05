@@ -169,6 +169,7 @@ class PythonTopologyGenerator:
     def _create_sc_lattice(self, nx_val, ny_val, nz_val):
         """Simple Cubic: N nodes, 6 neighbors each (periodic BC)."""
         g = nx.Graph()
+        g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
 
         total_nodes = nx_val * ny_val * nz_val
         for i in range(total_nodes):
@@ -204,8 +205,15 @@ class PythonTopologyGenerator:
         - Corner atoms at (i, j, k), high-res coords (2i, 2j, 2k)
         - Body atoms at (i+0.5, j+0.5, k+0.5), high-res coords (2i+1, 2j+1, 2k+1)
         - Neighbors via all 8 (±1, ±1, ±1) offsets in high-res space
+
+        The periodic cell is (nx, ny, nz), not the extent of the site
+        coordinates: body-centre sites sit at +0.5, so the coordinates
+        only reach nx-0.5 and a max-min+1 estimate would overshoot by
+        half a cell. Recording the cell explicitly keeps every downstream
+        minimum-image calculation on the right periodic replica.
         """
         g = nx.Graph()
+        g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
 
         hr_nx = 2 * nx_val
         hr_ny = 2 * ny_val
@@ -253,8 +261,13 @@ class PythonTopologyGenerator:
         - Face-XZ at (2i+1, 2j, 2k+1)
         - Face-YZ at (2i, 2j+1, 2k+1)
         - Neighbors via 12 face-diagonal offsets: XY(±1,±1,0), XZ(±1,0,±1), YZ(0,±1,±1)
+
+        As for BCC, the periodic cell is (nx, ny, nz) while the face-site
+        coordinates only reach nx-0.5, so the cell is recorded rather than
+        inferred from the coordinate extent.
         """
         g = nx.Graph()
+        g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
 
         hr_nx = 2 * nx_val
         hr_ny = 2 * ny_val
