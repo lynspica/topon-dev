@@ -1,16 +1,23 @@
-"""Parity tests between the vendored C generator and the Python one.
+"""Shared-surface tests for the vendored C generator.
 
-``topon/topology/csrc/generator.c`` and
-``topon/topology/generator_python.py`` implement the same algorithm. The
-Python one is the pipeline default; the C one is opt-in via
-``generator.exe_path`` and used for large runs on HPC. They have to agree
-on what they build and on the file format they emit, or a study that
-switches paths silently changes meaning.
+``topon/topology/csrc/generator.c`` is the standalone searcher for long
+runs; ``topon/topology/generator_python.py`` is the quick in-process path
+and the pipeline default. They are independent programs, not a library
+and a wrapper. What they share, and what these tests police, is the
+lattice construction and the ``.nodes`` / ``.edges`` format: a study that
+switches between them must get the same kind of network out.
 
 The C generator seeds with ``srand(time(NULL))`` and draws from
 ``rand()``, so it cannot reproduce a given Python draw. These tests
-therefore check the things that must match regardless of the stream:
-lattice site counts, edge counts, coordinates, and the ``.nodes`` header.
+therefore check what must match regardless of the stream: lattice site
+counts, edge counts, coordinates, the ``# BOX`` header, and that the C
+can sculpt the configurations Python can.
+
+That last one is load-bearing. The archive holds several near-identical
+``generator_serial_debug11.c`` files, and the newest by timestamp is an
+experimental variant that sculpts almost nothing. Picking a source by
+date alone is not safe, so
+``test_c_sculpts_the_configs_python_sculpts`` fails on it.
 
 Every test compiles the C source on the fly and skips when no compiler is
 available, so the suite still runs on machines without one.
@@ -184,6 +191,45 @@ def test_c_mixture_site_count_follows_the_same_formula(generator_exe, tmp_path):
         counts.append(G.number_of_nodes())
 
     assert abs(np.mean(counts) - expected) / expected < 0.10
+
+
+@pytest.mark.parametrize(
+    "dims,max_func,degree_dist",
+    [
+        ("4x4x4", 4, "0:0,1:0"),
+        ("4x4x4", 6, "0:0,1:0"),
+        ("5x5x5", 4, "0:0,1:0"),
+        ("5x5x5", 3, "0:0,1:0"),
+        ("4x4x4", 4, "0:2,1:0"),
+        ("5x5x5", 4, "e:200"),
+    ],
+)
+def test_c_sculpts_the_configs_python_sculpts(generator_exe, tmp_path,
+                                              dims, max_func, degree_dist):
+    """The C searcher must succeed wherever the Python one does.
+
+    This is the check that catches a wrong source being vendored. The
+    archive holds a later variant (md5 83d7f9d3, 2026-02-27) which swaps
+    the per-degree count check in is_move_safe for a cumulative one; it
+    fails five of these six, every case where max_func sits below the
+    lattice coordination. It was vendored first on the strength of being
+    newest and the mistake was invisible until someone ran a real
+    sculpting job, because the other tests all use a max_func high enough
+    that nothing needs pruning.
+
+    Kept to small lattices and a low trial count so it stays fast; these
+    all converge within a few trials on the correct source.
+    """
+    paths, proc = run_c(generator_exe, tmp_path / "sculpt", "SC",
+                        dims=dims, max_func=max_func, trials=500,
+                        degree_dist=degree_dist)
+    assert paths is not None, (
+        f"C failed to sculpt {dims} max_func={max_func} "
+        f"degree_distribution={degree_dist!r}, which the Python generator "
+        f"handles. Check which source is vendored.\n{proc.stdout[-800:]}"
+    )
+    G, _ = load_graph(nodes_path=paths[0], edges_path=paths[1])
+    assert max(d for _, d in G.degree()) <= max_func
 
 
 def test_c_survives_the_densest_mixture(generator_exe, tmp_path):

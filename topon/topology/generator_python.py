@@ -643,18 +643,42 @@ class PythonTopologyGenerator:
         In Stage 2 (Set d1), we mark nodes as `IS_DEGREE_1`.
         If they are excluded from connectivity check, that means we only care if the *remaining* network is connected.
         Dangling ends are by definition connected to *something* (degree 1), so as long as that something is in the main component, they are fine.
+
+        Implementation note: this walks the adjacency mapping directly
+        rather than building ``g.subgraph(active)`` and calling
+        ``nx.is_connected``. The two give identical answers, but a
+        NetworkX subgraph is a *view* that re-evaluates its node filter on
+        every neighbour access, which costs about six million predicate
+        calls per check on a 1000-node lattice. Since this function is
+        roughly 99% of the generator's runtime, that made the whole
+        generator about eight times slower than it needed to be.
         """
-        active_nodes = [n for n in g.nodes() if node_status[n] == "ACTIVE"]
-        if not active_nodes: return True
-        
-        # Determine subgraph of active nodes
-        # Note: This means we only traverse edges where BOTH ends are ACTIVE?
-        # C code:
-        # `if (node_status[pCrawl->dest] == ACTIVE) unite_sets(...)`
-        # Yes, edges are only considered if both nodes are ACTIVE.
-        
-        subg = g.subgraph(active_nodes)
-        return nx.is_connected(subg)
+        # Edges count only when BOTH ends are ACTIVE, matching the C
+        # searcher: `if (node_status[pCrawl->dest] == ACTIVE) unite_sets(...)`.
+        # Raw {node: {neighbour: attrs}}. `_adj` is NetworkX-internal but
+        # stable and ~1.6x faster than the public `adj` view, so take it
+        # when present and fall back if a future release renames it.
+        adj = getattr(g, "_adj", None)
+        if adj is None:
+            adj = g.adj
+        start = None
+        n_active = 0
+        for n in adj:
+            if node_status[n] == "ACTIVE":
+                n_active += 1
+                if start is None:
+                    start = n
+        if start is None:
+            return True
+
+        seen = {start}
+        stack = [start]
+        while stack:
+            for nbr in adj[stack.pop()]:
+                if nbr not in seen and node_status[nbr] == "ACTIVE":
+                    seen.add(nbr)
+                    stack.append(nbr)
+        return len(seen) == n_active
 
 
     def _is_move_safe(self, g, u, v, stage, target_degree_sum, current_total_degree_sum):

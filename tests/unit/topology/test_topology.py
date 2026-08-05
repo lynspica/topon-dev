@@ -146,3 +146,63 @@ def test_over_target_per_degree_degree_raises(small_lattice_config):
     with pytest.raises(ValueError, match=r"maximum degree in a 3x3x3 SC lattice is 6"):
         gen.generate(trials=1_000_000, time_limit=5)
 
+
+# ---------------------------------------------------------------------------
+# Connectivity check: hand-rolled traversal must match NetworkX exactly
+# ---------------------------------------------------------------------------
+
+def _networkx_reference(g, node_status):
+    """What `_is_subgraph_connected` used to do, kept as the oracle."""
+    active = [n for n in g.nodes() if node_status[n] == "ACTIVE"]
+    if not active:
+        return True
+    return nx.is_connected(g.subgraph(active))
+
+
+@pytest.mark.parametrize("lattice_type,dims", [("SC", (4, 4, 4)),
+                                               ("BCC", (3, 3, 3)),
+                                               ("FCC", (3, 3, 3))])
+def test_connectivity_matches_networkx_on_random_states(lattice_type, dims):
+    """The direct traversal must agree with NetworkX on every state.
+
+    `_is_subgraph_connected` walks `g._adj` itself instead of building a
+    `g.subgraph(...)` view, because the view re-evaluates its node filter
+    on every neighbour access and that call is ~99% of the generator's
+    runtime. The speedup is only worth having if the answers are
+    identical, so this fuzzes random edge removals against random status
+    assignments and compares.
+    """
+    import random
+
+    gen = PythonTopologyGenerator(
+        TopologyConfig(lattice_type, "x".join(map(str, dims)), "111", "", 6)
+    )
+    base = gen._create_lattice(dims, lattice_type)
+
+    random.seed(20260805)
+    for _ in range(120):
+        g = base.copy()
+        edges = list(g.edges())
+        for e in random.sample(edges, random.randint(0, len(edges) // 2)):
+            g.remove_edge(*e)
+        status = {}
+        for n in g.nodes():
+            r = random.random()
+            status[n] = ("ACTIVE" if r < 0.7
+                         else "IS_DEGREE_0" if r < 0.85 else "IS_DEGREE_1")
+        assert gen._is_subgraph_connected(g, status) == _networkx_reference(g, status)
+
+
+def test_connectivity_handles_degenerate_states():
+    """No ACTIVE nodes at all, and a single ACTIVE node, both count as connected."""
+    gen = PythonTopologyGenerator(TopologyConfig("SC", "2x2x2", "111", "", 6))
+    g = nx.Graph()
+    g.add_edges_from([(0, 1), (1, 2)])
+
+    none_active = {n: "IS_DEGREE_0" for n in g.nodes()}
+    assert gen._is_subgraph_connected(g, none_active) is True
+    assert _networkx_reference(g, none_active) is True
+
+    one_active = {0: "ACTIVE", 1: "IS_DEGREE_1", 2: "IS_DEGREE_0"}
+    assert gen._is_subgraph_connected(g, one_active) == _networkx_reference(g, one_active)
+

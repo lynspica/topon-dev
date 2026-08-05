@@ -2,22 +2,36 @@
  * @file generator.c
  * @brief C Program for Polymer Network Generation via Strict Sculpting (Serial Version with Logging).
  *
- * PROVENANCE: vendored 2026-08-05 from generator_serial_debug11.c
- * (md5 83d7f9d37c72bcd26bb15fe664b67cc6), the copy that appeared in five
- * archive locations including the most recently touched. debug12 differed
- * from it only in comments. This file is now the canonical source; the
- * archive copies are historical.
+ * ROLE: this is the standalone searcher. It runs on its own, without
+ * Python, and is the tool for long exhaustive searches over many trials.
+ * The pure-Python port in topon/topology/generator_python.py is the
+ * separate quick path for in-process generation of likely networks.
+ * The two are deliberately independent programs, not a library and a
+ * wrapper: nothing here is called from Python, and nothing here should
+ * grow a Python binding.
  *
- * Kept in step with topon/topology/generator_python.py, which implements
- * the same algorithm in pure Python and is the pipeline default. Changes
- * to lattice construction or the .nodes/.edges format must land in both.
- * See tests/unit/topology/test_c_generator.py for the parity checks.
+ * PROVENANCE: vendored 2026-08-05 from generator_serial_debug11.c
+ * (md5 e7631f4bbcb963d50c382721de3b3c18, dated 2025-11-03), the version
+ * the shipped generator.exe was built from and the one the Python port
+ * mirrors.
+ *
+ * A later variant exists in the archive (md5 83d7f9d3, 2026-02-27, under
+ * experiments/pruning_research/pruning_algorithm_math*) which replaces
+ * the per-degree count check in is_move_safe with a cumulative one. It is
+ * NOT used here: measured across six standard SC configurations it
+ * sculpts 1/6 where this version sculpts 6/6, failing whenever max_func
+ * is below the lattice coordination. Treat it as an open experiment.
  *
  * Build:  gcc -O2 -o generator.exe generator.c -lm
  *
- * KNOWN DIVERGENCES from the Python generator (pre-existing, not fixed here):
- *   - Periodicity: this file honours p_dims per axis; the Python builders
- *     always wrap.
+ * Lattice construction and the .nodes/.edges format are shared surface
+ * with the Python port and must be changed in both; see
+ * tests/unit/topology/test_c_generator.py. The sculpting search itself
+ * is this program's own business.
+ *
+ * KNOWN DIVERGENCES from the Python port (pre-existing, not fixed here):
+ *   - Periodicity: this file honours p_dims per axis; the Python
+ *     builders always wrap.
  *   - The degree<=2 guard in the sculpting stages is gated on
  *     is_sc_lattice here, but applied unconditionally in Python.
  *
@@ -128,77 +142,76 @@ int is_move_safe(Graph* g, int u, int v, const int* target_counts, int max_func,
             return 0; // FORBIDDEN: We have hit or gone below our target edge count.
         }
     }
+    // --- END NEW CHECK ---
     
     int u_new_degree = g->degrees[u] - 1;
     int v_new_degree = g->degrees[v] - 1;
 
-    // --- Cumulative Bounds Check ---
-    // Instead of explicitly forbidding target=0, we compute the cumulative allowed capacity.
-    // T_leq(D) = sum of all targets for degrees 0 to D.
-    // N_leq(D) = current number of nodes with degree <= D.
-    // A move reducing a node's degree to D increases N_leq(D) by 1.
-    // It is safe if N_leq(D) + increase <= T_leq(D). This allows "pass-through".
+    // --- Check 1: Check Neighbor 'v' (The "Victim") ---
+    // 'v' is always checked for collateral damage, regardless of stage.
 
-    // Check Neighbor 'v'
-    if (v_new_degree >= 0 && v_new_degree <= max_func) {
-        long long T_leq_v = 0;
-        int unconstrained_v = 0;
-        for (int i = 0; i <= v_new_degree; ++i) {
-            int t = target_counts[i];
-            if (t == -1) {
-                if (i == 0) { t = 0; } // d0 is unreachable after Stage 1
-                else { unconstrained_v = 1; break; }
+    // 1a. Forbidden Degree (target=0)
+    if (v_new_degree >= 0 && target_counts[v_new_degree] == 0) {
+        return 0; // Forbidden collateral damage on v
+    }
+
+    // 1b. Overshooting
+    if (v_new_degree >= 0 && target_counts[v_new_degree] > 0) {
+        
+        // Case A: d0 or d1. These are "sacred" after Stages 1 & 2.
+        // Never overshoot them in *any* stage.
+        if (v_new_degree <= 1) { 
+            int current_count = 0;
+            for (int i = 0; i < g->V; ++i) {
+                if (g->degrees[i] == v_new_degree) current_count++;
             }
-            if (t > 0) T_leq_v += t;
+            if (current_count >= target_counts[v_new_degree]) {
+                return 0; // Forbid overshooting d0 or d1
+            }
         }
         
-        if (!unconstrained_v) {
-            long long N_leq_v = 0;
+        // Case B: d2+. Only block overshooting explicit targets in Stage 4.
+        // Stages 1, 2, and 3 are *allowed* to overshoot these.
+        else if (current_stage == 4) { 
+            int current_count = 0;
             for (int i = 0; i < g->V; ++i) {
-                if (g->degrees[i] <= v_new_degree) N_leq_v++;
+                if (g->degrees[i] == v_new_degree) current_count++;
             }
-            
-            long long increase_v = 1;
-            // If u is also falling into the exact same bin, they simultaneously increase the count by 2
-            if (current_stage == 4 && u_new_degree == v_new_degree) {
-                increase_v = 2;
+            if (current_count >= target_counts[v_new_degree]) {
+                return 0; // Forbid overshooting v's target in Stage 4
             }
-            
-            if (N_leq_v + increase_v > T_leq_v) {
-                return 0; // Forbid overshooting the cumulative target for v
+        }
+        // (If stage 1, 2, or 3, we allow overshooting v for d2+)
+    }
+
+    // --- Check 2: Check Actor 'u' ---
+    // 'u' is *only* checked for damage in Stage 4.
+    // In Stages 1, 2, 3, 'u' is the node we are *trying* to change,
+    // so its new state isn't "collateral damage."
+
+    if (current_stage == 4) {
+        // 2a. Forbidden Degree (target=0)
+        if (u_new_degree >= 0 && target_counts[u_new_degree] == 0) {
+            return 0; // Forbid u from becoming a forbidden degree
+        }
+
+        // 2b. Overshooting (Only for *explicit* targets)
+        if (u_new_degree >= 0 && target_counts[u_new_degree] > 0) {
+            int current_count = 0;
+            for (int i = 0; i < g->V; ++i) {
+                if (g->degrees[i] == u_new_degree) current_count++;
+            }
+            if (current_count >= target_counts[u_new_degree]) {
+                return 0; // Forbid overshooting u's target
             }
         }
     }
     
-    // Check Actor 'u' (only checked in algorithmic Stage 4 search)
-    if (current_stage == 4 && u_new_degree >= 0 && u_new_degree <= max_func && u_new_degree != v_new_degree) {
-        long long T_leq_u = 0;
-        int unconstrained_u = 0;
-        for (int i = 0; i <= u_new_degree; ++i) {
-            int t = target_counts[i];
-            if (t == -1) {
-                if (i == 0) { t = 0; } // d0 is unreachable after Stage 1
-                else { unconstrained_u = 1; break; }
-            }
-            if (t > 0) T_leq_u += t;
-        }
-        
-        if (!unconstrained_u) {
-            long long N_leq_u = 0;
-            for (int i = 0; i < g->V; ++i) {
-                if (g->degrees[i] <= u_new_degree) N_leq_u++;
-            }
-            
-            // increase_u is 1, u_new_degree == v_new_degree was handled handled by 'increase_v = 2'
-            if (N_leq_u + 1 > T_leq_u) {
-                return 0; // Forbid overshooting the cumulative target for u
-            }
-        }
-    }
-
-    // If we passed all checks, the move strictly respects the cumulative capacity bounds.
+    // If we passed all checks (e.g., in Stage 1, Check 2 is skipped),
+    // the move is safe.
     return 1;
 }
+// --- END: HELPER FUNCTION ---
 
 
 // --- Union-Find Data Structure Functions ---
@@ -764,72 +777,10 @@ Graph* run_single_trial(Graph* base_graph, int max_func, const int* target_count
                     pCrawl = pCrawl->next;
                 }
             }
-        } // ADDED MISSING BRACE HERE
-        // shuffle_array((int*)edge_list, current_edge_idx); // Old random shuffle
-        
-        // Prioritize edges where both endpoints are already reduced (lower degree = higher score).
-        // This avoids "wasting" moves on pristine max-degree nodes and helps transit nodes get fixed.
-        // Use a stable partition: transit-touching edges first, then random shuffle within each group.
-        // --- NEW: Heuristic Edge Sorting ---
-        // To avoid deadlocks caused by the cumulative bounds, we MUST ensure that 
-        // nodes which have already begun degree reduction (degree < max_func)
-        // prioritize losing edges to EACH OTHER rather than to pristine max_func nodes.
-        // If they lose edges to max_func nodes, they bloat the active pool and hit capacity limits.
-        
-        // Since qsort in C doesn't easily capture context, we'll assign a score to each edge
-        // and sort by score.
-        // Score = (max_func - u_deg) + (max_func - v_deg)
-        // Higher score means the nodes are already heavily reduced. We want to try high scores first!
-        // To retain randomness among equal scores, we add a random tiebreaker.
-        
-        typedef struct EdgeScore {
-            Edge e;
-            int score;
-            int r;
-        } EdgeScore;
-        
-        EdgeScore* scored_edges = (EdgeScore*)malloc(current_edge_idx * sizeof(EdgeScore));
-        for (long long i = 0; i < current_edge_idx; ++i) {
-            scored_edges[i].e = edge_list[i];
-            int u_deg = g->degrees[edge_list[i].u];
-            int v_deg = g->degrees[edge_list[i].v];
-            
-            // Nodes <= 1 are generally untouchable, give them lowest score so they are avoided
-            if (u_deg <= 1 || v_deg <= 1) {
-                scored_edges[i].score = -1000;
-            } else {
-                scored_edges[i].score = (max_func - u_deg) + (max_func - v_deg);
-            }
-            scored_edges[i].r = rand();
         }
-        
-        // Bubble sort or a simple qsort. For C, let's write an inline bubble sort or shell sort
-        // given current_edge_idx is small (<= ~150)
-        for (long long i = 0; i < current_edge_idx - 1; ++i) {
-            for (long long j = i + 1; j < current_edge_idx; ++j) {
-                int swap = 0;
-                if (scored_edges[j].score > scored_edges[i].score) {
-                    swap = 1;
-                } else if (scored_edges[j].score == scored_edges[i].score) {
-                    if (scored_edges[j].r > scored_edges[i].r) swap = 1;
-                }
-                
-                if (swap) {
-                    EdgeScore temp = scored_edges[i];
-                    scored_edges[i] = scored_edges[j];
-                    scored_edges[j] = temp;
-                }
-            }
-        }
-        
-        for (long long i = 0; i < current_edge_idx; ++i) {
-            edge_list[i] = scored_edges[i].e;
-        }
-        free(scored_edges);
-        // --- END NEW ---
-        
+        shuffle_array((int*)edge_list, current_edge_idx);
+
         int move_made = 0;
-        
         for(long long i=0; i<current_edge_idx; ++i) {
             int u = edge_list[i].u;
             int v = edge_list[i].v;
@@ -1093,7 +1044,8 @@ Graph* create_fcc_lattice(int Nx, int Ny, int Nz, const int* p_dims) {
  * Edges join every pair within `cutoff` under the minimum image, because
  * a mixed point set has no single neighbour shell to enumerate the way
  * the pure builders do. Non-periodic axes (p_dims[k] == 0) are not
- * wrapped.
+ * wrapped. The search is O(N^2) in the site count, which is negligible
+ * at the cell counts topon uses but grows quickly past ~20x20x20.
  *
  * Site order matches the Python builder (z outer, then y, then x, and
  * within a cell corner, body, then the XY/XZ/YZ faces) so that fractions
@@ -1198,15 +1150,10 @@ int main(int argc, char *argv[]) {
     // --- NEW: Parse lattice type ---
     char* lattice_type = argv[8];
 
-    int p_dims[3] = {0, 0, 0};
-    int p_idx = 0;
-    for (int i = 0; periodicity_str[i] != '\0' && p_idx < 3; ++i) {
-        if (periodicity_str[i] == '1') {
-            p_dims[p_idx++] = 1;
-        } else if (periodicity_str[i] == '0') {
-            p_dims[p_idx++] = 0;
-        }
-    }
+    int p_dims[3];
+    p_dims[0] = (periodicity_str[0] == '1');
+    p_dims[1] = (periodicity_str[1] == '1');
+    p_dims[2] = (periodicity_str[2] == '1');
     
     char degree_dist_string[1024];
     strncpy(degree_dist_string, degree_dist_string_arg, sizeof(degree_dist_string) - 1);

@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
 | **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
 | **V43** | 2026-08-05 | **Generators record their periodic cell.** `infer_dims_from_graph` used to estimate the box as `max - min + 1`, exact for SC but half a cell too large for BCC/FCC/Diamond, which sent 33% of BCC edges (23% of FCC) to the wrong periodic replica at twice their true bond length. Generators now set `G.graph["box"]`; `.nodes` files carry a `# BOX` header. SC output unchanged. 20 unit tests. |
 | **V42** | 2026-07-17 | **README rewritten** around the algorithm and arc animations; "Sub-systems" dropped, protein path (topro) given its own section with MARTINI 3 + CHARMM36m worked examples. Six false claims caught and fixed pre-commit. |
@@ -64,9 +65,48 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V44)
+## 4. Changelog (V1 – V45)
 
 Notable changes are documented in reverse chronological order.
+
+### [V45] — 2026-08-05 — Right C source; Python generator ~7x faster
+
+#### Fixed
+- **`topon/topology/csrc/generator.c`** re-vendored from md5 `e7631f4b`
+  (2025-11-03) in place of `83d7f9d3` (2026-02-27). The latter is the
+  newest file by timestamp, confirmed by editor history, but it is an
+  experimental variant under
+  `experiments/pruning_research/pruning_algorithm_math*`: it replaces the
+  per-degree count check in `is_move_safe` with a cumulative one and
+  sculpts **1/6** standard SC configurations where the vendored version
+  and the Python port both do **6/6**, failing whenever `max_func` is
+  below the lattice coordination. Three signals were missed first time
+  round: the shipped `generator.exe` compiles from the 2025-11-03 source,
+  the Python port implements the per-degree rule, and the directory name
+  marks it as research. `test_c_sculpts_the_configs_python_sculpts` now
+  fails on that variant.
+
+#### Changed
+- **`generator_python.py:_is_subgraph_connected`** walks `g._adj`
+  directly instead of building `g.subgraph(...)` and calling
+  `nx.is_connected`. A NetworkX subgraph is a view that re-evaluates its
+  node filter on every neighbour access: 6.0M `new_node_ok` calls for one
+  1000-node lattice. That call was 99.5% of the generator's runtime, so
+  the whole generator is now 6-8x faster (12³: 10.95 s to 1.54 s).
+  Verified identical: 1200 fuzzed states against the NetworkX oracle with
+  zero disagreements, and identical edge sets across four sizes and three
+  seeds with the two implementations swapped. Both are now tests.
+
+#### Clarified
+- The C generator and the Python generator are **independent programs
+  with different jobs**, documented in `csrc/README.md` and
+  `ARCHITECTURE.md`. C is the standalone searcher for long exhaustive
+  runs; Python is the quick in-process path. The C is not called from
+  Python and must not grow a Python binding. Only lattice construction
+  and the `.nodes`/`.edges` format are shared surface. Benchmarked: at 6³
+  Python wins on wall clock (the C pays process startup), by 12³ the C is
+  14x ahead, and at 24³ it finishes in 6.7 s where Python would run for
+  hours.
 
 ### [V44] — 2026-08-05 — Mixed SC/BCC/FCC lattices; C generator vendored
 

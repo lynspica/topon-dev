@@ -61,12 +61,25 @@ Generates or loads a NetworkX `MultiGraph`. Nodes are network junctions; edges a
 
 Lattices: `SC`, `BCC`, `FCC` (fixed neighbour patterns), plus `MIX`, which
 overlays their basis sites in one cubic cell at configurable fractions and
-connects by distance cutoff. The C source lives in
-[`topon/topology/csrc/`](../topon/topology/csrc/) and is the optional fast
-path; the pure-Python generator is the default and needs no compiler. The
-two implement the same algorithm and must be changed together, which
-`tests/unit/topology/test_c_generator.py` checks. They agree on
-distributions, not on individual draws: the C one seeds from the clock.
+connects by distance cutoff.
+
+**Two generators, two jobs.** The C source in
+[`topon/topology/csrc/`](../topon/topology/csrc/) is the standalone
+searcher: it runs on its own, without Python, and is the tool for long
+exhaustive searches. The pure-Python `generator_python.py` is the pipeline
+default and exists for quick in-process generation of likely networks with
+no compiler. They are independent programs, not a library and a wrapper;
+nothing in `csrc/` is called from Python and it should not grow a Python
+binding. Only the shared surface (lattice construction, the
+`.nodes`/`.edges` format) has to stay in step, which
+`tests/unit/topology/test_c_generator.py` checks by compiling the source
+and comparing. They agree on distributions, not individual draws, since
+the C one seeds from the clock.
+
+The split is earned. Measured on SC at `max_func=4`, time to first
+success: at 6³ Python takes 0.01 s against the C's 0.04 s (process
+startup dominates), at 12³ Python takes 1.5 s against 0.11 s, and at 24³
+(13824 nodes) the C finishes in 6.7 s where Python would run for hours.
 
 Produces: `self.graph` (annotated `MultiGraph`) and `self.dims` (box size as `np.ndarray`).
 

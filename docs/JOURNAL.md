@@ -14,6 +14,64 @@ Newest first.
 
 ---
 
+## 2026-08-05 — Wrong C source vendored; corrected, plus a 7x Python speedup
+
+**Change** Re-vendored `topon/topology/csrc/generator.c` from md5
+`e7631f4b` (2025-11-03) instead of `83d7f9d3` (2026-02-27), and ported the
+MIX and `# BOX` work onto it. Replaced the connectivity check in
+[generator_python.py](../topon/topology/generator_python.py) with a direct
+adjacency walk, which is 6 to 8 times faster and provably returns the same
+networks.
+
+**Why (the C)** The earlier vendoring picked the newest file by timestamp.
+Editor history confirms `83d7f9d3` really was the final save of its
+session, so "newest" was right, but it is an experimental variant from
+`experiments/pruning_research/pruning_algorithm_math*`, not a newer
+release. It swaps the per-degree count check in `is_move_safe` for a
+cumulative one (`N_leq_v + increase > T_leq_v`), and across six standard
+SC configurations it sculpts **1/6** where the 2025-11-03 version and the
+Python port both do **6/6**. It fails whenever `max_func` sits below the
+lattice coordination, which is the ordinary case.
+
+Three independent signals all point the same way and were missed the first
+time: the binary that was actually shipped (`package/bin/generator.exe`,
+md5 `1fbd09cd`) compiles from the 2025-11-03 source, not from `83d7f9d3`;
+the Python port implements the per-degree rule; and the directory name
+`pruning_algorithm_math` marks it as research rather than release.
+
+**Why (the Python)** Profiling a 10x10x10 run put **99.5%** of the time in
+`_is_subgraph_connected`, and inside it in NetworkX's `is_connected` over
+a `g.subgraph(...)` *view*. A subgraph view re-evaluates its node filter
+on every neighbour access: 6.0 million `new_node_ok` calls and 7.3 million
+generator-expression evaluations for a single 1000-node lattice. Walking
+`g._adj` directly and skipping non-ACTIVE nodes inline gives the same
+answer without any of that.
+
+**Issue / solution** The speedup is only worth having if it changes
+nothing, so it was checked two ways rather than assumed. A fuzz over 1200
+random states (SC/BCC/FCC/MIX, random edge removals crossed with random
+status assignments, plus the all-inactive and single-active degenerate
+cases) found zero disagreements with the NetworkX oracle. Then the whole
+generator was run at four sizes and three seeds with the old and new check
+swapped in: identical edge sets every time. Measured 7.5x at 6³, 7.6x at
+8³, 6.2x at 10³, 7.1x at 12³ (10.95 s down to 1.54 s). Both checks are
+now tests.
+
+Note the two generators stay separate on purpose: C is the standalone
+searcher for long runs, Python is the quick in-process path. The C is not
+to be bound into Python. Benchmarked, the division holds: at 6³ Python
+wins on wall clock because the C pays process startup, by 12³ the C is
+14x ahead, and at 24³ (13824 nodes) it finishes in 6.7 s where Python
+would run for hours.
+
+**Follow-up** Whether the cumulative `is_move_safe` rule is the correct
+one is still open. If it is, the Python port has to move with it and the
+sculpting failures need fixing first. `test_c_sculpts_the_configs_python_sculpts`
+fails on that variant and passes on the vendored one, so the question
+cannot be forgotten silently.
+
+---
+
 ## 2026-08-05 — Mixed SC/BCC/FCC lattices, and the C generator moves into the repo
 
 **Change** `lattice_type: "MIX"` in
