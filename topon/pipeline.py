@@ -691,6 +691,22 @@ class Pipeline:
     # Stage 5: Conformation
     # ------------------------------------------------------------------
 
+    def _graph_periodicity(self):
+        """Per-axis boundaries the topology was built with.
+
+        Recorded by the generators and carried in ``.nodes`` files by a
+        ``# PERIODICITY`` header. Returns None when unknown, which every
+        consumer reads as fully periodic -- the behaviour before open
+        boundaries were supported.
+        """
+        if self.graph is None:
+            return None
+        axes = self.graph.graph.get("periodicity")
+        if axes is None:
+            return None
+        axes = tuple(bool(a) for a in axes)
+        return None if all(axes) else axes
+
     def _run_conformation_stage(self) -> None:
         print("--- Stage 5: Conformation ---")
         from topon.conformation import ConformationManager
@@ -704,10 +720,13 @@ class Pipeline:
             self.config.study.name,
         )
         # Hand down the same cell stage 4 routed the chains with, so a
-        # chain that wraps the boundary lands in a box of the same period.
+        # chain that wraps the boundary lands in a box of the same period,
+        # and the boundary conditions so open axes are not wrapped at all.
+        periodicity = self._graph_periodicity()
         conformed, roles = cm.apply_displacements(
             "system.data",
             lattice_box=None if self.dims is None else tuple(self.dims),
+            periodicity=periodicity,
         )
         noisy = cm.apply_noise(conformed, magnitude=conf_params["noise_magnitude"])
         cm.resolve_overlaps(
@@ -715,6 +734,7 @@ class Pipeline:
             roles,
             cutoff=conf_params["overlap_cutoff"],
             max_iters=conf_params["overlap_max_iters"],
+            periodicity=periodicity,
         )
         print()
 

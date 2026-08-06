@@ -14,6 +14,59 @@ Newest first.
 
 ---
 
+## 2026-08-06 — Open axes are no longer wrapped, so molecules stay whole
+
+**Change** [topon/conformation/manager.py](../topon/conformation/manager.py)
+wraps coordinates only on periodic axes and widens the box to contain
+whatever lands outside an open one. `apply_displacements` and
+`resolve_overlaps` both take a `periodicity` argument.
+[topon/pipeline.py](../topon/pipeline.py) reads it off the graph and
+passes it down. `.nodes` files carry a `# PERIODICITY 100` header, written
+by both generators and read by the loader, so the boundaries survive a
+file round-trip. 4 tests added.
+
+**Why** Spotted by the user in `Diamond_periodic_100_C/03_Conformation`:
+some atoms sat at the top of the box while the crosslinker they bond to
+sat at the bottom. The topology graph was correct -- 30 edges cross the
+periodic x axis, **0 cross the open y or z** -- but the conformation
+stage folded every axis with `% box` regardless. A junction on the free
+surface has chain and pendant atoms placed just below zero, and those
+wrapped to the far face.
+
+Measured on that exact run:
+
+| | wraps x | wraps y | wraps z | max raw bond |
+|---|---|---|---|---|
+| before | 138 | **98** | **98** | 138.6 Å |
+| after | 123 | **0** | **0** | 80.4 Å |
+
+x still wraps, correctly, because x is periodic; the residual 80.4 Å bond
+is that legitimate wrap. y and z now have none.
+
+**Issue / solution** It is invisible under `p p p`, where the wrap is a
+real periodic image and the bond is fine. It only bites under `p f f`,
+where the two halves are genuinely far apart and the bond is nonsense --
+which is exactly how the user intends to run these.
+
+The box on an open axis becomes `[min_atom - 1 Å, max_atom + 1 Å]`
+instead of `[0, L]`. The pad only has to keep atoms off the face, since
+LAMMPS deletes anything outside an `f` boundary; padding further would
+dilute a system that already has a free surface. Verified after overlap
+relaxation: **0 atoms outside the box on y and z**. Eight sit outside on
+x, which is harmless because `p` wraps them.
+
+`resolve_overlaps` needed the same treatment twice over: its minimum-image
+check must not take an image across an open axis, and its push-back wrap
+must not fold an atom to the far face. The wrap there also had to learn
+about a non-zero `box_lo`, since an open axis can now start below zero and
+a bare `%` would be wrong for the periodic axes sitting alongside it.
+
+**Deliberately not changed:** the LAMMPS input writer still emits
+`boundary p p p`. Those scripts are calibrated and out of scope; the user
+sets `p f f` themselves, and the data file is now correct for it.
+
+---
+
 ## 2026-08-05 — Diamond in C, per-axis periodicity in Python; the two now match exactly
 
 **Change** [generator.c](../topon/topology/csrc/generator.c) gained

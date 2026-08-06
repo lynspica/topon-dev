@@ -968,6 +968,19 @@ SC the minimum stays at 3, so the same request is fine. Either drop the
 `max_functionality` still applies on top, so a partially open lattice
 reaches the ceiling with less pruning than a closed one.
 
+**What an open axis does to the data file.** Coordinates are wrapped into
+the box only on periodic axes. An open axis keeps its atoms where they
+were placed and the box grows to contain them, so a junction on the free
+surface stays next to the chains bonded to it instead of being split
+across the cell. The `.nodes` file records the boundaries in a
+`# PERIODICITY 100` header (written only when an axis is open), and the
+conformation stage reads it.
+
+The generated LAMMPS scripts still say `boundary p p p` — they are not
+periodicity-aware, and changing them is out of scope here. Set
+`boundary p f f` yourself to match; the geometry in the data file is
+already correct for it, with no bond crossing an open face.
+
 ##### Mixed lattices (`lattice_type: "MIX"`)
 
 All three cubic lattices share the cell corner and each adds sites on top

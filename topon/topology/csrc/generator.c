@@ -120,6 +120,11 @@ typedef struct UnionFind {
 // --- Forward declarations ---
 // --- MODIFIED: Signatures updated for new 'e:N' logic ---
 Graph* run_single_trial(Graph* base_graph, int max_func, const int* target_counts, int target_edge_count, long long trial_num, int extensive_logging, const char* dims_str, const char* lattice_type);
+/* Per-axis boundaries, stashed for the .nodes writer so it can record
+ * them alongside the box. save_graph_to_file is reached through several
+ * call sites that do not carry p_dims, and threading it through all of
+ * them would touch far more of this file than the header is worth. */
+static int g_periodicity[3] = {1, 1, 1};
 void addEdge(Graph* graph, int src, int dest);
 void print_distribution(const char* stage_name, Graph* g, const int* target_counts, long long trial_num, long long move_num, int max_func, int extensive_logging);
 void save_move_log_to_file(const MoveLog* move_log, long long count, const char* dims_str, long long trial);
@@ -381,6 +386,14 @@ void save_graph_to_file(Graph* g, const char* dims_str, long long trial) {
             fprintf(nodes_file, "# BOX %g %g %g\n",
                     (double)bx, (double)by, (double)bz);
         }
+    }
+    /* Record open axes so the conformation stage knows not to wrap them.
+     * Written only when an axis is actually open, so a fully periodic
+     * run produces exactly the file format it did before. Must match
+     * topon.topology.loader.format_periodicity_header. */
+    if (!g_periodicity[0] || !g_periodicity[1] || !g_periodicity[2]) {
+        fprintf(nodes_file, "# PERIODICITY %d%d%d\n",
+                g_periodicity[0], g_periodicity[1], g_periodicity[2]);
     }
     fprintf(nodes_file, "# NodeID X Y Z Degree\n");
     for (int i = 0; i < g->V; ++i) {
@@ -1258,6 +1271,10 @@ int main(int argc, char *argv[]) {
     p_dims[0] = (periodicity_str[0] == '1');
     p_dims[1] = (periodicity_str[1] == '1');
     p_dims[2] = (periodicity_str[2] == '1');
+    /* Mirror into the file-scope copy the .nodes writer reads. */
+    g_periodicity[0] = p_dims[0];
+    g_periodicity[1] = p_dims[1];
+    g_periodicity[2] = p_dims[2];
     
     char degree_dist_string[1024];
     strncpy(degree_dist_string, degree_dist_string_arg, sizeof(degree_dist_string) - 1);

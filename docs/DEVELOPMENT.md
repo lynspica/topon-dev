@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V48** | 2026-08-06 | **Open axes are no longer wrapped in the data file.** The conformation stage folded every axis with `% box`, so a junction on a free surface ended up at one end of the box with the chains bonded to it at the other. Invisible under `p p p`, wrong under `p f f`. On the flagged run the wraps across the open y and z axes go **98 → 0**. `.nodes` gained a `# PERIODICITY` header; the LAMMPS scripts are untouched. |
 | **V47** | 2026-08-05 | **Diamond added to C, per-axis periodicity added to Python** — the last two asymmetries. Both are deterministic, so parity is now exact: all 16 lattice x periodicity combinations produce identical edge sets, and Diamond matches node-for-node including ids. `lattice_type: "Diamond"` works through the config on both paths. Also fixed a C seeding bug that made **every run started in the same second produce the same network**. Found that open boundaries make `"0:0,1:0"` unsatisfiable on BCC and Diamond (free-surface sites have degree 1). |
 | **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
 | **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
@@ -67,9 +68,42 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V47)
+## 4. Changelog (V1 – V48)
 
 Notable changes are documented in reverse chronological order.
+
+### [V48] — 2026-08-06 — Open axes are not wrapped; molecules stay whole
+
+#### Fixed
+- **`topon/conformation/manager.py`** wrapped coordinates with `% box` on
+  every axis regardless of the boundary condition. A junction sitting on
+  a free surface has chain and pendant atoms placed just below zero, and
+  those folded to the opposite face — leaving the crosslinker at one end
+  of the box and the atoms bonded to it at the other. On the run this was
+  spotted in, wraps across the **open** y and z axes went **98 → 0**
+  (x keeps 123, correctly, because x is periodic). The topology graph was
+  right all along: 0 edges crossed the open faces.
+- The box on an open axis is now `[min_atom − 1 Å, max_atom + 1 Å]`
+  rather than `[0, L]`, so nothing sits outside an `f` face. Verified
+  after overlap relaxation: 0 atoms outside on the open axes.
+- `resolve_overlaps` no longer takes a minimum image across an open axis,
+  and its push-back wrap no longer folds atoms to the far face. That wrap
+  also learned about a non-zero `box_lo`, since an open axis can start
+  below zero and a bare `%` would then be wrong for the periodic axes
+  beside it.
+
+#### Added
+- `.nodes` files carry a `# PERIODICITY 100` header, written by both
+  generators and read by the loader, so boundaries survive a round-trip.
+  Written **only when an axis is open**, so fully periodic files keep the
+  exact format they had.
+- `Pipeline._graph_periodicity` reads it off the graph and threads it to
+  both conformation calls.
+
+#### Deliberately not changed
+The LAMMPS input writer still emits `boundary p p p`. Those scripts are
+calibrated and out of scope; set `p f f` by hand and the data file is
+already correct for it.
 
 ### [V47] — 2026-08-05 — Diamond in C, per-axis periodicity in Python
 

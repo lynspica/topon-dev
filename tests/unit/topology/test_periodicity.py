@@ -13,6 +13,7 @@ before, so nothing that omits `periodicity` moves.
 """
 
 import random
+from pathlib import Path
 
 import networkx as nx
 import numpy as np
@@ -215,3 +216,123 @@ def test_diamond_reachable_through_the_main_generator():
 
 def test_config_accepts_diamond():
     assert GeneratorConfig(lattice_type="Diamond").lattice_type == "Diamond"
+
+
+# ---------------------------------------------------------------------------
+# Carrying the boundaries downstream
+# ---------------------------------------------------------------------------
+
+def test_periodicity_round_trips_through_nodes_files(tmp_path):
+    """`.nodes` carries the boundaries so the conformation stage sees them."""
+    from topon.topology.loader import (
+        load_graph, read_periodicity_header, save_nodes_edges,
+    )
+
+    g = build("SC", "100")
+    nodes_p, edges_p = tmp_path / "open.nodes", tmp_path / "open.edges"
+    save_nodes_edges(g, nodes_p, edges_p)
+
+    assert read_periodicity_header(nodes_p) == (True, False, False)
+    assert "# PERIODICITY 100" in nodes_p.read_text()
+
+    loaded, _ = load_graph(nodes_path=nodes_p, edges_path=edges_p)
+    assert loaded.graph["periodicity"] == (True, False, False)
+
+
+def test_fully_periodic_files_get_no_periodicity_header(tmp_path):
+    """The header appears only when an axis is open.
+
+    A fully periodic run has to keep the exact file format it had before
+    open boundaries existed, so nothing downstream sees a new line.
+    """
+    from topon.topology.loader import (
+        load_graph, read_periodicity_header, save_nodes_edges,
+    )
+
+    g = build("SC", "111")
+    nodes_p, edges_p = tmp_path / "closed.nodes", tmp_path / "closed.edges"
+    save_nodes_edges(g, nodes_p, edges_p)
+
+    assert "PERIODICITY" not in nodes_p.read_text()
+    assert read_periodicity_header(nodes_p) is None
+
+    loaded, _ = load_graph(nodes_path=nodes_p, edges_path=edges_p)
+    assert "periodicity" not in loaded.graph
+
+
+def test_malformed_periodicity_header_is_ignored(tmp_path):
+    """A bad header reads as absent, i.e. fully periodic."""
+    from topon.topology.loader import read_periodicity_header
+
+    for bad in ("# PERIODICITY 11\n", "# PERIODICITY abc\n", "# PERIODICITY 1102\n"):
+        p = tmp_path / "bad.nodes"
+        p.write_text(bad + "# NodeID X Y Z Degree\n0 0.0 0.0 0.0 1\n")
+        assert read_periodicity_header(p) is None
+
+
+def test_open_axis_is_not_wrapped_by_the_conformation_stage(tmp_path):
+    """The defect this fixes: an open axis must not fold molecules.
+
+    A junction on a free surface has chain and pendant atoms placed just
+    outside the cell. Wrapping those to the opposite face leaves the
+    crosslinker at one end of the box and the chains bonded to it at the
+    other, with nothing between. Harmless under fully periodic boundaries
+    where the wrap is real, but wrong under `p f f`.
+    """
+    from topon.conformation.manager import ConformationManager
+
+    study = tmp_path / "study"
+    chem = study / "02_Chemistry"
+    chem.mkdir(parents=True)
+
+    # Two atoms: one at the origin, one just below it on y and z.
+    (chem / "system.data").write_text(
+        "LAMMPS data\n\n2 atoms\n1 bonds\n\n"
+        "0.0 1.0 xlo xhi\n0.0 1.0 ylo yhi\n0.0 1.0 zlo zhi\n\n"
+        "Atoms # full\n\n"
+        "1 1 1 0.0 0.0 0.0 0.0\n2 1 1 0.0 0.0 0.0 0.0\n\n"
+        "Bonds\n\n1 1 1 2\n"
+    )
+    (chem / "system_nodes.displace").write_text(
+        "variable scale_x equal 10.0\n"
+        "variable scale_y equal 10.0\n"
+        "variable scale_z equal 10.0\n"
+        "variable dx_1 equal v_scale_x*0.0\n"
+        "variable dy_1 equal v_scale_y*0.0\n"
+        "variable dz_1 equal v_scale_z*0.0\n"
+        "variable dx_2 equal v_scale_x*0.0\n"
+        "variable dy_2 equal v_scale_y*-0.05\n"
+        "variable dz_2 equal v_scale_z*-0.05\n"
+    )
+
+    cm = ConformationManager(str(tmp_path), "study")
+    out, _ = cm.apply_displacements("system.data", lattice_box=(1.0, 1.0, 1.0),
+                                    periodicity=(True, False, False))
+
+    coords, box = {}, {}
+    section = None
+    for raw in Path(out).read_text().splitlines():
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        for axis, tag in zip("xyz", ("xlo xhi", "ylo yhi", "zlo zhi")):
+            if line.endswith(tag):
+                box[axis] = [float(v) for v in line.split()[:2]]
+        if line.split()[0] in ("Atoms", "Bonds"):
+            section = line.split()[0]
+            continue
+        if section == "Atoms" and len(line.split()) >= 7:
+            w = line.split()
+            coords[int(w[0])] = [float(v) for v in w[4:7]]
+
+    # Atom 2 stays just below the origin on the open axes rather than
+    # jumping to the far face, so the bond stays short.
+    assert coords[2][1] < 0, f"y was wrapped: {coords[2][1]}"
+    assert coords[2][2] < 0, f"z was wrapped: {coords[2][2]}"
+    assert abs(coords[1][1] - coords[2][1]) < 1.0
+
+    # The box grew to contain it, so nothing sits outside an `f` face.
+    assert box["y"][0] <= coords[2][1]
+    assert box["z"][0] <= coords[2][2]
+    # The periodic axis keeps its original bounds.
+    assert box["x"] == [0.0, 10.0]
