@@ -1179,7 +1179,11 @@ int main(int argc, char *argv[]) {
         base_graph = create_bcc_lattice(Nx, Ny, Nz, p_dims);
     } else if (strcmp(lattice_type, "FCC") == 0) {
         base_graph = create_fcc_lattice(Nx, Ny, Nz, p_dims);
-    } else if (strncmp(lattice_type, "MIX", 3) == 0) {
+    } else if (strncmp(lattice_type, "MIX", 3) == 0 &&
+               (lattice_type[3] == '\0' || lattice_type[3] == ':')) {
+        /* The trailing check matters: a bare strncmp would also swallow
+         * "MIXED", "MIXTURE" and any other typo starting with MIX, and
+         * silently build a pure-SC lattice instead of rejecting it. */
         /* "MIX:<sc>,<bcc>,<fcc>[,<cutoff>]" -- the fractions ride inside
          * argv[8] so the positional CLI stays the shape every existing
          * caller and SLURM script already writes. */
@@ -1256,6 +1260,29 @@ int main(int argc, char *argv[]) {
         if(target_counts[i] >= 0) node_sum += target_counts[i];
         if(target_counts[i] == -1) has_unconstrained = 1;
         if(target_counts[i] > 0) explicit_degree_sum += (long long)i * target_counts[i];
+    }
+
+    /* Reject explicit targets for degrees above max_func.
+     *
+     * A node's final degree can never exceed max_func: stage 3 prunes to
+     * it, and stage 4 refuses to finish while any ACTIVE node sits above
+     * it. But the completion check only scans i <= max_func, so a target
+     * like "7:5" with max_func=4 was parsed, stored, then never looked
+     * at -- and the run printed "SUCCESS: Target distribution met!" over
+     * a network containing no degree-7 nodes at all. Failing here makes
+     * the request's impossibility visible instead of silently dropping
+     * part of it. Mirrors the fail-fast guard in
+     * PythonTopologyGenerator._validate_targets_reachable. */
+    for (int i = max_func + 1; i <= max_possible_degree; ++i) {
+        if (target_counts[i] > 0) {
+            fprintf(stderr,
+                    "Error: degree_distribution %d:%d is unreachable. Sculpting "
+                    "enforces max_func=%d, so no node can finish with degree %d.\n",
+                    i, target_counts[i], max_func, i);
+            free(target_counts);
+            freeGraph(base_graph);
+            return 1;
+        }
     }
 
     if (target_edge_count != -1) { // --- NEW ---

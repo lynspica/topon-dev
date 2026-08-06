@@ -295,6 +295,10 @@ def test_format_lattice_arg_encodes_mix():
         ("MIX:0.5,0.5", "three fractions"),
         ("HCP", "Invalid lattice type"),
         ("MIX:0.2,0.4,0.4,0", "cutoff must be positive"),
+        # A prefix match on "MIX" would swallow these and quietly build a
+        # pure-SC lattice, so a typo would cost a whole study.
+        ("MIXED", "Invalid lattice type"),
+        ("MIXTURE:0.2,0.4,0.4", "Invalid lattice type"),
     ],
 )
 def test_c_rejects_bad_lattice_args(generator_exe, tmp_path, bad_arg, expect):
@@ -303,6 +307,41 @@ def test_c_rejects_bad_lattice_args(generator_exe, tmp_path, bad_arg, expect):
     assert paths is None
     assert proc.returncode != 0
     assert expect in proc.stderr
+
+
+@pytest.mark.parametrize("degree_dist", ["0:0,1:0,7:5", "0:0,1:0,6:100"])
+def test_c_rejects_degree_targets_above_max_func(generator_exe, tmp_path,
+                                                 degree_dist):
+    """A target no node can reach must fail, not silently pass.
+
+    Sculpting enforces ``max_func``, so a node can never finish above it.
+    The completion check only scans up to ``max_func``, so before this
+    guard such a target was parsed, stored, then never looked at: the run
+    printed "SUCCESS: Target distribution met!" over a network with none
+    of the requested nodes. Both cases below asked for degrees above
+    ``max_func=4`` and got a network back that had no such node.
+    """
+    paths, proc = run_c(generator_exe, tmp_path / "unreach", "SC",
+                        dims="5x5x5", max_func=4, trials=20,
+                        degree_dist=degree_dist)
+    assert paths is None, "unreachable target produced a network"
+    assert proc.returncode != 0
+    assert "unreachable" in proc.stderr
+
+
+@pytest.mark.parametrize("degree_dist", ["0:0,1:0", "0:0,1:0,4:20", "0:0,1:0,7:0"])
+def test_c_still_accepts_reachable_targets(generator_exe, tmp_path, degree_dist):
+    """The guard must not catch legitimate requests.
+
+    ``7:0`` is the interesting one: it forbids degree-7 nodes rather than
+    demanding them, so it is satisfiable even though 7 exceeds max_func.
+    """
+    paths, proc = run_c(generator_exe, tmp_path / f"ok{abs(hash(degree_dist))}",
+                        "SC", dims="5x5x5", max_func=4, trials=500,
+                        degree_dist=degree_dist)
+    assert paths is not None, (
+        f"reachable target {degree_dist!r} was rejected:\n{proc.stderr[-500:]}"
+    )
 
 
 def test_c_mix_negative_fraction_rejected(generator_exe, tmp_path):

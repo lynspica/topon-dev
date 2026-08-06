@@ -14,6 +14,70 @@ Newest first.
 
 ---
 
+## 2026-08-05 — C/Python parity swept across the config matrix; two C bugs found
+
+**Change** Added [tests/workflows/compare_generators.py](../tests/workflows/compare_generators.py),
+which runs both generators over 24 configurations (four lattice types,
+four sizes including a non-cubic 3x4x5, seven mixtures, and every
+distribution mode) and compares site counts, mean degree, edge-length
+shells and the recorded box, then pushes a subset through the pipeline to
+a LAMMPS stage-1 minimize. Two bugs it exposed are fixed in
+[generator.c](../topon/topology/csrc/generator.c), and
+[generator_python.py](../topon/topology/generator_python.py) gained a
+matching fail-fast guard.
+
+**Why** V44 added `MIX` to both generators and V45 corrected which C
+source was vendored, but nothing had checked that the two actually agree
+across the space of things they can be asked for. "The tests pass" only
+covered the configurations the tests happened to use.
+
+**Issue / solution** Result: **22 of 24 configurations agree**, and the
+remaining two are targets neither generator can satisfy, which both now
+refuse. All six LAMMPS pathways complete a stage-1 minimize from
+C-generated topology: SC, BCC and FCC pruned to `max_func=4`, a
+0.2/0.4/0.4 mixture, a non-cubic 3x4x5, and an `e:200` edge-count target.
+Getting there turned up four things.
+
+*A prefix match swallowing typos.* The MIX dispatch used
+`strncmp(lattice_type, "MIX", 3) == 0`, which also matches `MIXED`,
+`MIXTURE` and anything else starting with those letters. Such a run built
+a silent pure-SC lattice instead of erroring, so a typo would cost a whole
+study without a single warning. Now requires the next character to be
+`:` or end-of-string.
+
+*A completion check that never looked at part of the request.* The stage-4
+done-check loops `for(i=0; i <= max_func; ++i)`, but
+`parse_degree_distribution` accepts any degree up to the array bound. Ask
+a `max_func=4` run for `7:5` and the target was parsed, stored, and never
+read again: the generator printed **"SUCCESS: Target distribution met!"**
+over a network containing zero degree-7 nodes. Same for `6:100`, where the
+lattice can supply degree 6 but sculpting cannot leave it there. Since no
+node can ever finish above `max_func`, such targets are now rejected up
+front with an explicit message. Python got the matching guard, ordered
+after the existing lattice-coordination check so the more fundamental
+reason still wins the error message.
+
+*Two of the disagreements were my own measurement, not the generators.*
+The C side arrives through `load_graph`, which drops degree-0 nodes, while
+a Python graph is returned raw, so a `0:5` defect target looked like a
+five-node discrepancy that was pure bookkeeping. And comparing raw edge
+counts on a mixture flags a 15% gap from a 7% site-count gap, because
+edges grow superlinearly with sites; mean degree is the scale-free form
+and agrees. Worth recording because both looked like real disagreements
+until the harness was examined rather than the code.
+
+*A cosmetic-looking divergence that is real.* `is_sc_lattice` is
+`strcmp(lattice_type, "SC") == 0`, so the degree-2 sculpting guard is off
+for `MIX:1,0,0` even though that builds the identical simple-cubic
+lattice. On 5x5x5 pruning to `max_func=4`, `SC` averages 221 edges against
+`MIX:1,0,0`'s 216. Both succeed and both are valid networks, they are just
+drawn from slightly different distributions. Left alone and documented.
+
+**Follow-up** Diamond exists only in Python, and per-axis periodicity only
+in C. Neither is a parity bug so much as a feature each side lacks.
+
+---
+
 ## 2026-08-05 — Wrong C source vendored; corrected, plus a 7x Python speedup
 
 **Change** Re-vendored `topon/topology/csrc/generator.c` from md5

@@ -846,6 +846,9 @@ For lower-level entry points (each stage individually), see ARCHITECTURE.md §2 
 | `generate_simbox_crosslink.py` | Drives `simbox.workflow.run_workflow` end-to-end |
 | `run_v41_matrix.py`, `run_v42_matrix.py`, `run_v43_core_topon.py` | Versioned sweep drivers — parameterise the workflows above and write into `tests/output/v<NN>/<cell>/` |
 | `analyze_v41_collapse.py` | Post-processing analysis for the v41 sweep |
+| `verify_lattice_box.py` | Audits the recorded periodic cell on all four lattices, then runs a BCC network through the pipeline + LAMMPS stage 1 |
+| `verify_mixed_lattice.py` | Builds a mixture end-to-end and reports the edge-length shells and bond-length tail against an SC baseline |
+| `compare_generators.py` | Sweeps the C searcher against the Python generator over lattices, sizes, mixtures and distribution modes; `--lammps` also builds and minimises a subset |
 
 Output goes to `tests/output/v<NN>/<cell>/` (gitignored). Don't introduce a parallel `runs/` folder — the convention is `tests/output/`.
 

@@ -133,6 +133,22 @@ class PythonTopologyGenerator:
                         f"lattice is {max_base_degree}; sculpting only removes "
                         f"edges, so this target is unreachable."
                     )
+                # Checked after the lattice bound, which is the more
+                # fundamental reason when both apply. Stage 3 prunes every
+                # node to max_func and stage 4 refuses to finish while any
+                # sits above it, so a target above the ceiling can never be
+                # met however rich the lattice was. Without this the run
+                # burns through every trial before giving up, and the C
+                # searcher used to report success on such a request
+                # outright -- see topon/topology/csrc/README.md.
+                if degree > self.max_func:
+                    raise ValueError(
+                        f"degree_distribution {degree}:{count} requires degree-"
+                        f"{degree} nodes on a {label} lattice, but "
+                        f"max_functionality is {self.max_func}; sculpting "
+                        f"enforces that ceiling, so no node can finish with "
+                        f"degree {degree}."
+                    )
 
     def generate(self, trials=1, max_saves=1, time_limit=None):
         """

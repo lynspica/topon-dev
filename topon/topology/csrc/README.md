@@ -15,6 +15,30 @@ immediate. What they share is the lattice construction and the
 `.nodes`/`.edges` format, and only that shared surface has to stay in
 step.
 
+## Feature status
+
+The two cover the same ground except at the ends of this table:
+
+| capability | C | Python |
+|---|---|---|
+| SC / BCC / FCC lattices | yes | yes |
+| `MIX` overlay with fractions + cutoff | yes | yes |
+| `# BOX` header recording the periodic cell | yes | yes (reader and writer) |
+| per-degree targets `d:N` | yes | yes |
+| total edge target `e:N` | yes | yes |
+| per-axis periodicity | yes | **no** (Python always wraps) |
+| Diamond lattice | **no** | yes (`generator_python_diamond.py`) |
+
+Verified by `tests/workflows/compare_generators.py`, which sweeps both
+across 24 configurations (lattices, sizes including non-cubic, mixtures
+and distribution modes) and compares site counts, mean degree,
+edge-length shells and the recorded box. **22 agree**; the other two ask
+for degree distributions no lattice can supply and both generators
+refuse them, each naming its own reason. A subset is then built through
+the pipeline to a LAMMPS stage-1 minimize, which all six complete:
+SC/BCC/FCC pruned to `max_func=4`, a 0.2/0.4/0.4 mixture, a non-cubic
+3x4x5, and an `e:200` edge-count target.
+
 ## Build
 
 ```bash
@@ -83,13 +107,24 @@ distributions, not individual networks.
 
 ### Known divergences
 
-Both predate the vendoring and are deliberately left alone:
+All predate the vendoring and are deliberately left alone:
 
 - **Periodicity.** This file honours `p_dims` per axis; the Python
   builders always wrap, ignoring the `periodicity` config value.
 - **The degree-2 guard.** In the sculpting stages it is gated on
-  `is_sc_lattice` here, but applied unconditionally in Python, so the two
-  sculpt BCC and FCC differently.
+  `is_sc_lattice`, computed as `strcmp(lattice_type, "SC") == 0`. Two
+  consequences: the guard is off for BCC and FCC where Python applies it
+  unconditionally, and it is also off for `MIX:1,0,0` even though that
+  builds the identical simple-cubic lattice. Measured on 5x5x5 pruning to
+  `max_func=4`, `SC` averages 221 edges against `MIX:1,0,0`'s 216. Both
+  succeed; the networks are just drawn from slightly different
+  distributions.
+- **Unreachable targets.** Python's fail-fast guard rejects a per-degree
+  target above the *lattice's* coordination; this file rejects one above
+  `max_func`. The two overlap but are not identical, so a request can be
+  refused by one and merely fail to converge in the other. Both refuse to
+  claim success.
+- **Diamond.** Only Python has it.
 
 ## Provenance
 

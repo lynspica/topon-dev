@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
 | **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
 | **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
 | **V43** | 2026-08-05 | **Generators record their periodic cell.** `infer_dims_from_graph` used to estimate the box as `max - min + 1`, exact for SC but half a cell too large for BCC/FCC/Diamond, which sent 33% of BCC edges (23% of FCC) to the wrong periodic replica at twice their true bond length. Generators now set `G.graph["box"]`; `.nodes` files carry a `# BOX` header. SC output unchanged. 20 unit tests. |
@@ -65,9 +66,54 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V45)
+## 4. Changelog (V1 – V46)
 
 Notable changes are documented in reverse chronological order.
+
+### [V46] — 2026-08-05 — C/Python parity sweep; two C bugs
+
+#### Added
+- **`tests/workflows/compare_generators.py`** — runs both generators over
+  24 configurations (SC/BCC/FCC/MIX, four sizes including a non-cubic
+  3x4x5, seven mixtures, per-degree and `e:N` distribution modes) and
+  compares site counts, mean degree, edge-length shells and the recorded
+  box, then pushes a subset through the pipeline to a LAMMPS stage-1
+  minimize. **22 of 24 agree**; the other two are targets neither
+  generator can satisfy and both now refuse. All six LAMMPS pathways
+  complete: SC, BCC and FCC pruned to `max_func=4`, a 0.2/0.4/0.4
+  mixture, a non-cubic 3x4x5, and an `e:200` edge-count target.
+
+#### Fixed
+- **`csrc/generator.c` — prefix match on the MIX dispatch.**
+  `strncmp(lattice_type, "MIX", 3) == 0` also matched `MIXED`, `MIXTURE`
+  and any other typo starting with those letters, and quietly built a
+  pure-SC lattice instead of erroring. Now requires `:` or end-of-string
+  after `MIX`.
+- **`csrc/generator.c` — targets above `max_func` were never checked.**
+  The stage-4 completion check loops only to `max_func`, but the parser
+  accepts higher degrees, so `7:5` on a `max_func=4` run was stored and
+  then ignored: the generator reported *"SUCCESS: Target distribution
+  met!"* over a network with no degree-7 nodes at all. Same for `6:100`,
+  where the lattice offers degree 6 but sculpting cannot leave it there.
+  No node can finish above `max_func`, so such targets are now rejected
+  up front.
+- **`generator_python.py`** gained the matching guard, ordered after the
+  existing lattice-coordination check so the more fundamental reason
+  still produces the error message. Previously these requests churned
+  through every trial before giving up.
+
+- **`pyproject.toml`** — `package-data` listed only `data/*`, so an
+  installed topon would have shipped no C source at all: `topology/csrc/`
+  has no `__init__.py` and is therefore not found as a package. Now
+  includes `topology/csrc/*.c` and `*.md`.
+
+#### Documented, not changed
+- `is_sc_lattice` is `strcmp(lattice_type, "SC") == 0`, so the degree-2
+  sculpting guard is off for `MIX:1,0,0` even though it builds the
+  identical SC lattice. On 5x5x5 pruning to `max_func=4`, `SC` averages
+  221 edges against `MIX:1,0,0`'s 216 — both valid, drawn from slightly
+  different distributions.
+- Diamond exists only in Python; per-axis periodicity only in C.
 
 ### [V45] — 2026-08-05 — Right C source; Python generator ~7x faster
 

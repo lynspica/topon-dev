@@ -60,7 +60,11 @@ where = ["."]
 include = ["topon*"]
 
 [tool.setuptools.package-data]
-topon = ["data/*"]
+# topology/csrc holds the C searcher's source, which has no __init__.py
+# and so is not picked up as a package. Without it listed here an
+# installed topon would ship no C source and `exe_path` would have
+# nothing to build from.
+topon = ["data/*", "topology/csrc/*.c", "topology/csrc/*.md"]
 
 [tool.black]
 line-length = 100

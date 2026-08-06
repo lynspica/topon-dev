@@ -147,6 +147,35 @@ def test_over_target_per_degree_degree_raises(small_lattice_config):
         gen.generate(trials=1_000_000, time_limit=5)
 
 
+def test_over_target_above_max_func_raises(small_lattice_config):
+    """A target the lattice could supply but max_functionality forbids.
+
+    Degree 6 exists on an SC lattice, so the lattice-bound guard lets it
+    through, but sculpting to max_functionality=4 means no node can end
+    there. Without this the run churns through every trial before giving
+    up. The C searcher has the matching guard; before it was added it
+    reported success on exactly this request while producing no degree-6
+    nodes at all.
+    """
+    config = small_lattice_config._replace(degree_distribution="6:5",
+                                           max_functionality=4)
+    gen = PythonTopologyGenerator(config)
+    with pytest.raises(ValueError, match=r"max_functionality is 4"):
+        gen.generate(trials=1_000_000, time_limit=5)
+
+
+def test_forbidding_a_high_degree_is_still_allowed(small_lattice_config):
+    """`d:0` forbids rather than demands, so it stays satisfiable.
+
+    The guard keys on `count > 0`; a zero count above max_functionality is
+    trivially met and must not be rejected.
+    """
+    config = small_lattice_config._replace(degree_distribution="0:0,1:0,6:0",
+                                           max_functionality=4)
+    gen = PythonTopologyGenerator(config)
+    assert gen.generate(trials=200, time_limit=30)
+
+
 # ---------------------------------------------------------------------------
 # Connectivity check: hand-rolled traversal must match NetworkX exactly
 # ---------------------------------------------------------------------------
