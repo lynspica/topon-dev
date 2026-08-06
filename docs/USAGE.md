@@ -976,10 +976,19 @@ across the cell. The `.nodes` file records the boundaries in a
 `# PERIODICITY 100` header (written only when an axis is open), and the
 conformation stage reads it.
 
+An open axis also gets **12 Å of vacuum** between the outermost atom and
+the box face, matching the pair cutoff the generated scripts use. That is
+not cosmetic: LAMMPS *deletes* atoms that leave a non-periodic (`f`) face,
+and the geometry handed to stage 1 is strained enough that surface atoms
+move several Å in the first few dozen steps. With only 1 Å of clearance a
+bonded atom was lost at step 49. Override with `open_axis_pad` if a run
+needs more, or less when the extra volume matters.
+
 The generated LAMMPS scripts still say `boundary p p p` — they are not
 periodicity-aware, and changing them is out of scope here. Set
-`boundary p f f` yourself to match; the geometry in the data file is
-already correct for it, with no bond crossing an open face.
+`boundary p f f` yourself to match; the data file is already correct for
+it. Verified on a Diamond `100` network: `p f f` and `p p p` both
+complete stage-1 minimization, with no bond crossing an open face.
 
 ##### Mixed lattices (`lattice_type: "MIX"`)
 

@@ -47,6 +47,7 @@ import numpy as np
 from rdkit import Chem
 
 # Stage 1 — topology interface
+from topon.topology.loader import graph_periodicity as _graph_periodicity
 from topon.topology.network import load as load_network
 
 # Stage 2 — chemistry (writers + displacement utilities)
@@ -317,16 +318,20 @@ def run(
 
     cm = ConformationManager(str(output_dir), study_name)
     # Same cell stage 2 routed the chains with, so boundary-wrapping
-    # chains land in a box of the same period.
+    # chains land in a box of the same period, plus the boundary
+    # conditions so an open axis is not wrapped and molecules stay whole.
+    periodicity = _graph_periodicity(G)
     conformed, roles = cm.apply_displacements(
         "system.data",
         lattice_box=None if dims is None else tuple(dims),
+        periodicity=periodicity,
     )
     noisy = cm.apply_noise(conformed, magnitude=1e-4)
     cm.resolve_overlaps(
         noisy, roles,
         cutoff=config["conformation"]["overlap_cutoff"],
         max_iters=config["conformation"].get("overlap_max_iters", 20),
+        periodicity=periodicity,
     )
 
     # =========================================================================

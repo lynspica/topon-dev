@@ -83,9 +83,20 @@ Notable changes are documented in reverse chronological order.
   spotted in, wraps across the **open** y and z axes went **98 → 0**
   (x keeps 123, correctly, because x is periodic). The topology graph was
   right all along: 0 edges crossed the open faces.
-- The box on an open axis is now `[min_atom − 1 Å, max_atom + 1 Å]`
-  rather than `[0, L]`, so nothing sits outside an `f` face. Verified
-  after overlap relaxation: 0 atoms outside on the open axes.
+- The box on an open axis is now `[min_atom − pad, max_atom + pad]`
+  rather than `[0, L]`. The pad defaults to **12 Å**, matching the pair
+  cutoff in the generated scripts, and is overridable via
+  `open_axis_pad`. It was first set to 1 Å on the argument that it only
+  needs to keep atoms off the face; the written geometry supported that
+  (0 atoms outside), but a real `boundary p f f` run then failed at step
+  49 with *"Bond atoms 25 15148 missing"* — LAMMPS deletes atoms leaving
+  an `f` face and topon's strained initial geometry moves surface atoms
+  several Å. With 12 Å both `p f f` and `p p p` complete.
+- **`cg_network.py` and `atomistic_network.py`** passed `lattice_box` but
+  not `periodicity`, so loading an open lattice through either standalone
+  workflow reverted to wrapping every axis. All three entry points now
+  share `loader.graph_periodicity`, with a test that reads their source
+  to assert the argument is present at both call sites.
 - `resolve_overlaps` no longer takes a minimum image across an open axis,
   and its push-back wrap no longer folds atoms to the far face. That wrap
   also learned about a non-zero `box_lo`, since an open axis can start

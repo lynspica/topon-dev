@@ -699,13 +699,9 @@ class Pipeline:
         consumer reads as fully periodic -- the behaviour before open
         boundaries were supported.
         """
-        if self.graph is None:
-            return None
-        axes = self.graph.graph.get("periodicity")
-        if axes is None:
-            return None
-        axes = tuple(bool(a) for a in axes)
-        return None if all(axes) else axes
+        from topon.topology.loader import graph_periodicity
+
+        return graph_periodicity(self.graph)
 
     def _run_conformation_stage(self) -> None:
         print("--- Stage 5: Conformation ---")

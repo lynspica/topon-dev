@@ -48,18 +48,38 @@ real periodic image and the bond is fine. It only bites under `p f f`,
 where the two halves are genuinely far apart and the bond is nonsense --
 which is exactly how the user intends to run these.
 
-The box on an open axis becomes `[min_atom - 1 Å, max_atom + 1 Å]`
-instead of `[0, L]`. The pad only has to keep atoms off the face, since
-LAMMPS deletes anything outside an `f` boundary; padding further would
-dilute a system that already has a free surface. Verified after overlap
-relaxation: **0 atoms outside the box on y and z**. Eight sit outside on
-x, which is harmless because `p` wraps them.
+The box on an open axis becomes `[min_atom - pad, max_atom + pad]`
+instead of `[0, L]`.
+
+**The pad had to be sized by running LAMMPS, not by reasoning.** The
+first attempt used 1 Å, on the argument that it only needs to keep atoms
+off the face. Checking the written geometry supported that: 0 atoms
+outside the box. But running the stage-1 minimize with `boundary p f f`
+failed at step 49 with *"Bond atoms 25 15148 missing"* — LAMMPS deletes
+atoms that leave an `f` face, and topon's initial geometry is strained
+enough (`E_mol` ~1.4e7, `Press` ~3.8e5 at step 2) that a surface atom
+crossed 1 Å easily. Atom 15148 had started 1.00 Å from the face; the bond
+itself was a healthy 0.58 Å. The default is now **12 Å**, matching the
+`lj/cut/coul/long 12.0` cutoff the generated scripts use, and
+`open_axis_pad` overrides it. With that, `p f f` and `p p p` both
+complete. The lesson: verifying the data file is not the same as
+verifying the run.
 
 `resolve_overlaps` needed the same treatment twice over: its minimum-image
 check must not take an image across an open axis, and its push-back wrap
 must not fold an atom to the far face. The wrap there also had to learn
 about a non-zero `box_lo`, since an open axis can now start below zero and
 a bare `%` would be wrong for the periodic axes sitting alongside it.
+
+**A second gap, found by asking whether the testing was actually enough:**
+`Pipeline` threaded `periodicity` through, but `cg_network.py` and
+`atomistic_network.py` passed only `lattice_box`. Loading an open lattice
+through either standalone workflow silently reverted to wrapping every
+axis, i.e. the exact bug this entry is about. All three now share
+`loader.graph_periodicity`, and a test reads the source of all three
+modules to assert the argument is present at both call sites — crude, but
+it is what catches a *missing* argument, which a behavioural test only
+covers on the path it happens to exercise.
 
 **Deliberately not changed:** the LAMMPS input writer still emits
 `boundary p p p`. Those scripts are calibrated and out of scope; the user

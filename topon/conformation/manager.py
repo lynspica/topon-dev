@@ -23,15 +23,25 @@ class ConformationManager:
         elif n == 5: return [2, 3, 4]
         else: return [4, 5, 6]
 
-    # Clearance left between the outermost atom and an open box face, in
-    # Angstrom. Only needs to be enough that nothing sits exactly on the
-    # face, since LAMMPS deletes atoms outside a non-periodic ("f")
-    # boundary. Deliberately small: an open axis already has a free
-    # surface, and padding further would dilute the system.
-    OPEN_AXIS_PAD = 1.0
+    # Vacuum left between the outermost atom and an open box face, in
+    # Angstrom.
+    #
+    # This is not cosmetic. LAMMPS *deletes* atoms that leave a
+    # non-periodic ("f") face, and the geometry topon hands to stage 1 is
+    # strained enough that surface atoms move several Angstrom in the
+    # first few dozen steps. A 1 A clearance was measured losing a bonded
+    # atom at step 49 ("Bond atoms 25 15148 missing"), even though that
+    # bond was a healthy 0.58 A at t=0.
+    #
+    # The default matches the pair cutoff the generated scripts use
+    # (12 A lj/cut/coul/long), which is also the usual slab-construction
+    # rule: enough vacuum that the free surface cannot interact across
+    # the gap. Override via the conformation config when a run needs more
+    # or when the extra volume matters.
+    OPEN_AXIS_PAD = 12.0
 
     def apply_displacements(self, base_filename="system.data", lattice_box=None,
-                            periodicity=None):
+                            periodicity=None, open_axis_pad=None):
         """
         Applies displacements, calculates the IDEAL lattice box,
         and wraps all coordinates into it.
@@ -190,13 +200,14 @@ class ConformationManager:
         # Box bounds. A periodic axis keeps [0, L] because everything was
         # wrapped into it. An open axis was not wrapped, so the box has to
         # cover wherever the atoms actually landed, plus a clearance.
+        pad = self.OPEN_AXIS_PAD if open_axis_pad is None else float(open_axis_pad)
         lo = {axis: 0.0 for axis in "xyz"}
         hi = dict(box_len)
         for axis in "xyz":
             if periodic[axis] or not placed[axis]:
                 continue
-            lo[axis] = min(min(placed[axis]), 0.0) - self.OPEN_AXIS_PAD
-            hi[axis] = max(max(placed[axis]), box_len[axis]) + self.OPEN_AXIS_PAD
+            lo[axis] = min(min(placed[axis]), 0.0) - pad
+            hi[axis] = max(max(placed[axis]), box_len[axis]) + pad
 
         open_axes = [axis for axis in "xyz" if not periodic[axis]]
         if open_axes:

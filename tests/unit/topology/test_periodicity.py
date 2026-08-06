@@ -270,6 +270,62 @@ def test_malformed_periodicity_header_is_ignored(tmp_path):
         assert read_periodicity_header(p) is None
 
 
+def test_every_conformation_entry_point_passes_periodicity():
+    """Pipeline and both standalone workflows must all thread it through.
+
+    They were not: `Pipeline` passed `periodicity` while `cg_network` and
+    `atomistic_network` passed only `lattice_box`, so loading an open
+    lattice through a workflow silently reverted to wrapping every axis.
+    Reading the source is crude but it is what catches a *missing*
+    argument; a behavioural test only covers the path it exercises.
+    """
+    import inspect
+
+    from topon import pipeline
+    from topon.workflows import atomistic_network, cg_network
+
+    def arg_list(src, start):
+        """Text between the call's parentheses, honouring nesting.
+
+        Stopping at the first ``)`` would truncate at an inner call such
+        as ``tuple(self.dims)`` and report a false miss.
+        """
+        depth, i = 0, src.index("(", start)
+        for j in range(i, len(src)):
+            if src[j] == "(":
+                depth += 1
+            elif src[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    return src[i + 1:j]
+        raise AssertionError("unbalanced parentheses")
+
+    for module in (pipeline, cg_network, atomistic_network):
+        src = inspect.getsource(module)
+        for call in ("apply_displacements(", "resolve_overlaps("):
+            start = src.find(call)
+            assert start != -1, f"{module.__name__} does not call {call}"
+            assert "periodicity" in arg_list(src, start), (
+                f"{module.__name__} calls {call} without periodicity; an "
+                f"open axis would be wrapped and molecules split"
+            )
+
+
+def test_graph_periodicity_helper_normalises():
+    """None for unknown and for all-periodic; the tuple only when open."""
+    from topon.topology.loader import graph_periodicity
+
+    assert graph_periodicity(None) is None
+    assert graph_periodicity(nx.Graph()) is None
+
+    g = nx.Graph()
+    g.graph["periodicity"] = (True, True, True)
+    assert graph_periodicity(g) is None       # all-periodic reads as "default"
+
+    g.graph["periodicity"] = (True, False, True)
+    assert graph_periodicity(g) == (True, False, True)
+
+
 def test_open_axis_is_not_wrapped_by_the_conformation_stage(tmp_path):
     """The defect this fixes: an open axis must not fold molecules.
 

@@ -219,6 +219,31 @@ BOX_HEADER_KEY = "BOX"
 PERIODICITY_HEADER_KEY = "PERIODICITY"
 
 
+def graph_periodicity(G):
+    """Per-axis boundaries a graph was built with, or None if all-periodic.
+
+    Returns None both when nothing was recorded and when every axis is
+    periodic, because every consumer treats those identically and the
+    None case is the one that reproduces pre-open-boundary behaviour.
+
+    Shared by ``Pipeline`` and the standalone workflows so the three
+    cannot drift on what an open axis means.
+
+    Args:
+        G: Graph, possibly carrying a ``periodicity`` graph attribute.
+
+    Returns:
+        ``(px, py, pz)`` booleans, or None.
+    """
+    if G is None:
+        return None
+    axes = G.graph.get("periodicity")
+    if axes is None:
+        return None
+    axes = tuple(bool(a) for a in axes)
+    return None if all(axes) else axes
+
+
 def format_periodicity_header(periodicity) -> str:
     """Render per-axis boundaries as a ``.nodes`` header line.
 
