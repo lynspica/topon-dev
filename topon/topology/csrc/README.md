@@ -17,17 +17,17 @@ step.
 
 ## Feature status
 
-The two cover the same ground except at the ends of this table:
+The two now cover the same ground:
 
 | capability | C | Python |
 |---|---|---|
 | SC / BCC / FCC lattices | yes | yes |
+| Diamond lattice | yes | yes (`generator_python_diamond.py`) |
 | `MIX` overlay with fractions + cutoff | yes | yes |
+| per-axis periodicity | yes | yes |
 | `# BOX` header recording the periodic cell | yes | yes (reader and writer) |
 | per-degree targets `d:N` | yes | yes |
 | total edge target `e:N` | yes | yes |
-| per-axis periodicity | yes | **no** (Python always wraps) |
-| Diamond lattice | **no** | yes (`generator_python_diamond.py`) |
 
 Verified by `tests/workflows/compare_generators.py`, which sweeps both
 across 24 configurations (lattices, sizes including non-cubic, mixtures
@@ -64,7 +64,7 @@ generator.exe <dims> <periodicity> <max_func> <max_trials> <max_saves> "<degree_
 | `max_saves` | networks to write |
 | `degree_dist` | `"d:N,..."` per-degree counts, or `"e:N"` for a total edge count |
 | `logging` | `0` or `1` |
-| `lattice_type` | `SC`, `BCC`, `FCC`, or `MIX:<sc>,<bcc>,<fcc>[,<cutoff>]` |
+| `lattice_type` | `SC`, `BCC`, `FCC`, `Diamond`, or `MIX:<sc>,<bcc>,<fcc>[,<cutoff>]` |
 
 The mix fractions ride inside the `lattice_type` argument rather than
 taking a ninth position, so scripts written against the original
@@ -79,6 +79,12 @@ enumerate a fixed neighbour pattern instead.
 ```bash
 ./generator.exe 6x6x6 111 4 1000 1 "0:0,1:0" 0 SC
 ./generator.exe 6x6x6 111 4 1000 1 "0:0,1:0" 0 MIX:0.2,0.4,0.4
+
+# Diamond is 4-coordinated already, so max_func=4 needs no pruning
+./generator.exe 6x6x6 111 4 10 1 "" 0 Diamond
+
+# A slab: periodic in x and y, open in z
+./generator.exe 6x6x6 110 4 1000 1 "0:0,1:0" 0 SC
 ```
 
 ## Output
@@ -101,16 +107,31 @@ business.
 site counts, coordinates, the `# BOX` header, and that the C sculpts the
 same configurations Python does. It skips when no compiler is on PATH.
 
-The two do not produce identical draws. This one seeds from
-`srand(time(NULL))` and draws from `rand()`, so parity is over
-distributions, not individual networks.
+The two do not produce identical draws: this one draws from `rand()`
+seeded per process, so parity is over distributions, not individual
+networks.
+
+## Seeding
+
+The seed mixes the clock with the pid. `time(NULL)` alone advances only
+once a second, so a script looping this executable to collect N networks
+used to get **byte-identical output from every run that started in the
+same second** — three back-to-back MIX runs produced the same file.
+
+Set `TOPON_SEED` for a reproducible run:
+
+```bash
+TOPON_SEED=42 ./generator.exe 6x6x6 111 4 1000 1 "0:0,1:0" 0 MIX:0.2,0.4,0.4
+```
+
+Without it every run differs, which is what you want when collecting a
+population of networks. The Python generator gets the same control by
+seeding `random` before calling `generate`.
 
 ### Known divergences
 
 All predate the vendoring and are deliberately left alone:
 
-- **Periodicity.** This file honours `p_dims` per axis; the Python
-  builders always wrap, ignoring the `periodicity` config value.
 - **The degree-2 guard.** In the sculpting stages it is gated on
   `is_sc_lattice`, computed as `strcmp(lattice_type, "SC") == 0`. Two
   consequences: the guard is off for BCC and FCC where Python applies it
@@ -124,7 +145,14 @@ All predate the vendoring and are deliberately left alone:
   `max_func`. The two overlap but are not identical, so a request can be
   refused by one and merely fail to converge in the other. Both refuse to
   claim success.
-- **Diamond.** Only Python has it.
+- **No wall-clock limit.** Python's `generate` takes a `time_limit`; this
+  file has no equivalent, so a structurally-impossible request looks like
+  a hang rather than a failure. It is not an infinite loop — each trial
+  does terminate — but stage 4's systematic search on a doomed graph
+  scales badly: with `"0:0,1:0"` on a fully open Diamond, 2x2x2 is
+  instant, 3x3x3 exceeds 90 s for three trials, and a single 4x4x4 trial
+  did not finish in 300 s. Prefer a small lattice when probing whether a
+  distribution is satisfiable at all.
 
 ## Provenance
 

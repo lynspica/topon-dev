@@ -96,22 +96,29 @@ def _diamond_sublattice_offsets(hx: int, hy: int, hz: int):
     )
 
 
-def create_diamond_lattice(Nx: int, Ny: int, Nz: int) -> nx.Graph:
-    """Build the full Diamond lattice as a NetworkX Graph (periodic BC).
+def create_diamond_lattice(
+    Nx: int, Ny: int, Nz: int,
+    periodicity: tuple[bool, bool, bool] = (True, True, True),
+) -> nx.Graph:
+    """Build the full Diamond lattice as a NetworkX Graph.
 
     Returns a graph with ``8*Nx*Ny*Nz`` nodes, each with attribute
     ``pos = (x, y, z)`` in units of the conventional cubic unit cell
     (so the box spans ``[0, Nx] x [0, Ny] x [0, Nz]``).
 
-    Every node has exactly 4 neighbors → ``avg_degree = 4.0``.
+    Every node has exactly 4 neighbors → ``avg_degree = 4.0`` when fully
+    periodic. ``periodicity`` opens individual axes: an open axis omits
+    its wrap-around bonds, so sites on that face drop below 4.
 
     The periodic cell (Nx, Ny, Nz) is recorded on the graph. Diamond
     basis sites sit at quarter-cell offsets, so the coordinates only
     reach Nx-0.25 and estimating the box from their extent would
     overshoot it.
     """
+    px, py, pz = periodicity
     g = nx.Graph()
     g.graph["box"] = (float(Nx), float(Ny), float(Nz))
+    g.graph["periodicity"] = (px, py, pz)
 
     # 8 atoms per conventional unit cell, in (low-res, low-res, low-res)
     # × 4 -> integer high-res coords. The 8 positions are the 4 FCC sites
@@ -148,21 +155,28 @@ def create_diamond_lattice(Nx: int, Ny: int, Nz: int) -> nx.Graph:
                     coord_to_id[(hx, hy, hz)] = node_idx
                     node_idx += 1
 
-    # Step 2: connect each atom to its 4 nearest neighbors (PBC via
-    # modulo on the high-res grid). The (uid < vid) guard prevents
-    # double-adding undirected edges.
+    # Step 2: connect each atom to its 4 nearest neighbors. A periodic
+    # axis wraps by modulo on the high-res grid; an open one drops the
+    # neighbour instead, leaving a free surface. The (uid < vid) guard
+    # prevents double-adding undirected edges.
     for (hx, hy, hz), uid in coord_to_id.items():
         for dx, dy, dz in _diamond_sublattice_offsets(hx, hy, hz):
-            nhx = (hx + dx) % hr_Nx
-            nhy = (hy + dy) % hr_Ny
-            nhz = (hz + dz) % hr_Nz
-            vid = coord_to_id.get((nhx, nhy, nhz))
-            if vid is None:
-                # Should not happen on a fully populated, periodic
-                # Diamond lattice -- but guard anyway.
-                continue
-            if uid < vid:
-                g.add_edge(uid, vid)
+            addr = []
+            for raw, extent, is_periodic in (
+                (hx + dx, hr_Nx, px), (hy + dy, hr_Ny, py), (hz + dz, hr_Nz, pz)
+            ):
+                if is_periodic:
+                    addr.append(raw % extent)
+                elif 0 <= raw < extent:
+                    addr.append(raw)
+                else:
+                    break            # left an open face; no neighbour there
+            else:
+                # On a fully populated periodic lattice every address
+                # resolves; the .get() guard covers the open-face case.
+                vid = coord_to_id.get(tuple(addr))
+                if vid is not None and uid < vid:
+                    g.add_edge(uid, vid)
 
     return g
 

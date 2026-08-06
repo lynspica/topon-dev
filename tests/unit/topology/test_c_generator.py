@@ -23,6 +23,7 @@ Every test compiles the C source on the fly and skips when no compiler is
 available, so the suite still runs on machines without one.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -63,7 +64,7 @@ def generator_exe(tmp_path_factory):
 
 
 def run_c(exe, workdir, lattice_arg, dims="4x4x4", max_func=64,
-          trials=20, degree_dist="0:0,1:0"):
+          trials=20, degree_dist="0:0,1:0", periodicity="111"):
     """Run the C generator and return (nodes_path, edges_path) or None.
 
     ``max_func`` defaults above any degree these lattices reach (a mixture
@@ -75,7 +76,7 @@ def run_c(exe, workdir, lattice_arg, dims="4x4x4", max_func=64,
     """
     workdir.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
-        [str(exe), dims, "111", str(max_func), str(trials), "1",
+        [str(exe), dims, periodicity, str(max_func), str(trials), "1",
          degree_dist, "0", lattice_arg],
         cwd=workdir, capture_output=True, text=True, timeout=600,
     )
@@ -121,6 +122,106 @@ def test_c_sc_output_matches_the_python_sc_lattice(generator_exe, tmp_path):
     expected = {(float(x), float(y), float(z))
                 for x in range(4) for y in range(4) for z in range(4)}
     assert positions == expected
+
+
+# ---------------------------------------------------------------------------
+# Diamond and periodicity: exact parity, both sides deterministic
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "lattice_type,periodicity",
+    [(lat, per)
+     for lat in ("SC", "BCC", "FCC", "Diamond")
+     for per in ("111", "110", "100", "000")],
+)
+def test_c_and_python_build_identical_lattices(generator_exe, tmp_path,
+                                               lattice_type, periodicity):
+    """Same sites AND the same edge set, for every lattice and boundary.
+
+    Lattice construction is deterministic on both sides (only MIX draws
+    randomly), so this is an exact comparison rather than a statistical
+    one. It covers the two features that used to exist on one side only:
+    Diamond was Python-only, per-axis periodicity C-only.
+    """
+    import random
+
+    from topon.topology.generator_python import PythonTopologyGenerator
+    from topon.topology.generator_python_diamond import create_diamond_lattice
+
+    paths, proc = run_c(generator_exe, tmp_path / f"{lattice_type}_{periodicity}",
+                        lattice_type, periodicity=periodicity, trials=5,
+                        degree_dist="")
+    assert paths is not None, (
+        f"C produced nothing for {lattice_type} periodicity={periodicity}:\n"
+        f"{proc.stdout[-800:]}{proc.stderr[-800:]}"
+    )
+    G_c, _ = load_graph(nodes_path=paths[0], edges_path=paths[1])
+
+    axes = tuple(c == "1" for c in periodicity)
+    if lattice_type == "Diamond":
+        G_py = create_diamond_lattice(4, 4, 4, axes)
+    else:
+        class _Cfg:
+            lattice_size = (4, 4, 4)
+            max_functionality = 64
+            degree_distribution = ""
+            mix_fractions = {"SC": 1.0, "BCC": 0.0, "FCC": 0.0}
+            mix_cutoff = 1.0
+        cfg = _Cfg()
+        cfg.lattice_type = lattice_type
+        cfg.periodicity = periodicity
+        random.seed(0)
+        G_py = PythonTopologyGenerator(cfg)._create_lattice((4, 4, 4), lattice_type)
+
+    assert G_c.number_of_nodes() == G_py.number_of_nodes()
+    assert ({frozenset(e) for e in G_c.edges()}
+            == {frozenset(e) for e in G_py.edges()}), (
+        f"{lattice_type} periodicity={periodicity}: edge sets differ "
+        f"(C {G_c.number_of_edges()}, Python {G_py.number_of_edges()})"
+    )
+
+
+def test_c_diamond_is_four_coordinated(generator_exe, tmp_path):
+    """Diamond's whole point: 4-regular without any sculpting."""
+    paths, proc = run_c(generator_exe, tmp_path / "dia", "Diamond",
+                        dims="3x3x3", max_func=4, trials=5, degree_dist="")
+    assert paths is not None, f"C produced nothing:\n{proc.stdout[-800:]}"
+    G, dims = load_graph(nodes_path=paths[0], edges_path=paths[1])
+
+    assert G.number_of_nodes() == 8 * 27
+    assert {d for _, d in G.degree()} == {4}
+    assert np.allclose(dims, [3.0, 3.0, 3.0])
+
+    pos = {n: np.asarray(d["pos"], float) for n, d in G.nodes(data=True)}
+    box = np.asarray(dims, float)
+    lengths = np.asarray([
+        np.linalg.norm((pos[u] - pos[v]) - box * np.round((pos[u] - pos[v]) / box))
+        for u, v in G.edges()
+    ])
+    assert np.allclose(lengths, np.sqrt(3) / 4)
+
+
+def test_c_accepts_both_diamond_spellings(generator_exe, tmp_path):
+    for spelling in ("Diamond", "DIAMOND"):
+        paths, proc = run_c(generator_exe, tmp_path / spelling, spelling,
+                            dims="2x2x2", max_func=4, trials=3, degree_dist="")
+        assert paths is not None, f"{spelling} rejected:\n{proc.stderr[-400:]}"
+
+
+def test_c_open_axis_drops_only_wrap_bonds(generator_exe, tmp_path):
+    """Opening an axis leaves the sites alone and removes wrap bonds."""
+    closed, _ = run_c(generator_exe, tmp_path / "closed", "SC",
+                      max_func=6, trials=5, degree_dist="")
+    open_z, _ = run_c(generator_exe, tmp_path / "open", "SC",
+                      max_func=6, trials=5, degree_dist="", periodicity="110")
+    assert closed is not None and open_z is not None
+
+    Gc, _ = load_graph(nodes_path=closed[0], edges_path=closed[1])
+    Go, _ = load_graph(nodes_path=open_z[0], edges_path=open_z[1])
+
+    assert Gc.number_of_nodes() == Go.number_of_nodes() == 64
+    assert Gc.number_of_edges() == 192
+    assert Go.number_of_edges() == 176        # one 4x4 layer of z-wraps gone
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +443,55 @@ def test_c_still_accepts_reachable_targets(generator_exe, tmp_path, degree_dist)
     assert paths is not None, (
         f"reachable target {degree_dist!r} was rejected:\n{proc.stderr[-500:]}"
     )
+
+
+def test_c_runs_started_together_are_independent(generator_exe, tmp_path):
+    """Back-to-back runs must not produce the same network.
+
+    `srand(time(NULL))` alone advances once a second, so a script looping
+    this executable to collect N networks got byte-identical output from
+    every run that started within the same second. Verified before the
+    fix: three back-to-back MIX runs produced the same file. The pid is
+    now mixed into the seed.
+
+    MIX is the probe because its site draw makes any shared stream
+    obvious in the node count; the pure lattices would look identical
+    regardless.
+    """
+    counts, digests = [], []
+    for i in range(4):
+        paths, proc = run_c(generator_exe, tmp_path / f"indep{i}",
+                            "MIX:0.2,0.4,0.4", trials=3, degree_dist="")
+        assert paths is not None, f"run {i} produced nothing:\n{proc.stdout[-600:]}"
+        counts.append(len(
+            [ln for ln in paths[0].read_text().splitlines()
+             if ln and not ln.startswith("#")]
+        ))
+        digests.append(paths[0].read_text())
+
+    assert len(set(digests)) > 1, (
+        f"all {len(digests)} runs produced identical output (node counts "
+        f"{counts}); the seed is not varying between runs"
+    )
+
+
+def test_c_seed_env_makes_runs_reproducible(generator_exe, tmp_path):
+    """TOPON_SEED pins the stream, the way seeding `random` does in Python."""
+    outputs = []
+    for i in range(2):
+        workdir = tmp_path / f"seeded{i}"
+        workdir.mkdir(parents=True, exist_ok=True)
+        proc = subprocess.run(
+            [str(generator_exe), "4x4x4", "111", "64", "3", "1", "", "0",
+             "MIX:0.2,0.4,0.4"],
+            cwd=workdir, capture_output=True, text=True, timeout=600,
+            env={**os.environ, "TOPON_SEED": "42"},
+        )
+        nodes = sorted((workdir / "output").glob("*.nodes"))
+        assert nodes, f"seeded run {i} produced nothing:\n{proc.stdout[-600:]}"
+        outputs.append(nodes[0].read_text())
+
+    assert outputs[0] == outputs[1], "TOPON_SEED did not make the run reproducible"
 
 
 def test_c_mix_negative_fraction_rejected(generator_exe, tmp_path):

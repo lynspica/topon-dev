@@ -32,6 +32,7 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V47** | 2026-08-05 | **Diamond added to C, per-axis periodicity added to Python** — the last two asymmetries. Both are deterministic, so parity is now exact: all 16 lattice x periodicity combinations produce identical edge sets, and Diamond matches node-for-node including ids. `lattice_type: "Diamond"` works through the config on both paths. Also fixed a C seeding bug that made **every run started in the same second produce the same network**. Found that open boundaries make `"0:0,1:0"` unsatisfiable on BCC and Diamond (free-surface sites have degree 1). |
 | **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
 | **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
 | **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
@@ -66,9 +67,73 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V46)
+## 4. Changelog (V1 – V47)
 
 Notable changes are documented in reverse chronological order.
+
+### [V47] — 2026-08-05 — Diamond in C, per-axis periodicity in Python
+
+#### Added
+- **`csrc/generator.c`** — `create_diamond_lattice` plus a `Diamond` /
+  `DIAMOND` dispatch. Eight sites per cubic cell, 4-coordinated by
+  construction, so a `max_func=4` network needs no pruning. Walks the
+  basis in the same order as `generator_python_diamond.py`, so the two
+  number their nodes identically.
+- **`generator_python.py`** — reads `periodicity` (previously ignored
+  entirely) and honours it per axis in the SC, BCC, FCC and MIX
+  builders. `generator_python_diamond.create_diamond_lattice` takes the
+  same argument. Accepts the C's `"110"` digit string, a bool, or any
+  3-element iterable; an unparseable value falls back to fully periodic
+  with a warning, since guessing "open" would silently introduce free
+  surfaces.
+- **`lattice_type: "Diamond"`** in the config schema and in
+  `_create_lattice`, which dispatches to the standalone module rather
+  than inlining it — the Diamond logic stays reviewable in isolation.
+  Also offered by `topon init --interactive` (MIX is not: it needs
+  fractions, which is more than that prompt should ask).
+- **29 tests** in `tests/unit/topology/test_periodicity.py`, plus 18
+  exact-parity cases in `test_c_generator.py`.
+
+#### Verified
+Both features are deterministic on both sides, so parity is exact rather
+than statistical: across **four lattice types x four periodicity
+settings, all 16 produce identical edge sets**. Diamond additionally
+matches node-for-node including ids.
+
+#### Behaviour change
+A config setting a non-default `periodicity` on the Python path used to
+be silently ignored and produce a fully periodic lattice; it now builds
+the slab it asked for. Configs at the `"111"` default are unaffected,
+which `test_default_is_fully_periodic_and_unchanged` pins.
+
+#### Fixed
+- **`csrc/generator.c` seeded only from `time(NULL)`**, which advances
+  once a second, so **every C run started within the same second
+  produced byte-identical output**. A script looping the executable to
+  collect N networks was silently collecting N copies of one network.
+  Caught by the comparison sweep, where the "independent" reps of a
+  mixture were not independent and skewed the site-count statistics. The
+  pid is now mixed in, and `TOPON_SEED` overrides for a reproducible run
+  (the Python equivalent is seeding `random` before calling `generate`).
+
+#### Found while testing
+- Opening an axis puts corner sites on a free surface with very low
+  coordination. On 4x4x4 with every axis open the minimum degree is 3 for
+  SC and FCC but **1 for BCC (2 sites) and Diamond (22 sites)**, which
+  makes the usual `"0:0,1:0"` unsatisfiable there — clearing a degree-1
+  site means cutting its last bond, producing the degree-0 node the same
+  request forbids. Both generators decline. Documented in `USAGE.md` with
+  the per-lattice table.
+- **The C searcher has no wall-clock limit**, so a structurally-doomed
+  request looks like a hang. Not an infinite loop — each trial does
+  terminate — but stage 4's systematic search scales badly on a graph it
+  can never satisfy: for `"0:0,1:0"` on an open Diamond, 2x2x2 is
+  instant, 3x3x3 exceeds 90 s for three trials, and a **single 4x4x4
+  trial did not finish in 300 s**, where Python gives up in ~0.25 s per
+  trial via its `time_limit`. Pre-existing, newly reachable. Two fixes
+  suggest themselves and neither is applied here: a pre-flight guard
+  comparing requested `d0`/`d1` counts against the sites the boundary
+  forces below that degree, and a wall-clock cap matching Python's.
 
 ### [V46] — 2026-08-05 — C/Python parity sweep; two C bugs
 

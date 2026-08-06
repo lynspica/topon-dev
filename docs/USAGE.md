@@ -905,16 +905,68 @@ Top-level sections:
 |---|---|---|---|
 | `exe_path` | string \| null | `null` | Path to `generator.exe`; `null` → use Python generator |
 | `lattice_size` | string | `"6x6x6"` | Lattice dimensions, e.g. `"8x8x8"` |
-| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` \| `"MIX"` | `"SC"` | Lattice type; `MIX` overlays the three (see below) |
+| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` \| `"Diamond"` \| `"MIX"` | `"SC"` | Lattice type; `MIX` overlays SC/BCC/FCC (see below) |
 | `mix_fractions` | object | `{"SC":1,"BCC":0,"FCC":0}` | Sublattice fractions for `MIX`; must sum to 1 |
 | `mix_cutoff` | float | `1.0` | Neighbour cutoff for `MIX`, in cell units |
-| `periodicity` | string | `"111"` | Periodicity per axis (`1`=periodic, `0`=open) |
+| `periodicity` | string | `"111"` | Periodicity per axis (`1`=periodic, `0`=open); see below |
 | `max_functionality` | int | `6` | Maximum crosslink degree per node |
 | `max_trials` | int | `1000000` | Trials before giving up |
 | `max_saves` | int | `1` | Number of networks to save |
 | `degree_distribution` | string | `"0:0,1:0"` | Target degree distribution |
 
 Degree distribution format: `"d:N"` requires N nodes of degree d; `"e:N"` requires N edges total; omitted degrees are unconstrained. Example: `"0:15,1:30,e:371"`.
+
+##### Diamond (`lattice_type: "Diamond"`)
+
+Two interpenetrating FCC sublattices offset by ¼ along the body diagonal:
+8 sites per cubic cell, **every site exactly 4-coordinated by
+construction**. A `max_functionality: 4` network therefore needs no
+pruning at all, which makes it the cleanest backbone for a tetrafunctional
+network and much faster to generate than sculpting SC or FCC down to 4.
+
+```json
+"generator": { "lattice_type": "Diamond", "lattice_size": "6x6x6",
+               "max_functionality": 4, "degree_distribution": "" }
+```
+
+An `NxNxN` Diamond has `8N³` sites and `16N³` bonds at a nearest-neighbour
+distance of `√3/4 ≈ 0.433` cells. Both generators build it identically.
+
+##### Boundaries (`periodicity`)
+
+One digit per axis, `1` periodic and `0` open. An open axis omits its
+wrap-around bonds, so the lattice grows a **free surface** there and the
+sites on it lose coordination. The site set is unchanged either way.
+
+```json
+"generator": { "lattice_size": "6x6x6", "periodicity": "110" }
+```
+
+That builds a slab: periodic in x and y, open in z. On a 4x4x4 SC lattice
+the bond count goes 192 → 176 → 160 → 144 as you open one, two and three
+axes, and the surface sites drop from degree 6 to 5.
+
+**Open boundaries interact with `degree_distribution`.** Corner and edge
+sites on a free surface have very low coordination, and the centred
+lattices lose the most:
+
+| lattice (4x4x4) | min degree, `"111"` | `"110"` | `"000"` |
+|---|---|---|---|
+| SC | 6 | 5 | 3 |
+| BCC | 8 | 4 | 1 (2 such sites) |
+| FCC | 12 | 8 | 3 |
+| Diamond | 4 | 2 | 1 (22 such sites) |
+
+So the usual `"0:0,1:0"` (no isolated nodes, no dangling ends) is
+**unsatisfiable** on a fully open BCC or Diamond: the only way to clear a
+degree-1 site is to cut its last bond, which makes it degree 0, and that
+is forbidden too. Both generators decline rather than claim success. On
+SC the minimum stays at 3, so the same request is fine. Either drop the
+`1:0` term on open lattices, or leave `degree_distribution` empty and let
+`max_functionality` do the work.
+
+`max_functionality` still applies on top, so a partially open lattice
+reaches the ceiling with less pruning than a closed one.
 
 ##### Mixed lattices (`lattice_type: "MIX"`)
 

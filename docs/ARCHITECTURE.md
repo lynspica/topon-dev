@@ -19,7 +19,7 @@ Three peer sub-systems share the same Python package. They do related but distin
 | LAMMPS data | `atom_style full`, wrap-only (7-column atom rows, no image flags) | `atom_style full`, wrap-only (same convention as core topon) | `atom_style full`, wrap-only |
 | Pipeline | the six stages below | BFM lattice → JSON snapshot → 3-stage relax (parallel pipeline) | independent packing flow |
 | Crosslinks | Y-merge (CG) / chemistry-defined (atomistic) | dityrosine SC4–SC4 (TN6 bead) | reaction templates (epoxy/amine, etc.) |
-| Topology shape | lattice graph (SC / BCC / FCC, configurable functionality) | BFM self-avoiding-walk lattice | molecule library + grid packing |
+| Topology shape | lattice graph (SC / BCC / FCC / Diamond / MIX, configurable functionality) | BFM self-avoiding-walk lattice | molecule library + grid packing |
 
 A fourth, smaller utility — `topon/singlechain/` — handles single-chain solubility computations and is used by neither the main pipeline nor topro directly.
 
@@ -59,9 +59,12 @@ Generates or loads a NetworkX `MultiGraph`. Nodes are network junctions; edges a
 - `source="generate"` — calls the C generator (`generator.exe`) via `topon.topology.generator.run_generator`, then loads `.nodes`/`.edges` files.
 - `source="load"` — reads existing `.gpickle` or `.nodes`+`.edges` files via `topon.topology.loader.load_graph`.
 
-Lattices: `SC`, `BCC`, `FCC` (fixed neighbour patterns), plus `MIX`, which
-overlays their basis sites in one cubic cell at configurable fractions and
-connects by distance cutoff.
+Lattices: `SC`, `BCC`, `FCC` and `Diamond` (fixed neighbour patterns),
+plus `MIX`, which overlays SC/BCC/FCC basis sites in one cubic cell at
+configurable fractions and connects by distance cutoff. `periodicity`
+opens individual axes, giving a free surface on that face. Both
+generators support all five lattices and per-axis boundaries, and build
+identical lattices for every combination.
 
 **Two generators, two jobs.** The C source in
 [`topon/topology/csrc/`](../topon/topology/csrc/) is the standalone

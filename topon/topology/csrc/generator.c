@@ -57,7 +57,12 @@
 #include <sys/stat.h> // For mkdir
 #ifdef _WIN32
 #include <direct.h> // For _mkdir on Windows
+#include <process.h> // For _getpid
 #define mkdir(dir, mode) _mkdir(dir)
+#define topon_getpid _getpid
+#else
+#include <unistd.h> // For getpid
+#define topon_getpid getpid
 #endif
 
 
@@ -1031,6 +1036,105 @@ Graph* create_fcc_lattice(int Nx, int Ny, int Nz, const int* p_dims) {
     return g;
 }
 
+/* Diamond lattice: 8 sites per conventional cubic cell, every site
+ * exactly 4-coordinated by construction. Two interpenetrating FCC
+ * sublattices offset by (1/4, 1/4, 1/4) along the body diagonal.
+ *
+ * This is the cleanest backbone for a max_func=4 network: the raw
+ * lattice already satisfies that ceiling, so sculpting has nothing to
+ * prune unless defects are requested.
+ *
+ * Mirrors create_diamond_lattice in generator_python_diamond.py,
+ * including the site order (cell-major, then the eight basis sites in
+ * the order listed below), so the two number their nodes identically.
+ *
+ * Sites live on a x4 integer grid. A-sublattice sites satisfy
+ * (hx+hy+hz) % 4 == 0 and reach their four neighbours through the
+ * sign-product +1 offsets; B-sublattice sites satisfy sum % 4 == 3 and
+ * use the sign-product -1 offsets. No other residue holds a site.
+ */
+Graph* create_diamond_lattice(int Nx, int Ny, int Nz, const int* p_dims) {
+    static const int basis_hr[8][3] = {
+        {0,0,0}, {2,2,0}, {2,0,2}, {0,2,2},     /* A sublattice */
+        {1,1,1}, {3,3,1}, {3,1,3}, {1,3,3},     /* B sublattice */
+    };
+    static const int off_a[4][3] = {            /* sign product +1: A -> B */
+        {+1,+1,+1}, {+1,-1,-1}, {-1,+1,-1}, {-1,-1,+1},
+    };
+    static const int off_b[4][3] = {            /* sign product -1: B -> A */
+        {-1,-1,-1}, {-1,+1,+1}, {+1,-1,+1}, {+1,+1,-1},
+    };
+
+    int total_nodes = 8 * Nx * Ny * Nz;
+    Graph* g = createGraph(total_nodes);
+    int node_idx = 0;
+
+    int hr_Nx = 4 * Nx, hr_Ny = 4 * Ny, hr_Nz = 4 * Nz;
+    long long map_size = (long long)hr_Nx * hr_Ny * hr_Nz;
+    int* coord_to_id_map = (int*)malloc(map_size * sizeof(int));
+    if (!coord_to_id_map) {
+        fprintf(stderr, "Error: out of memory building diamond lattice.\n");
+        freeGraph(g);
+        return NULL;
+    }
+    for (long long i = 0; i < map_size; ++i) coord_to_id_map[i] = -1;
+
+    /* 1. Place sites. */
+    for (int k = 0; k < Nz; k++) {
+        for (int j = 0; j < Ny; j++) {
+            for (int i = 0; i < Nx; i++) {
+                for (int b = 0; b < 8; ++b) {
+                    int hx = 4*i + basis_hr[b][0];
+                    int hy = 4*j + basis_hr[b][1];
+                    int hz = 4*k + basis_hr[b][2];
+                    g->coords[node_idx] = (Coord){
+                        (double)i + basis_hr[b][0] / 4.0,
+                        (double)j + basis_hr[b][1] / 4.0,
+                        (double)k + basis_hr[b][2] / 4.0,
+                    };
+                    coord_to_id_map[(long long)hx
+                                    + (long long)hy * hr_Nx
+                                    + (long long)hz * hr_Nx * hr_Ny] = node_idx++;
+                }
+            }
+        }
+    }
+
+    /* 2. Connect each site to its four tetrahedral neighbours. */
+    for (long long map_idx = 0; map_idx < map_size; ++map_idx) {
+        int id = coord_to_id_map[map_idx];
+        if (id == -1) continue;
+
+        int z = map_idx / ((long long)hr_Nx * hr_Ny);
+        int y = (map_idx / hr_Nx) % hr_Ny;
+        int x = map_idx % hr_Nx;
+
+        int s = (x + y + z) % 4;
+        const int (*offsets)[3] = (s == 0) ? off_a : off_b;
+
+        for (int o = 0; o < 4; ++o) {
+            int nx = x + offsets[o][0];
+            int ny = y + offsets[o][1];
+            int nz = z + offsets[o][2];
+            if (p_dims[0]) nx = (nx + hr_Nx) % hr_Nx;
+            if (p_dims[1]) ny = (ny + hr_Ny) % hr_Ny;
+            if (p_dims[2]) nz = (nz + hr_Nz) % hr_Nz;
+
+            if (nx >= 0 && nx < hr_Nx && ny >= 0 && ny < hr_Ny && nz >= 0 && nz < hr_Nz) {
+                int neighbor_id = coord_to_id_map[(long long)nx
+                                                  + (long long)ny * hr_Nx
+                                                  + (long long)nz * hr_Nx * hr_Ny];
+                if (neighbor_id != -1 && id < neighbor_id) {
+                    addEdge(g, id, neighbor_id);
+                }
+            }
+        }
+    }
+
+    free(coord_to_id_map);
+    return g;
+}
+
 /* Mixed SC/BCC/FCC lattice.
  *
  * Mirrors PythonTopologyGenerator._create_mixed_lattice. All three
@@ -1128,7 +1232,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Example (New 'e'): %s 8x6x8 110 6 1000 1 \"0:0,1:0,2:100,e:450\" 1 SC\n", argv[0]);
         fprintf(stderr, "  <dims_str>: Dimensions in NxN_yN_z format (e.g., '8x6x8').\n");
         fprintf(stderr, "  <degree_dist_string>: \"d0:N0,d1:N1,e:TotalEdges\"\n");
-        fprintf(stderr, "  <lattice_type>: SC, BCC, FCC, or MIX:<sc>,<bcc>,<fcc>[,<cutoff>]\n");
+        fprintf(stderr, "  <lattice_type>: SC, BCC, FCC, Diamond, or MIX:<sc>,<bcc>,<fcc>[,<cutoff>]\n");
         fprintf(stderr, "Example (Mixed):  %s 6x6x6 111 4 1000 1 \"0:0,1:0\" 0 MIX:0.2,0.4,0.4\n", argv[0]);
         return 1;
     }
@@ -1168,8 +1272,23 @@ int main(int argc, char *argv[]) {
     /* Seed before building the lattice: MIX draws its sites from rand(),
      * unlike the pure builders. Moving this up from just before the trial
      * loop is a no-op for SC/BCC/FCC, which consume no randomness while
-     * being built, so the sculpting stream they see is unchanged. */
-    srand(time(NULL));
+     * being built, so the sculpting stream they see is unchanged.
+     *
+     * The pid is mixed in because time(NULL) only advances once a second:
+     * a script looping this executable to collect N networks used to get
+     * byte-identical output from every run that started within the same
+     * second. Verified before the fix -- three back-to-back runs produced
+     * the same file. TOPON_SEED overrides for reproducible runs, which
+     * the Python generator gets from seeding `random` directly. */
+    unsigned int seed;
+    const char* seed_env = getenv("TOPON_SEED");
+    if (seed_env && *seed_env) {
+        seed = (unsigned int)strtoul(seed_env, NULL, 10);
+        printf("INFO: Using TOPON_SEED=%u (reproducible run).\n", seed);
+    } else {
+        seed = (unsigned int)time(NULL) ^ ((unsigned int)topon_getpid() << 16);
+    }
+    srand(seed);
 
     // --- MODIFIED: Create base_graph based on lattice_type input using Nx, Ny, Nz ---
     Graph* base_graph = NULL;
@@ -1179,6 +1298,11 @@ int main(int argc, char *argv[]) {
         base_graph = create_bcc_lattice(Nx, Ny, Nz, p_dims);
     } else if (strcmp(lattice_type, "FCC") == 0) {
         base_graph = create_fcc_lattice(Nx, Ny, Nz, p_dims);
+    } else if (strcmp(lattice_type, "Diamond") == 0 || strcmp(lattice_type, "DIAMOND") == 0) {
+        /* Both spellings: "Diamond" is what generator_python_diamond.py
+         * uses, "DIAMOND" matches the shouting style of the other three. */
+        base_graph = create_diamond_lattice(Nx, Ny, Nz, p_dims);
+        if (!base_graph) return 1;
     } else if (strncmp(lattice_type, "MIX", 3) == 0 &&
                (lattice_type[3] == '\0' || lattice_type[3] == ':')) {
         /* The trailing check matters: a bare strncmp would also swallow
@@ -1221,7 +1345,7 @@ int main(int argc, char *argv[]) {
         base_graph = create_mixed_lattice(Nx, Ny, Nz, p_dims, f_bcc, f_fcc, cutoff);
         if (!base_graph) return 1;
     } else {
-        fprintf(stderr, "Error: Invalid lattice type '%s'. Must be SC, BCC, FCC, or MIX:<sc>,<bcc>,<fcc>.\n", lattice_type);
+        fprintf(stderr, "Error: Invalid lattice type '%s'. Must be SC, BCC, FCC, Diamond, or MIX:<sc>,<bcc>,<fcc>.\n", lattice_type);
         return 1;
     }
 

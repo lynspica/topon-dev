@@ -27,12 +27,13 @@ class GeneratorConfig(BaseModel):
     """C generator configuration."""
     exe_path: Optional[str] = Field(default=None, description="Path to generator executable")
     lattice_size: str = Field(default="6x6x6", description="Lattice dimensions (e.g., '6x6x6')")
-    lattice_type: Literal["SC", "BCC", "FCC", "MIX"] = Field(
+    lattice_type: Literal["SC", "BCC", "FCC", "Diamond", "MIX"] = Field(
         default="SC",
         description=(
             "Lattice type. SC/BCC/FCC are the canonical single lattices. "
-            "MIX overlays their basis sites in one cubic cell using "
-            "`mix_fractions`."
+            "Diamond is 4-coordinated by construction, so a max_func=4 "
+            "network needs no pruning. MIX overlays SC/BCC/FCC basis "
+            "sites in one cubic cell using `mix_fractions`."
         ),
     )
     mix_fractions: dict[str, float] = Field(

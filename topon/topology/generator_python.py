@@ -47,11 +47,73 @@ class PythonTopologyGenerator:
             or {"SC": 1.0, "BCC": 0.0, "FCC": 0.0}
         )
         self.mix_cutoff = float(getattr(config, 'mix_cutoff', 1.0) or 1.0)
+
+        # Per-axis periodic boundaries, matching the C searcher's p_dims.
+        # Defaults to fully periodic, which is what every builder did
+        # unconditionally before this was read at all.
+        self.periodicity = self._parse_periodicity(
+            getattr(config, 'periodicity', '111')
+        )
         
         # Parse degree distribution string
         self.target_counts = defaultdict(lambda: -2)  # -2 means not specified
         self.target_edge_count = -1
         self._parse_degree_distribution(getattr(config, 'degree_distribution', ""))
+
+    @staticmethod
+    def _wrap_hr(coord, hr_dims, periodic):
+        """Wrap a high-res neighbour address, or None if it left an open face.
+
+        Mirrors the C searcher's neighbour step: wrap the axis when it is
+        periodic, otherwise keep the raw index and let the bounds check
+        drop it.
+        """
+        out = []
+        for value, extent, is_periodic in zip(coord, hr_dims, periodic):
+            if is_periodic:
+                out.append(value % extent)
+            elif 0 <= value < extent:
+                out.append(value)
+            else:
+                return None
+        return tuple(out)
+
+    @staticmethod
+    def _parse_periodicity(value):
+        """Normalise a periodicity spec to ``(px, py, pz)`` booleans.
+
+        Accepts the C searcher's ``"111"`` / ``"110"`` digit string, a
+        single bool applied to all three axes, or any 3-element iterable
+        of truthy values. Anything unrecognised falls back to fully
+        periodic with a warning rather than silently producing an open
+        lattice, since a surprise free surface changes the physics.
+
+        A non-periodic axis simply omits the wrap-around bonds, so the
+        lattice grows a free surface there and the sites on it have
+        reduced coordination.
+        """
+        if value is None:
+            return (True, True, True)
+        if isinstance(value, bool):
+            return (value, value, value)
+        if isinstance(value, str):
+            digits = [c for c in value.strip() if c in "01"]
+            if len(digits) == 3:
+                return tuple(c == "1" for c in digits)
+            print(f"Warning: could not parse periodicity {value!r}; "
+                  f"using fully periodic '111'.")
+            return (True, True, True)
+        try:
+            axes = tuple(bool(v) for v in value)
+        except TypeError:
+            print(f"Warning: could not parse periodicity {value!r}; "
+                  f"using fully periodic '111'.")
+            return (True, True, True)
+        if len(axes) != 3:
+            print(f"Warning: periodicity {value!r} does not have 3 axes; "
+                  f"using fully periodic '111'.")
+            return (True, True, True)
+        return axes
 
     def _parse_degree_distribution(self, dist_str):
         if not dist_str:
@@ -196,16 +258,36 @@ class PythonTopologyGenerator:
             return self._create_fcc_lattice(nx_val, ny_val, nz_val)
         elif lattice_type == "MIX":
             return self._create_mixed_lattice(nx_val, ny_val, nz_val)
+        elif lattice_type in ("Diamond", "DIAMOND"):
+            # Delegates to the standalone module rather than inlining the
+            # basis here: the Diamond logic deliberately lives in its own
+            # file so it can be reviewed in isolation. This is a dispatch
+            # bridge so a config can name Diamond on either generator, not
+            # a merge of the two.
+            from topon.topology.generator_python_diamond import (
+                create_diamond_lattice,
+            )
+            return create_diamond_lattice(
+                nx_val, ny_val, nz_val, self.periodicity
+            )
         else:
             raise NotImplementedError(
                 f"Lattice type {lattice_type} not supported. "
-                f"Use SC, BCC, FCC, or MIX."
+                f"Use SC, BCC, FCC, Diamond, or MIX."
             )
 
     def _create_sc_lattice(self, nx_val, ny_val, nz_val):
-        """Simple Cubic: N nodes, 6 neighbors each (periodic BC)."""
+        """Simple Cubic: N nodes, 6 neighbours each when fully periodic.
+
+        Honours ``self.periodicity`` per axis, matching the C searcher's
+        ``if (p_dims[0] || x < Nx - 1)`` guard: an open axis simply omits
+        the wrap-around bond, leaving a free surface whose sites have
+        reduced coordination.
+        """
+        px, py, pz = self.periodicity
         g = nx.Graph()
         g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
+        g.graph["periodicity"] = (px, py, pz)
 
         total_nodes = nx_val * ny_val * nz_val
         for i in range(total_nodes):
@@ -220,17 +302,20 @@ class PythonTopologyGenerator:
                 for x in range(nx_val):
                     u = z * (nx_val * ny_val) + y * nx_val + x
 
-                    v_x = z * (nx_val * ny_val) + y * nx_val + (x + 1) % nx_val
-                    if not g.has_edge(u, v_x):
-                        g.add_edge(u, v_x)
+                    if px or x < nx_val - 1:
+                        v_x = z * (nx_val * ny_val) + y * nx_val + (x + 1) % nx_val
+                        if u != v_x and not g.has_edge(u, v_x):
+                            g.add_edge(u, v_x)
 
-                    v_y = z * (nx_val * ny_val) + ((y + 1) % ny_val) * nx_val + x
-                    if not g.has_edge(u, v_y):
-                        g.add_edge(u, v_y)
+                    if py or y < ny_val - 1:
+                        v_y = z * (nx_val * ny_val) + ((y + 1) % ny_val) * nx_val + x
+                        if u != v_y and not g.has_edge(u, v_y):
+                            g.add_edge(u, v_y)
 
-                    v_z = ((z + 1) % nz_val) * (nx_val * ny_val) + y * nx_val + x
-                    if not g.has_edge(u, v_z):
-                        g.add_edge(u, v_z)
+                    if pz or z < nz_val - 1:
+                        v_z = ((z + 1) % nz_val) * (nx_val * ny_val) + y * nx_val + x
+                        if u != v_z and not g.has_edge(u, v_z):
+                            g.add_edge(u, v_z)
 
         return g
 
@@ -248,8 +333,10 @@ class PythonTopologyGenerator:
         half a cell. Recording the cell explicitly keeps every downstream
         minimum-image calculation on the right periodic replica.
         """
+        px, py, pz = self.periodicity
         g = nx.Graph()
         g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
+        g.graph["periodicity"] = (px, py, pz)
 
         hr_nx = 2 * nx_val
         hr_ny = 2 * ny_val
@@ -274,15 +361,20 @@ class PythonTopologyGenerator:
                     coord_map[(bx, by, bz)] = node_idx
                     node_idx += 1
 
-        # Connect: each node links to 8 diagonal neighbors in high-res space
+        # Connect: each node links to 8 diagonal neighbors in high-res space.
+        # An open axis does not wrap, so neighbours off that face simply
+        # do not exist and the surface sites lose coordination.
         for (hx, hy, hz), uid in coord_map.items():
             for dx in (-1, 1):
                 for dy in (-1, 1):
                     for dz in (-1, 1):
-                        nx_ = (hx + dx) % hr_nx
-                        ny_ = (hy + dy) % hr_ny
-                        nz_ = (hz + dz) % hr_nz
-                        vid = coord_map.get((nx_, ny_, nz_))
+                        nbr = self._wrap_hr(
+                            (hx + dx, hy + dy, hz + dz),
+                            (hr_nx, hr_ny, hr_nz), (px, py, pz),
+                        )
+                        if nbr is None:
+                            continue
+                        vid = coord_map.get(nbr)
                         if vid is not None and uid < vid:
                             g.add_edge(uid, vid)
 
@@ -302,8 +394,10 @@ class PythonTopologyGenerator:
         coordinates only reach nx-0.5, so the cell is recorded rather than
         inferred from the coordinate extent.
         """
+        px, py, pz = self.periodicity
         g = nx.Graph()
         g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
+        g.graph["periodicity"] = (px, py, pz)
 
         hr_nx = 2 * nx_val
         hr_ny = 2 * ny_val
@@ -341,10 +435,13 @@ class PythonTopologyGenerator:
 
         for (hx, hy, hz), uid in coord_map.items():
             for dx, dy, dz in fcc_offsets:
-                nx_ = (hx + dx) % hr_nx
-                ny_ = (hy + dy) % hr_ny
-                nz_ = (hz + dz) % hr_nz
-                vid = coord_map.get((nx_, ny_, nz_))
+                nbr = self._wrap_hr(
+                    (hx + dx, hy + dy, hz + dz),
+                    (hr_nx, hr_ny, hr_nz), (px, py, pz),
+                )
+                if nbr is None:
+                    continue
+                vid = coord_map.get(nbr)
                 if vid is not None and uid < vid:
                     g.add_edge(uid, vid)
 
@@ -392,8 +489,10 @@ class PythonTopologyGenerator:
         f_bcc = float(self.mix_fractions.get("BCC", 0.0))
         f_fcc = float(self.mix_fractions.get("FCC", 0.0))
 
+        px, py, pz = self.periodicity
         g = nx.Graph()
         g.graph["box"] = (float(nx_val), float(ny_val), float(nz_val))
+        g.graph["periodicity"] = (px, py, pz)
         g.graph["mix_fractions"] = dict(self.mix_fractions)
 
         # Face-centre offsets, in the same XY / XZ / YZ order the pure FCC
@@ -422,13 +521,16 @@ class PythonTopologyGenerator:
         # memory; N stays in the low thousands for realistic cell counts.
         pts = np.asarray(positions, dtype=float)
         box = np.array([nx_val, ny_val, nz_val], dtype=float)
+        # Only periodic axes take the minimum image; an open axis keeps
+        # the raw separation, so nothing bonds across that face.
+        wrap = np.array([px, py, pz], dtype=bool)
         cutoff_sq = self.mix_cutoff ** 2
         n = len(pts)
         block = 512
         for start in range(0, n, block):
             chunk = pts[start:start + block]
             delta = chunk[:, None, :] - pts[None, :, :]
-            delta -= box * np.round(delta / box)
+            delta -= np.where(wrap, box * np.round(delta / box), 0.0)
             dist_sq = (delta * delta).sum(axis=-1)
             rows, cols = np.nonzero(
                 (dist_sq <= cutoff_sq + 1e-12) & (dist_sq > 1e-12)

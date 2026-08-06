@@ -66,13 +66,30 @@ def slugify(label):
 
 
 class Case:
-    def __init__(self, label, lattice, dims, max_func, degree_dist, mix=None):
+    def __init__(self, label, lattice, dims, max_func, degree_dist, mix=None,
+                 periodicity="111", trials=500):
         self.label = label
-        self.lattice = lattice          # "SC" | "BCC" | "FCC" | "MIX"
+        self.lattice = lattice     # "SC" | "BCC" | "FCC" | "Diamond" | "MIX"
         self.dims = dims
         self.max_func = max_func
         self.degree_dist = degree_dist
         self.mix = mix or {"SC": 1.0, "BCC": 0.0, "FCC": 0.0}
+        self.periodicity = periodicity
+        # Per-case trial budget. Cases expected to be structurally
+        # unreachable get a small one: the failure is a property of the
+        # request rather than bad luck, so more attempts change nothing
+        # while costing minutes. The budget is printed with the result so
+        # "no success" is never mistaken for an exhaustive search.
+        self.trials = trials
+
+    @property
+    def deterministic(self):
+        """True when both generators must produce byte-identical lattices.
+
+        Only MIX draws randomly, and even then the pure corners are
+        deterministic because every site is either always or never placed.
+        """
+        return self.lattice != "MIX" or set(self.mix.values()) <= {0.0, 1.0}
 
     @property
     def c_arg(self):
@@ -89,10 +106,50 @@ class Case:
 def build_matrix():
     cases = []
 
-    # --- the three canonical lattices, unsculpted and sculpted ---
-    for lat, native_deg in (("SC", 6), ("BCC", 8), ("FCC", 12)):
-        cases.append(Case(f"{lat} native", lat, (4, 4, 4), native_deg, "0:0,1:0"))
-        cases.append(Case(f"{lat} prune->4", lat, (4, 4, 4), 4, "0:0,1:0"))
+    # --- the canonical lattices, unsculpted and sculpted ---
+    #
+    # Diamond uses a 3x3x3 cell: it packs 8 sites per cell against SC's 1,
+    # so 4x4x4 would be 512 junctions and 1024 chains, and the atomistic
+    # chemistry stage on that many chains dominates the whole sweep.
+    # 3x3x3 (216 sites, 432 chains) exercises the same code paths.
+    for lat, native_deg, dims in (("SC", 6, (4, 4, 4)), ("BCC", 8, (4, 4, 4)),
+                                  ("FCC", 12, (4, 4, 4)), ("Diamond", 4, (3, 3, 3))):
+        cases.append(Case(f"{lat} native", lat, dims, native_deg, "0:0,1:0"))
+        cases.append(Case(f"{lat} prune->4", lat, dims, 4, "0:0,1:0"))
+
+    # --- per-axis periodicity, on every lattice type ---
+    #
+    # Deliberately unconstrained ("" rather than "0:0,1:0"): opening an
+    # axis puts corner sites on a free surface with very low coordination
+    # -- a fully open 4x4x4 BCC has 2 degree-1 sites and Diamond has 22 --
+    # so forbidding degree 1 AND degree 0 at once is unsatisfiable there.
+    # The only way to clear a degree-1 node is to cut its last edge, which
+    # makes it degree 0. That is a property of the request, not a defect,
+    # and `SC open + no d1` below keeps one such case in the matrix so the
+    # behaviour stays visible.
+    for lat in ("SC", "BCC", "FCC", "Diamond"):
+        for per in ("110", "100", "000"):
+            cases.append(Case(f"{lat} periodic {per}", lat,
+                              (3, 3, 3) if lat == "Diamond" else (4, 4, 4),
+                              8 if lat != "Diamond" else 4, "",
+                              periodicity=per))
+    # SC keeps min degree 3 with every axis open, so this one IS solvable.
+    cases.append(Case("SC open + no d1", "SC", (4, 4, 4), 4, "0:0,1:0",
+                      periodicity="000"))
+    # A fully open Diamond has degree-1 corner sites, so forbidding both
+    # 0 and 1 is unsatisfiable: clearing a degree-1 site means cutting its
+    # last bond, which produces the degree-0 node the same request bans.
+    # Both generators should decline rather than claim success.
+    #
+    # Deliberately 2x2x2 and 5 trials. A doomed target sends stage 4
+    # through its full systematic search every attempt, and the C has no
+    # time limit, so the cost explodes with lattice size: 2x2x2 is
+    # instant, 3x3x3 exceeds 90 s for three trials, and a single 4x4x4
+    # trial did not finish in 300 s. Python gives up in ~0.25 s/trial at
+    # 4x4x4 because `generate` takes a `time_limit`. The impossibility is
+    # structural, so the small lattice demonstrates it just as well.
+    cases.append(Case("Diamond open + no d1", "Diamond", (2, 2, 2), 4,
+                      "0:0,1:0", periodicity="000", trials=5))
 
     # --- lattice sizes, including non-cubic ---
     for dims in ((3, 3, 3), (5, 5, 5), (6, 6, 6), (3, 4, 5)):
@@ -108,11 +165,13 @@ def build_matrix():
     # it, then never checks it, because its completion loop only runs to
     # max_func -- so it reports success on a network with no degree-7
     # nodes at all. Kept in the matrix to keep that visible.
-    cases.append(Case("SC unreachable d7",  "SC", (4, 4, 4), 4, "0:0,1:0,7:5"))
+    cases.append(Case("SC unreachable d7",  "SC", (4, 4, 4), 4, "0:0,1:0,7:5",
+                      trials=40))
     # Same shape but within range: 100 nodes of degree 6 on a 125-node
     # lattice that must also prune to max_func=4. Genuinely unreachable
     # and both should say so.
-    cases.append(Case("SC over-target d6",  "SC", (5, 5, 5), 4, "0:0,1:0,6:100"))
+    cases.append(Case("SC over-target d6",  "SC", (5, 5, 5), 4, "0:0,1:0,6:100",
+                      trials=40))
 
     # --- mixtures ---
     for name, mix in (
@@ -148,7 +207,7 @@ def compile_c(workdir):
     return exe
 
 
-def run_c(exe, workdir, case, trials=500):
+def run_c(exe, workdir, case, trials=None):
     """One C run in its own directory. Returns (graph, dims, paths) or None.
 
     A fresh directory per run rather than clearing one: the generator
@@ -156,11 +215,12 @@ def run_c(exe, workdir, case, trials=500):
     deleting that between runs races against file handles held by
     OneDrive or a shell sitting in the tree.
     """
+    trials = case.trials if trials is None else trials
     workdir.mkdir(parents=True, exist_ok=True)
     out = workdir / "output"
     proc = subprocess.run(
-        [str(exe), case.dims_str, "111", str(case.max_func), str(trials), "1",
-         case.degree_dist, "0", case.c_arg],
+        [str(exe), case.dims_str, case.periodicity, str(case.max_func),
+         str(trials), "1", case.degree_dist, "0", case.c_arg],
         cwd=workdir, capture_output=True, text=True, timeout=900,
     )
     nodes = sorted(out.glob("*.nodes")) if out.exists() else []
@@ -172,7 +232,7 @@ def run_c(exe, workdir, case, trials=500):
     return (g, dims, nodes[0], edges[0]), proc
 
 
-def run_python(case, seed, trials=500):
+def run_python(case, seed, trials=None):
     import random
 
     class _Cfg:
@@ -180,6 +240,7 @@ def run_python(case, seed, trials=500):
         lattice_size = case.dims
         max_functionality = case.max_func
         degree_distribution = case.degree_dist
+        periodicity = case.periodicity
         mix_fractions = case.mix
         mix_cutoff = 1.0
 
@@ -187,7 +248,8 @@ def run_python(case, seed, trials=500):
     try:
         with redirect_stdout(StringIO()):
             graphs = PythonTopologyGenerator(_Cfg()).generate(
-                trials=trials, max_saves=1, time_limit=120
+                trials=case.trials if trials is None else trials,
+                max_saves=1, time_limit=120,
             )
     except ValueError as exc:               # unreachable target, fail-fast guard
         return None, f"rejected: {exc}"
@@ -215,6 +277,11 @@ def describe(g, dims):
         "max_degree": max((d for _, d in g.degree()), default=0),
         "shells": tuple(sorted(shells)),
         "box": tuple(round(float(b), 4) for b in box),
+        # Kept so deterministic cases can be compared exactly rather than
+        # statistically. Sculpted runs differ by construction (the two
+        # draw from different RNGs), so this is only used when the case
+        # is unsculpted.
+        "edge_set": frozenset(frozenset(e) for e in g.edges()),
     }
 
 
@@ -230,6 +297,30 @@ def summarise(runs):
         "shells": sorted({s for r in runs for s in r["shells"]}),
         "box": runs[0]["box"],
     }
+
+
+def base_lattice_edges(case):
+    """Edge count of the unsculpted lattice, or None if it varies.
+
+    Used to tell whether a run pruned anything. Comes from the Python
+    builder because that is free; the C side is then compared against it.
+    A random mixture has no fixed base, so those cases stay statistical.
+    """
+    if not case.deterministic:
+        return None
+
+    class _Cfg:
+        lattice_type = case.lattice
+        lattice_size = case.dims
+        max_functionality = case.max_func
+        degree_distribution = ""
+        periodicity = case.periodicity
+        mix_fractions = case.mix
+        mix_cutoff = 1.0
+
+    with redirect_stdout(StringIO()):
+        g = PythonTopologyGenerator(_Cfg())._create_lattice(case.dims, case.lattice)
+    return g.number_of_edges()
 
 
 def compare(case, c_runs, py_runs, c_fail_note, py_fail_note):
@@ -249,9 +340,28 @@ def compare(case, c_runs, py_runs, c_fail_note, py_fail_note):
     if c["shells"] != p["shells"]:
         problems.append(f"shells {c['shells']} vs {p['shells']}")
 
+    # When the lattice is deterministic AND neither run pruned anything,
+    # the two must agree edge-for-edge rather than merely in
+    # distribution, since only lattice construction was exercised.
+    #
+    # "Pruned nothing" has to be judged against the *base* lattice's edge
+    # count, not the result's max degree: sculpting always leaves the max
+    # degree at or below max_func, so that test would call every run
+    # unsculpted and then demand two independently-sculpted graphs match.
+    base_edges = base_lattice_edges(case)
+    exact = (
+        case.deterministic
+        and base_edges is not None
+        and c["edges_mean"] == base_edges
+        and p["edges_mean"] == base_edges
+    )
+    if exact and c_runs[0]["edge_set"] != py_runs[0]["edge_set"]:
+        only_c = len(c_runs[0]["edge_set"] - py_runs[0]["edge_set"])
+        only_p = len(py_runs[0]["edge_set"] - c_runs[0]["edge_set"])
+        problems.append(f"edge sets differ (+{only_c} C, +{only_p} PY)")
+
     # Site count: exact for the deterministic lattices, tolerance for MIX.
-    deterministic = case.lattice != "MIX" or set(case.mix.values()) <= {0.0, 1.0}
-    if deterministic:
+    if case.deterministic:
         if c["nodes_mean"] != p["nodes_mean"]:
             problems.append(f"nodes {c['nodes_mean']:.0f} vs {p['nodes_mean']:.0f}")
     else:
@@ -275,9 +385,9 @@ def compare(case, c_runs, py_runs, c_fail_note, py_fail_note):
 
     if problems:
         return "DISAGREE", "; ".join(problems)
-    return "agree", (f"{c['nodes_mean']:.0f}/{p['nodes_mean']:.0f} nodes, "
-                     f"deg {c_deg:.2f}/{p_deg:.2f}, "
-                     f"{len(c['shells'])} shell(s)")
+    return ("agree (exact)" if exact else "agree",
+            f"{c['nodes_mean']:.0f}/{p['nodes_mean']:.0f} nodes, "
+            f"deg {c_deg:.2f}/{p_deg:.2f}, {len(c['shells'])} shell(s)")
 
 
 # ---------------------------------------------------------------------------
@@ -352,9 +462,9 @@ def main():
     print(f"C generator compiled: {exe.name}\n")
 
     cases = build_matrix()
-    print("=" * 100)
-    print(f"{'case':26s} {'C':>7s} {'PY':>7s}  {'verdict':16s} detail")
-    print("=" * 100)
+    print("=" * 106)
+    print(f"{'case':26s} {'trials':>6s} {'C':>7s} {'PY':>7s}  {'verdict':18s} detail")
+    print("=" * 106)
 
     results = []
     for case in cases:
@@ -387,13 +497,14 @@ def main():
                 py_runs.append(describe(g_py, infer_dims_from_graph(g_py)))
 
         verdict, detail = compare(case, c_runs, py_runs, c_note, py_note)
-        print(f"{case.label:26s} {len(c_runs):>3d}/{args.reps:<3d} "
-              f"{len(py_runs):>3d}/{args.reps:<3d}  {verdict:16s} {detail}")
+        print(f"{case.label:26s} {case.trials:>6d} {len(c_runs):>3d}/{args.reps:<3d} "
+              f"{len(py_runs):>3d}/{args.reps:<3d}  {verdict:18s} {detail}")
         results.append((case, verdict, first_c_paths))
 
     print("=" * 100)
     bad = [r for r in results if r[1] in ("DISAGREE", "C-ONLY-FAILED", "PY-ONLY-FAILED")]
-    print(f"agree: {sum(1 for r in results if r[1] == 'agree')}   "
+    print(f"agree (exact): {sum(1 for r in results if r[1] == 'agree (exact)')}   "
+          f"agree (statistical): {sum(1 for r in results if r[1] == 'agree')}   "
           f"both-unreachable: {sum(1 for r in results if r[1] == 'both-unreachable')}   "
           f"problems: {len(bad)}")
 
@@ -405,8 +516,10 @@ def main():
         subset = [r for r in results
                   if r[2] is not None
                   and r[0].label in {"SC prune->4", "BCC prune->4", "FCC prune->4",
+                                     "Diamond native", "Diamond prune->4",
                                      "MIX 20/40/40 prune->4", "SC edge target",
-                                     "SC 3x4x5"}]
+                                     "SC 3x4x5", "SC periodic 110",
+                                     "Diamond periodic 100"}]
         for case, _, paths in subset:
             ok, msg = lammps_pathway(case, paths[0], paths[1], "C")
             status = {True: "ok", False: "FAILED", None: "skipped"}[ok]

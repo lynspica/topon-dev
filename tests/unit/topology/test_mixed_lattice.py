@@ -311,5 +311,5 @@ def test_config_rejects_non_positive_cutoff():
 
 def test_unknown_lattice_type_is_rejected_by_the_generator():
     gen = PythonTopologyGenerator(_Cfg("HCP"))
-    with pytest.raises(NotImplementedError, match="SC, BCC, FCC, or MIX"):
+    with pytest.raises(NotImplementedError, match="SC, BCC, FCC, Diamond, or MIX"):
         gen._create_lattice(DIMS, "HCP")

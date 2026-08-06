@@ -14,6 +14,94 @@ Newest first.
 
 ---
 
+## 2026-08-05 — Diamond in C, per-axis periodicity in Python; the two now match exactly
+
+**Change** [generator.c](../topon/topology/csrc/generator.c) gained
+`create_diamond_lattice` and a `Diamond` / `DIAMOND` dispatch.
+[generator_python.py](../topon/topology/generator_python.py) now reads
+`periodicity`, which it had ignored entirely, and honours it per axis in
+the SC, BCC, FCC and MIX builders;
+[generator_python_diamond.py](../topon/topology/generator_python_diamond.py)
+takes the same argument. `lattice_type: "Diamond"` is accepted by the
+config schema and dispatched by `_create_lattice`, so both generators
+build it from the same config. 29 new tests in
+`tests/unit/topology/test_periodicity.py` plus 18 exact-parity cases in
+`test_c_generator.py`.
+
+**Why** These were the last two asymmetries: Diamond existed only in
+Python, per-axis periodicity only in C. A config naming either got
+different physics depending on which generator ran it, and the Python
+side silently ignored `periodicity` rather than warning.
+
+**Issue / solution** Both features are deterministic on both sides, so
+this could be verified exactly rather than statistically: across four
+lattice types x four periodicity settings, **all 16 produce identical
+edge sets**, not merely matching distributions. Diamond also matches
+node-for-node, including the ids, because both walk the eight basis
+sites in the same order.
+
+The Diamond dispatch is a bridge, not a merge. `create_diamond_lattice`
+stays in its own module, per the note at the top of that file about
+reviewing Diamond logic in isolation; `_create_lattice` only calls it.
+
+**Open boundaries are not free.** Opening an axis puts corner sites on a
+free surface with very low coordination, and the centred lattices lose
+the most: on 4x4x4 with every axis open the minimum degree is 3 for SC
+and FCC but **1 for BCC (2 sites) and Diamond (22 sites)**. That makes
+the usual `"0:0,1:0"` unsatisfiable there, since the only way to clear a
+degree-1 site is to cut its last bond and make it degree 0, which the
+same request forbids. Found by watching the comparison sweep grind on
+`BCC periodic 000`; the matrix now uses an unconstrained distribution for
+the open-boundary cases and keeps two deliberate cases (one solvable on
+SC, one not on Diamond) so the behaviour stays visible. Documented in
+[USAGE.md](USAGE.md) with the per-lattice minimum-degree table.
+
+**Follow-up** Two things worth knowing.
+
+`periodicity` reaching the Python generator changes what a config with
+`"110"` builds: it used to be silently ignored and produce a fully
+periodic lattice. Any study that set a non-default periodicity and relied
+on the Python path was getting periodic boundaries regardless, and will
+now get the slab it asked for.
+
+**The C generated the same network every time when run in a loop.** Its
+seed came from `time(NULL)` alone, which advances once a second, so any
+runs starting inside the same second shared a stream and produced
+byte-identical files. Three back-to-back MIX runs confirmed it. Anyone
+scripting the executable to collect a population of networks was
+collecting copies of one. Found because the comparison sweep's
+"independent" reps were not independent: a mixture's mean site count came
+out 11% off expectation, far outside binomial noise, which is what
+prompted the check. The pid is now mixed into the seed, and `TOPON_SEED`
+gives back reproducibility when it is wanted.
+
+**The C searcher also effectively hangs on a structurally-doomed request.** Neither generator
+recognises a surface-induced impossibility cheaply: the existing
+fail-fast guards catch targets above the lattice coordination or above
+`max_func`, and neither covers "the boundary condition forces sites below
+the degree you banned". Both then fall back to trying, and each doomed
+attempt runs stage 4's full systematic search. Measured on an open
+Diamond with `"0:0,1:0"`:
+
+| lattice | C | Python |
+|---|---|---|
+| 2x2x2 (64 sites) | instant | instant |
+| 3x3x3 (216) | >90 s for 3 trials | fast |
+| 4x4x4 (512) | **one trial unfinished at 300 s** | ~0.25 s/trial |
+
+Python stays responsive because `generate` takes a `time_limit`; the C
+has no such parameter, so a doomed run on a large lattice is
+indistinguishable from a hang. Pre-existing behaviour, but newly
+reachable now that open boundaries and Diamond exist on that side. Two
+independent fixes suggest themselves: a cheap pre-flight guard comparing
+the requested `d0`/`d1` counts against the number of sites the boundary
+forces below that degree (computable from the base graph before any
+trial), and a wall-clock cap in the C to match Python's `time_limit`.
+The comparison matrix uses a 2x2x2 lattice for that case so it stays
+demonstrable without costing minutes.
+
+---
+
 ## 2026-08-05 — C/Python parity swept across the config matrix; two C bugs found
 
 **Change** Added [tests/workflows/compare_generators.py](../tests/workflows/compare_generators.py),
