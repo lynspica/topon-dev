@@ -606,6 +606,40 @@ def measure_pair(data_file, seq_a, seq_b, contact=None):
     return far_closed_linking(pa, pb, contact), min_separation(pa, pb)
 
 
+def write_z1(path, chains, box):
+    """Write chains in Z1 format: count, box, beads per chain, coordinates.
+
+    Coordinates must be unwrapped -- Z1+ measures the shortest path a chain
+    can take without crossing another, and a chain folded at the boundary
+    is not the chain it is measuring.
+    """
+    lines = [f"{len(chains)}",
+             f"{box[0]:.6f} {box[1]:.6f} {box[2]:.6f}",
+             " ".join(str(len(c)) for c in chains)]
+    for c in chains:
+        lines += [f"{q[0]:.6f} {q[1]:.6f} {q[2]:.6f}" for q in c]
+    Path(path).write_text("\n".join(lines) + "\n")
+    return path
+
+
+def z1_export(data_file, sequences, out_path):
+    """Pull named chains out of a data file and write them for Z1+.
+
+    Taking only the prescribed pair is what makes the answer unambiguous.
+    Z1+ measures entanglements between whatever chains it is given, so with
+    the rest of the network removed anything it reports is between these
+    two and nothing else. Crosslinks go too: Z1+ analyses linear chains, and
+    a junction would join several into one branched object it cannot read.
+    """
+    box, xyz, _ = read_data(data_file)
+    chains = [unwrap_chain(seq, xyz, box) for seq in sequences]
+    # Put every chain in the image nearest the first, or two strands that
+    # are wound together get reported as far apart and unentangled.
+    ref = chains[0].mean(axis=0)
+    chains = [c + box * np.round((ref - c.mean(axis=0)) / box) for c in chains]
+    return write_z1(out_path, chains, box)
+
+
 def step2(args):
     """One pair of chains, entangled once."""
     graph = build_network()

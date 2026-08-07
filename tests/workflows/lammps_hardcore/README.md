@@ -58,3 +58,24 @@ run against.
 Origin: hand-edited by the repository owner from the generated scripts of
 `tests/output/entangle_steps/step2_band1_b90_wca`, and kept here so runs are
 reproducible rather than depending on a local copy.
+
+## Confirmed by primitive-path analysis
+
+Z1+ (Kroger, Comput. Phys. Commun. 283 (2023) 108567) on the prescribed pair
+with the rest of the network removed, so anything it reports is between
+those two chains and nothing else:
+
+| stage | hard core | generated (soft) |
+|---|---|---|
+| as built | Z = 1, 1 | Z = 1, 1 |
+| after stage 1 | **1, 1** | **0, 0** |
+| equilibrated | **1, 1** | **0, 0** |
+
+Both protocols start with exactly the one entanglement that was designed.
+The soft push removes it during stage 1. The hard core keeps it, and the
+primitive path length barely moves (20.6 to 19.2).
+
+Z1+ is not in this repository: its README says it should not be
+re-distributed. Obtain it from the CPC library or mk@mat.ethz.ch. Only a
+Linux binary ships for the core module, so on Windows it runs under WSL;
+`tests/workflows/run_z1.sh` drives it over a directory of .Z1 files.
