@@ -365,9 +365,12 @@ def _interactive_config() -> dict:
         type=click.Choice(["atomistic", "coarse_grained"]),
         default="atomistic",
     )
+    # MIX is deliberately absent: it needs sublattice fractions, which is
+    # more than this prompt-driven starter should ask for. Set
+    # `lattice_type: "MIX"` and `mix_fractions` in the JSON instead.
     lattice_type = click.prompt(
         "Lattice type",
-        type=click.Choice(["SC", "BCC", "FCC"]),
+        type=click.Choice(["SC", "BCC", "FCC", "Diamond"]),
         default="SC",
     )
     lattice_size = click.prompt("Lattice size (NxNxN)", default="5x5x5").strip()

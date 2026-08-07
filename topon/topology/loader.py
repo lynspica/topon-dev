@@ -88,7 +88,14 @@ def _load_from_gpickle(path: Union[str, Path]) -> tuple[nx.MultiGraph, Optional[
     # Ensure it's a MultiGraph
     if not isinstance(G, nx.MultiGraph):
         G = nx.MultiGraph(G)
-    
+
+    # A recorded box wins over a stored dims: it is the generator's exact
+    # cell, whereas a dims saved alongside an older graph may have come
+    # from the positional fallback (and be half a cell too large on any
+    # lattice with fractional basis sites).
+    if G.graph.get("box") is not None:
+        dims = infer_dims_from_graph(G)
+
     # Remove vacancies (degree-0 nodes)
     n_removed = remove_vacancies(G)
     
@@ -146,18 +153,30 @@ def _load_from_nodes_edges(
     
     # Build graph
     G = nx.MultiGraph()
-    
+
     for _, row in nodes_df.iterrows():
         G.add_node(
             int(row["id"]),
             pos=(float(row["x"]), float(row["y"]), float(row["z"]))
         )
-    
+
     for _, row in edges_df.iterrows():
         u, v = int(row["u"]), int(row["v"])
         if G.has_node(u) and G.has_node(v):
             G.add_edge(u, v)
-    
+
+    # An optional "# BOX Lx Ly Lz" header carries the true periodic cell.
+    # Files written without one fall back to the positional heuristic.
+    box = read_box_header(nodes_path)
+    if box is not None:
+        G.graph["box"] = box
+
+    # "# PERIODICITY 110" records which axes are open. Absent means fully
+    # periodic, which is what every file predating the header represents.
+    axes = read_periodicity_header(nodes_path)
+    if axes is not None:
+        G.graph["periodicity"] = axes
+
     # Infer dimensions from positions
     dims = infer_dims_from_graph(G)
     
@@ -191,6 +210,172 @@ def remove_vacancies(G: nx.Graph) -> int:
     return len(vacancies)
 
 
+# Header line the topology generators write into ``.nodes`` files to record
+# the exact periodic cell, e.g. "# BOX 6 6 6". Held as a module constant so
+# the Python reader/writer and the C generator agree on one spelling.
+BOX_HEADER_KEY = "BOX"
+
+
+PERIODICITY_HEADER_KEY = "PERIODICITY"
+
+
+def graph_periodicity(G):
+    """Per-axis boundaries a graph was built with, or None if all-periodic.
+
+    Returns None both when nothing was recorded and when every axis is
+    periodic, because every consumer treats those identically and the
+    None case is the one that reproduces pre-open-boundary behaviour.
+
+    Shared by ``Pipeline`` and the standalone workflows so the three
+    cannot drift on what an open axis means.
+
+    Args:
+        G: Graph, possibly carrying a ``periodicity`` graph attribute.
+
+    Returns:
+        ``(px, py, pz)`` booleans, or None.
+    """
+    if G is None:
+        return None
+    axes = G.graph.get("periodicity")
+    if axes is None:
+        return None
+    axes = tuple(bool(a) for a in axes)
+    return None if all(axes) else axes
+
+
+def format_periodicity_header(periodicity) -> str:
+    """Render per-axis boundaries as a ``.nodes`` header line.
+
+    Args:
+        periodicity: Iterable of three truthy values, one per axis.
+
+    Returns:
+        The header line, e.g. ``"# PERIODICITY 110"``, without a newline.
+    """
+    digits = "".join("1" if p else "0" for p in periodicity)
+    return f"# {PERIODICITY_HEADER_KEY} {digits}"
+
+
+def read_periodicity_header(path: Union[str, Path]):
+    """Read the ``# PERIODICITY 110`` header from a .nodes file.
+
+    Returns ``(px, py, pz)`` booleans, or None when absent or malformed.
+    Absent means fully periodic, which is what every file written before
+    this header existed represents.
+    """
+    try:
+        with open(path) as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                parts = line.lstrip("#").split()
+                if len(parts) == 2 and parts[0].upper() == PERIODICITY_HEADER_KEY:
+                    digits = parts[1].strip()
+                    if len(digits) == 3 and set(digits) <= {"0", "1"}:
+                        return tuple(c == "1" for c in digits)
+                    return None
+    except OSError:
+        return None
+    return None
+
+
+def format_box_header(box) -> str:
+    """Render a 3-component box as its ``.nodes`` header line.
+
+    Args:
+        box: Iterable of three box lengths in lattice units.
+
+    Returns:
+        The header line, without a trailing newline.
+    """
+    lx, ly, lz = (float(v) for v in box)
+    return f"# {BOX_HEADER_KEY} {lx:g} {ly:g} {lz:g}"
+
+
+def read_box_header(path: Union[str, Path]) -> Optional[tuple[float, float, float]]:
+    """Read the ``# BOX Lx Ly Lz`` header from a .nodes file.
+
+    Only the leading comment block is scanned, so this stops after a
+    handful of lines on any file. Returns None when the header is absent
+    or malformed, which is the expected case for files written before
+    generators recorded their box.
+
+    Args:
+        path: Path to a ``.nodes`` file.
+
+    Returns:
+        ``(Lx, Ly, Lz)`` in lattice units, or None.
+    """
+    try:
+        with open(path) as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                parts = line.lstrip("#").split()
+                if len(parts) == 4 and parts[0].upper() == BOX_HEADER_KEY:
+                    try:
+                        lx, ly, lz = (float(v) for v in parts[1:4])
+                    except ValueError:
+                        return None
+                    if min(lx, ly, lz) <= 0:
+                        return None
+                    return (lx, ly, lz)
+    except OSError:
+        return None
+    return None
+
+
+def save_nodes_edges(
+    G: nx.Graph,
+    nodes_path: Union[str, Path],
+    edges_path: Union[str, Path],
+    box=None,
+    periodicity=None,
+) -> None:
+    """Write a graph in the ``.nodes`` / ``.edges`` format.
+
+    Matches what the C generator emits, plus a ``# BOX`` header carrying
+    the exact periodic cell so a reload does not have to guess it, and a
+    ``# PERIODICITY`` header when any axis is open.
+
+    Args:
+        G: Graph whose nodes carry ``pos``.
+        nodes_path: Destination ``.nodes`` path.
+        edges_path: Destination ``.edges`` path.
+        box: Periodic cell to record. Defaults to ``G.graph["box"]``;
+             omitted from the header when neither is available.
+        periodicity: Per-axis boundaries. Defaults to
+             ``G.graph["periodicity"]``. Written only when an axis is
+             actually open, so fully periodic files keep the exact
+             format they had before this existed.
+    """
+    nodes_path = Path(nodes_path)
+    edges_path = Path(edges_path)
+    nodes_path.parent.mkdir(parents=True, exist_ok=True)
+    edges_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if box is None:
+        box = G.graph.get("box")
+    if periodicity is None:
+        periodicity = G.graph.get("periodicity")
+
+    with open(nodes_path, "w") as f:
+        if box is not None:
+            f.write(format_box_header(box) + "\n")
+        if periodicity is not None and not all(periodicity):
+            f.write(format_periodicity_header(periodicity) + "\n")
+        f.write("# NodeID X Y Z Degree\n")
+        for node in sorted(G.nodes()):
+            x, y, z = G.nodes[node].get("pos", (0.0, 0.0, 0.0))
+            f.write(f"{node} {x:f} {y:f} {z:f} {G.degree(node)}\n")
+
+    with open(edges_path, "w") as f:
+        f.write("# Node1 Node2\n")
+        for u, v in sorted(G.edges()):
+            f.write(f"{u} {v}\n")
+
+
 def infer_dims_from_graph(G: nx.Graph) -> Optional[np.ndarray]:
     """
     Infer box dimensions from node positions.
@@ -200,7 +385,28 @@ def infer_dims_from_graph(G: nx.Graph) -> Optional[np.ndarray]:
         
     Returns:
         Box dimensions as numpy array, or None if no positions.
+
+    Notes:
+        Prefers the exact cell recorded by the generator in
+        ``G.graph["box"]``. The ``max - min + 1`` fallback below is only
+        correct when every site sits on an integer coordinate with unit
+        spacing, i.e. simple cubic. BCC, FCC and Diamond place basis
+        sites at fractional offsets, so the fallback overshoots the true
+        cell by that offset: a 4x4x4 BCC or FCC lattice reports 4.5
+        instead of 4.0. Since this value feeds every minimum-image
+        calculation downstream, that overshoot makes roughly a third of
+        BCC edges (and a quarter of FCC edges) resolve to the wrong
+        periodic replica and be built at twice their true bond length.
+        Generators therefore record the true cell explicitly; the
+        fallback survives only for graphs written before they did
+        (old gpickles, ``.nodes`` files with no ``# BOX`` header).
     """
+    box = G.graph.get("box")
+    if box is not None:
+        arr = np.asarray(box, dtype=float).ravel()
+        if arr.size == 3 and np.all(np.isfinite(arr)) and np.all(arr > 0):
+            return arr
+
     positions = []
     for node, data in G.nodes(data=True):
         if "pos" in data:

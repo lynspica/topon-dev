@@ -32,12 +32,11 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
-| **V42** | 2026-07-17 | **README rewritten** around the algorithm and arc animations; "Sub-systems" dropped, protein path (topro) given its own section with MARTINI 3 + CHARMM36m worked examples. Six false claims caught and fixed pre-commit. |
-| **V41** | 2026-07-17 | **Entanglement + graft animations** — two-panel single-entanglement (`ent_arc`, `make_ent_movie.py`) and a graft showcase (`graft_arc`, new `grafted` system). All arc animations slowed to ~0.66×. |
-| **V40** | 2026-07-17 | `topology/generator_python.py` (+ `generator_python_diamond.py`) — fail fast on unreachable `degree_distribution` targets. An `e:N` above the lattice's edge count (e.g. `e:128` on an 81-edge 3×3×3 SC), or a per-degree target above the node count / max degree, now raises a clear `ValueError` instead of churning through doomed trials. 11 unit tests added. |
-| **V39** | 2026-07-17 | Arc **animations** for the gallery — real MD trajectories (lattice → minimised → equilibrated) as boomerang loops, one builder `make_arc_movie.py`. |
-| **V38** | 2026-07-16 | Showcase **gallery** (`assets/gallery/`, eleven panels on strict-sculpted heterogeneous networks) + README rewrite. |
-| **V37** | 2026-05-20 | In-situ crosslinking (`bfm.generate_topology(crosslink_method="none")`) + opt-in physically-correct CHARMM builds (`--physical-backbone`). NPZ node-feature schema v2. Five CHARMM36m parameter-injection fixes. |
+| **V48** | 2026-08-06 | **Open axes are no longer wrapped in the data file.** The conformation stage folded every axis with `% box`, so a junction on a free surface ended up at one end of the box with the chains bonded to it at the other. Invisible under `p p p`, wrong under `p f f`. On the flagged run the wraps across the open y and z axes go **98 → 0**. `.nodes` gained a `# PERIODICITY` header; the LAMMPS scripts are untouched. |
+| **V47** | 2026-08-05 | **Diamond added to C, per-axis periodicity added to Python** — the last two asymmetries. Both are deterministic, so parity is now exact: all 16 lattice x periodicity combinations produce identical edge sets, and Diamond matches node-for-node including ids. `lattice_type: "Diamond"` works through the config on both paths. Also fixed a C seeding bug that made **every run started in the same second produce the same network**. Found that open boundaries make `"0:0,1:0"` unsatisfiable on BCC and Diamond (free-surface sites have degree 1). |
+| **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
+| **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
+| **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
 
 ---
 
@@ -62,9 +61,314 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V42)
+## 4. Changelog (V1 – V48)
 
 Notable changes are documented in reverse chronological order.
+
+### [V48] — 2026-08-06 — Open axes are not wrapped; molecules stay whole
+
+#### Fixed
+- **`topon/conformation/manager.py`** wrapped coordinates with `% box` on
+  every axis regardless of the boundary condition. A junction sitting on
+  a free surface has chain and pendant atoms placed just below zero, and
+  those folded to the opposite face — leaving the crosslinker at one end
+  of the box and the atoms bonded to it at the other. On the run this was
+  spotted in, wraps across the **open** y and z axes went **98 → 0**
+  (x keeps 123, correctly, because x is periodic). The topology graph was
+  right all along: 0 edges crossed the open faces.
+- The box on an open axis is now `[min_atom − pad, max_atom + pad]`
+  rather than `[0, L]`. The pad defaults to **12 Å**, matching the pair
+  cutoff in the generated scripts, and is overridable via
+  `open_axis_pad`. It was first set to 1 Å on the argument that it only
+  needs to keep atoms off the face; the written geometry supported that
+  (0 atoms outside), but a real `boundary p f f` run then failed at step
+  49 with *"Bond atoms 25 15148 missing"* — LAMMPS deletes atoms leaving
+  an `f` face and topon's strained initial geometry moves surface atoms
+  several Å. With 12 Å both `p f f` and `p p p` complete.
+- **`cg_network.py` and `atomistic_network.py`** passed `lattice_box` but
+  not `periodicity`, so loading an open lattice through either standalone
+  workflow reverted to wrapping every axis. All three entry points now
+  share `loader.graph_periodicity`, with a test that reads their source
+  to assert the argument is present at both call sites.
+- `resolve_overlaps` no longer takes a minimum image across an open axis,
+  and its push-back wrap no longer folds atoms to the far face. That wrap
+  also learned about a non-zero `box_lo`, since an open axis can start
+  below zero and a bare `%` would then be wrong for the periodic axes
+  beside it.
+
+#### Added
+- `.nodes` files carry a `# PERIODICITY 100` header, written by both
+  generators and read by the loader, so boundaries survive a round-trip.
+  Written **only when an axis is open**, so fully periodic files keep the
+  exact format they had.
+- `Pipeline._graph_periodicity` reads it off the graph and threads it to
+  both conformation calls.
+
+#### Deliberately not changed
+The LAMMPS input writer still emits `boundary p p p`. Those scripts are
+calibrated and out of scope; set `p f f` by hand and the data file is
+already correct for it.
+
+### [V47] — 2026-08-05 — Diamond in C, per-axis periodicity in Python
+
+#### Added
+- **`csrc/generator.c`** — `create_diamond_lattice` plus a `Diamond` /
+  `DIAMOND` dispatch. Eight sites per cubic cell, 4-coordinated by
+  construction, so a `max_func=4` network needs no pruning. Walks the
+  basis in the same order as `generator_python_diamond.py`, so the two
+  number their nodes identically.
+- **`generator_python.py`** — reads `periodicity` (previously ignored
+  entirely) and honours it per axis in the SC, BCC, FCC and MIX
+  builders. `generator_python_diamond.create_diamond_lattice` takes the
+  same argument. Accepts the C's `"110"` digit string, a bool, or any
+  3-element iterable; an unparseable value falls back to fully periodic
+  with a warning, since guessing "open" would silently introduce free
+  surfaces.
+- **`lattice_type: "Diamond"`** in the config schema and in
+  `_create_lattice`, which dispatches to the standalone module rather
+  than inlining it — the Diamond logic stays reviewable in isolation.
+  Also offered by `topon init --interactive` (MIX is not: it needs
+  fractions, which is more than that prompt should ask).
+- **29 tests** in `tests/unit/topology/test_periodicity.py`, plus 18
+  exact-parity cases in `test_c_generator.py`.
+
+#### Verified
+Both features are deterministic on both sides, so parity is exact rather
+than statistical: across **four lattice types x four periodicity
+settings, all 16 produce identical edge sets**. Diamond additionally
+matches node-for-node including ids.
+
+#### Behaviour change
+A config setting a non-default `periodicity` on the Python path used to
+be silently ignored and produce a fully periodic lattice; it now builds
+the slab it asked for. Configs at the `"111"` default are unaffected,
+which `test_default_is_fully_periodic_and_unchanged` pins.
+
+#### Fixed
+- **`csrc/generator.c` seeded only from `time(NULL)`**, which advances
+  once a second, so **every C run started within the same second
+  produced byte-identical output**. A script looping the executable to
+  collect N networks was silently collecting N copies of one network.
+  Caught by the comparison sweep, where the "independent" reps of a
+  mixture were not independent and skewed the site-count statistics. The
+  pid is now mixed in, and `TOPON_SEED` overrides for a reproducible run
+  (the Python equivalent is seeding `random` before calling `generate`).
+
+#### Found while testing
+- Opening an axis puts corner sites on a free surface with very low
+  coordination. On 4x4x4 with every axis open the minimum degree is 3 for
+  SC and FCC but **1 for BCC (2 sites) and Diamond (22 sites)**, which
+  makes the usual `"0:0,1:0"` unsatisfiable there — clearing a degree-1
+  site means cutting its last bond, producing the degree-0 node the same
+  request forbids. Both generators decline. Documented in `USAGE.md` with
+  the per-lattice table.
+- **The C searcher has no wall-clock limit**, so a structurally-doomed
+  request looks like a hang. Not an infinite loop — each trial does
+  terminate — but stage 4's systematic search scales badly on a graph it
+  can never satisfy: for `"0:0,1:0"` on an open Diamond, 2x2x2 is
+  instant, 3x3x3 exceeds 90 s for three trials, and a **single 4x4x4
+  trial did not finish in 300 s**, where Python gives up in ~0.25 s per
+  trial via its `time_limit`. Pre-existing, newly reachable. Two fixes
+  suggest themselves and neither is applied here: a pre-flight guard
+  comparing requested `d0`/`d1` counts against the sites the boundary
+  forces below that degree, and a wall-clock cap matching Python's.
+
+### [V46] — 2026-08-05 — C/Python parity sweep; two C bugs
+
+#### Added
+- **`tests/workflows/compare_generators.py`** — runs both generators over
+  24 configurations (SC/BCC/FCC/MIX, four sizes including a non-cubic
+  3x4x5, seven mixtures, per-degree and `e:N` distribution modes) and
+  compares site counts, mean degree, edge-length shells and the recorded
+  box, then pushes a subset through the pipeline to a LAMMPS stage-1
+  minimize. **22 of 24 agree**; the other two are targets neither
+  generator can satisfy and both now refuse. All six LAMMPS pathways
+  complete: SC, BCC and FCC pruned to `max_func=4`, a 0.2/0.4/0.4
+  mixture, a non-cubic 3x4x5, and an `e:200` edge-count target.
+
+#### Fixed
+- **`csrc/generator.c` — prefix match on the MIX dispatch.**
+  `strncmp(lattice_type, "MIX", 3) == 0` also matched `MIXED`, `MIXTURE`
+  and any other typo starting with those letters, and quietly built a
+  pure-SC lattice instead of erroring. Now requires `:` or end-of-string
+  after `MIX`.
+- **`csrc/generator.c` — targets above `max_func` were never checked.**
+  The stage-4 completion check loops only to `max_func`, but the parser
+  accepts higher degrees, so `7:5` on a `max_func=4` run was stored and
+  then ignored: the generator reported *"SUCCESS: Target distribution
+  met!"* over a network with no degree-7 nodes at all. Same for `6:100`,
+  where the lattice offers degree 6 but sculpting cannot leave it there.
+  No node can finish above `max_func`, so such targets are now rejected
+  up front.
+- **`generator_python.py`** gained the matching guard, ordered after the
+  existing lattice-coordination check so the more fundamental reason
+  still produces the error message. Previously these requests churned
+  through every trial before giving up.
+
+- **`pyproject.toml`** — `package-data` listed only `data/*`, so an
+  installed topon would have shipped no C source at all: `topology/csrc/`
+  has no `__init__.py` and is therefore not found as a package. Now
+  includes `topology/csrc/*.c` and `*.md`.
+
+#### Documented, not changed
+- `is_sc_lattice` is `strcmp(lattice_type, "SC") == 0`, so the degree-2
+  sculpting guard is off for `MIX:1,0,0` even though it builds the
+  identical SC lattice. On 5x5x5 pruning to `max_func=4`, `SC` averages
+  221 edges against `MIX:1,0,0`'s 216 — both valid, drawn from slightly
+  different distributions.
+- Diamond exists only in Python; per-axis periodicity only in C.
+
+### [V45] — 2026-08-05 — Right C source; Python generator ~7x faster
+
+#### Fixed
+- **`topon/topology/csrc/generator.c`** re-vendored from md5 `e7631f4b`
+  (2025-11-03) in place of `83d7f9d3` (2026-02-27). The latter is the
+  newest file by timestamp, confirmed by editor history, but it is an
+  experimental variant under
+  `experiments/pruning_research/pruning_algorithm_math*`: it replaces the
+  per-degree count check in `is_move_safe` with a cumulative one and
+  sculpts **1/6** standard SC configurations where the vendored version
+  and the Python port both do **6/6**, failing whenever `max_func` is
+  below the lattice coordination. Three signals were missed first time
+  round: the shipped `generator.exe` compiles from the 2025-11-03 source,
+  the Python port implements the per-degree rule, and the directory name
+  marks it as research. `test_c_sculpts_the_configs_python_sculpts` now
+  fails on that variant.
+
+#### Changed
+- **`generator_python.py:_is_subgraph_connected`** walks `g._adj`
+  directly instead of building `g.subgraph(...)` and calling
+  `nx.is_connected`. A NetworkX subgraph is a view that re-evaluates its
+  node filter on every neighbour access: 6.0M `new_node_ok` calls for one
+  1000-node lattice. That call was 99.5% of the generator's runtime, so
+  the whole generator is now 6-8x faster (12³: 10.95 s to 1.54 s).
+  Verified identical: 1200 fuzzed states against the NetworkX oracle with
+  zero disagreements, and identical edge sets across four sizes and three
+  seeds with the two implementations swapped. Both are now tests.
+
+#### Clarified
+- The C generator and the Python generator are **independent programs
+  with different jobs**, documented in `csrc/README.md` and
+  `ARCHITECTURE.md`. C is the standalone searcher for long exhaustive
+  runs; Python is the quick in-process path. The C is not called from
+  Python and must not grow a Python binding. Only lattice construction
+  and the `.nodes`/`.edges` format are shared surface. Benchmarked: at 6³
+  Python wins on wall clock (the C pays process startup), by 12³ the C is
+  14x ahead, and at 24³ it finishes in 6.7 s where Python would run for
+  hours.
+
+### [V44] — 2026-08-05 — Mixed SC/BCC/FCC lattices; C generator vendored
+
+#### Added
+- **`lattice_type: "MIX"`** in both generators. All three cubic lattices
+  share the cell corner and each adds sites on top of it, so `MIX` places
+  the corner in every cell, the BCC body centre with probability
+  `mix_fractions["BCC"]` and each of the three FCC face centres with
+  probability `mix_fractions["FCC"]`. The `"SC"` entry is the remainder and
+  places no site of its own, which is what makes the three a partition
+  summing to 1. Expected site count `Nx*Ny*Nz * (1 + f_bcc + 3*f_fcc)`
+  recovers N / 2N / 4N at the pure corners.
+- Edges join every pair within `mix_cutoff` (default 1.0 cell, the
+  simple-cubic nearest-neighbour distance) under the minimum image, since a
+  mixed point set has no single neighbour shell to enumerate.
+- **`topon/topology/csrc/`** — the C generator vendored from
+  `generator_serial_debug11.c` (md5 `83d7f9d3`, the copy present in five
+  archive locations including the most recent). It gained `MIX` and the
+  `# BOX` header from V43. The fractions ride inside the existing
+  `lattice_type` argument as `MIX:<sc>,<bcc>,<fcc>[,<cutoff>]`, so the
+  eight-positional-argument CLI every existing caller and SLURM script
+  writes is unchanged.
+- **40 tests**: `test_mixed_lattice.py` (26) and `test_c_generator.py` (14).
+  The C tests compile the source on the fly and skip without a compiler.
+
+#### Fixed
+- **`topon/topology/csrc/generator.c`** — `target_counts` was sized from a
+  per-lattice constant (`max(max_func, 12)`) but is indexed by node degree
+  in `run_single_trial`. The pure lattices top out at 12 so it exactly
+  fit, but a mixture reaches degree 20 and `mix_cutoff` is user-settable,
+  so no constant is safe. It is now sized from the maximum degree of the
+  graph actually built, which required moving the lattice construction
+  ahead of the argument parsing.
+- `srand` moved above the lattice build so `MIX` can draw its sites. A
+  no-op for SC/BCC/FCC, which consume no randomness while being built.
+- **Heap overflow in `create_mixed_lattice`.** The site scratch buffer was
+  sized at `4 * Ncells`, the FCC site count, but a cell can hold five
+  sites (corner + body + 3 faces). It looks safe on the mean and is not:
+  at `f_bcc=0.1, f_fcc=0.9` roughly 0.2% of 4x4x4 draws exceed `4*N`.
+  Now sized at `5 * Ncells`, with a repeated-draw regression test on that
+  exact mixture.
+
+#### Known, deliberate
+- `MIX` at `{"SC": 1}` reproduces `SC` exactly, down to node ids. It does
+  **not** at the other corners: the cutoff also admits the corner-corner
+  shell, giving 14 neighbours at `{"BCC": 1}` against canonical BCC's 8,
+  and 18 at `{"FCC": 1}` against FCC's 12. The site sets do match. Pinned
+  by `test_mix_bcc_corner_is_not_canonical_bcc`.
+- A body centre and a face centre can sit 0.5 cells apart, half the SC
+  spacing, so at fixed DP the bond length spreads by up to 2x.
+- Two pre-existing C/Python divergences are documented in
+  `topon/topology/csrc/README.md` and left alone: the C honours per-axis
+  periodicity while Python always wraps, and the sculpting degree-2 guard
+  is SC-gated in C but unconditional in Python.
+
+### [V43] — 2026-08-05 — Generators record their periodic cell
+
+#### Fixed
+- **`topon/topology/loader.py`** — `infer_dims_from_graph` now returns the
+  cell recorded by the generator in `G.graph["box"]`, falling back to the
+  old `max - min + 1` estimate only when no box is present. The estimate is
+  exact for SC, whose sites are integer-spaced with unit separation, but
+  overshoots every lattice with fractional basis sites: BCC and FCC body and
+  face sites sit at +0.5, Diamond sites at quarter cells, so the coordinates
+  stop short of the cell edge and a 4x4x4 BCC or FCC was reported as 4.5.
+- Because that value is the box for every minimum-image calculation in the
+  pipeline, the overshoot broke the `bond < box/2` invariant of Design
+  Principle 3 and pushed edges onto the wrong periodic replica. Measured on
+  4x4x4: **169 of 512 BCC edges (33%) and 360 of 1536 FCC edges (23%)** were
+  built at exactly twice their true bond length (BCC 1.732 vs 0.866, FCC
+  1.414 vs 0.707). Diamond was affected identically.
+- A box recorded on the graph now also overrides a `dims` stored alongside
+  an older gpickle, which may have come from the estimate.
+- **`topon/conformation/manager.py`** — the box was estimated in a *second*,
+  independent place: stage 5 re-derived it from the `.displace` files as
+  `(max node coord + 1) * scale`. `apply_displacements` gained a
+  `lattice_box` argument, and `pipeline.py` plus both workflows now pass the
+  same `dims` stage 4 routed the chains with. Fixing only the topology side
+  left the two disagreeing (routing on period 4.0, box written at 4.5) and
+  produced **63 bonds up to 14.5 Å** where the unfixed code had none over
+  1.85 Å. As a side effect the box is now `dims * scale = volume^(1/3)`
+  whatever `dims` holds, so the target density is hit exactly on every
+  lattice instead of only on SC.
+
+#### Added
+- **`topon/topology/generator_python.py`**, **`generator_python_diamond.py`** —
+  SC, BCC, FCC and Diamond builders set `G.graph["box"]` to the true lattice
+  repeat. The attribute survives `Graph.copy()` (sculpting), the
+  `nx.MultiGraph` conversion, vacancy removal and pickling.
+- **`.nodes` files** gained an optional `# BOX Lx Ly Lz` header, with
+  `read_box_header` / `format_box_header` to parse and render it and a
+  `save_nodes_edges` writer that emits it. Files without the header load
+  exactly as before.
+- **`tests/unit/topology/test_lattice_box.py`** — 20 tests covering the
+  recorded cell per lattice, uniform nearest-neighbour edge lengths,
+  survival through the pipeline transforms, `.nodes` round-trip, malformed
+  and absent headers, and the gpickle precedence rule. One test pins the
+  old fallback behaviour so a future change to it is visible rather than
+  silent.
+- **`tests/workflows/verify_lattice_box.py`** — end-to-end script that
+  audits all four lattices, then runs the same BCC network through the
+  pipeline twice (with and without the header) and LAMMPS stage-1 minimize.
+
+#### Compatibility
+SC output is unchanged by construction, since both estimates were already
+exact there: on the frozen 5x5x5 sample graph the old `max + 1` and the new
+`dims` are both 5.0. Verified by running `pytest tests/regression/` with the
+change stashed and again with it applied: the per-test status diff is empty
+(43 passed, 8 failed, 14 skipped, 3 errors in both, the failures
+pre-existing). The two reference-generating scripts under `tests/workflows/`
+were left passing no `lattice_box` on purpose, since they regenerate SC
+references where the fallback is exact. The C generator does not yet emit
+the header, so its `.nodes` output still uses the fallback for BCC/FCC.
 
 ### [V42] — 2026-07-17 — README rewritten around the animations
 

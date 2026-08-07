@@ -19,7 +19,7 @@ Three peer sub-systems share the same Python package. They do related but distin
 | LAMMPS data | `atom_style full`, wrap-only (7-column atom rows, no image flags) | `atom_style full`, wrap-only (same convention as core topon) | `atom_style full`, wrap-only |
 | Pipeline | the six stages below | BFM lattice → JSON snapshot → 3-stage relax (parallel pipeline) | independent packing flow |
 | Crosslinks | Y-merge (CG) / chemistry-defined (atomistic) | dityrosine SC4–SC4 (TN6 bead) | reaction templates (epoxy/amine, etc.) |
-| Topology shape | lattice graph (SC / BCC / FCC, configurable functionality) | BFM self-avoiding-walk lattice | molecule library + grid packing |
+| Topology shape | lattice graph (SC / BCC / FCC / Diamond / MIX, configurable functionality) | BFM self-avoiding-walk lattice | molecule library + grid packing |
 
 A fourth, smaller utility — `topon/singlechain/` — handles single-chain solubility computations and is used by neither the main pipeline nor topro directly.
 
@@ -59,7 +59,46 @@ Generates or loads a NetworkX `MultiGraph`. Nodes are network junctions; edges a
 - `source="generate"` — calls the C generator (`generator.exe`) via `topon.topology.generator.run_generator`, then loads `.nodes`/`.edges` files.
 - `source="load"` — reads existing `.gpickle` or `.nodes`+`.edges` files via `topon.topology.loader.load_graph`.
 
+Lattices: `SC`, `BCC`, `FCC` and `Diamond` (fixed neighbour patterns),
+plus `MIX`, which overlays SC/BCC/FCC basis sites in one cubic cell at
+configurable fractions and connects by distance cutoff. `periodicity`
+opens individual axes, giving a free surface on that face. Both
+generators support all five lattices and per-axis boundaries, and build
+identical lattices for every combination.
+
+**Two generators, two jobs.** The C source in
+[`topon/topology/csrc/`](../topon/topology/csrc/) is the standalone
+searcher: it runs on its own, without Python, and is the tool for long
+exhaustive searches. The pure-Python `generator_python.py` is the pipeline
+default and exists for quick in-process generation of likely networks with
+no compiler. They are independent programs, not a library and a wrapper;
+nothing in `csrc/` is called from Python and it should not grow a Python
+binding. Only the shared surface (lattice construction, the
+`.nodes`/`.edges` format) has to stay in step, which
+`tests/unit/topology/test_c_generator.py` checks by compiling the source
+and comparing. They agree on distributions, not individual draws, since
+the C one seeds from the clock.
+
+The split is earned. Measured on SC at `max_func=4`, time to first
+success: at 6³ Python takes 0.01 s against the C's 0.04 s (process
+startup dominates), at 12³ Python takes 1.5 s against 0.11 s, and at 24³
+(13824 nodes) the C finishes in 6.7 s where Python would run for hours.
+
 Produces: `self.graph` (annotated `MultiGraph`) and `self.dims` (box size as `np.ndarray`).
+
+**The periodic cell is recorded, not inferred.** Generators write the exact
+repeat distance into `G.graph["box"]`, and `.nodes` files carry it in a
+`# BOX Lx Ly Lz` header. `infer_dims_from_graph` returns that value when it
+is present and only falls back to estimating the cell from the coordinate
+extent (`max - min + 1`) for graphs written before this existed. The estimate
+is exact for SC, whose sites are integer-spaced, but overshoots any lattice
+with fractional basis sites: BCC and FCC body/face sites sit at +0.5 and
+Diamond sites at quarter-cell offsets, so a 4x4x4 BCC or FCC reported 4.5.
+Because `self.dims` is the box every minimum-image calculation uses, that
+overshoot violated the `bond < box/2` invariant in Design Principle 3 and
+sent roughly a third of BCC edges (a quarter of FCC) to the wrong periodic
+replica, where they were built at twice their true bond length. Any new
+lattice with non-integer sites must record its cell for the same reason.
 
 ### Stage 2 — Analysis
 **Module:** `topon/assignment/manager.py:analyze` &nbsp;**Code:** `pipeline.py:146-154`
@@ -118,6 +157,17 @@ Conformation defaults (`pipeline.py:47`):
 
 Output: `<output_dir>/03_Conformation/system_relaxed.data`.
 
+**The simulation box comes from stage 1, not from the coordinates.** Callers
+pass `lattice_box=dims` into `apply_displacements`, giving a box of
+`dims * scale`; only when it is omitted does the manager fall back to
+estimating `(max node coord + 1) * scale` from the `.displace` files. This
+has to match the cell stage 4 used to route chains across the periodic
+boundary. When the two disagree, a chain that wraps under one period lands
+in a box of another and its closing bond is left stretched across the
+system. The two estimates happen to coincide for SC, which is why the
+fallback survived so long, and passing the box also makes the written box
+exactly `volume^(1/3)`, so the target density is hit on every lattice.
+
 ### Stage 6 — Output
 **Module:** `topon/writers/` (`LammpsInputGenerator`) &nbsp;**Code:** `pipeline.py:277-300`
 
@@ -137,7 +187,7 @@ Concise tour of every directory under `topon/`. Every module above the dashed li
 
 | Directory | Files / Subdirs | Role |
 |---|---|---|
-| `topology/` | 4 files + `network/`, `sequence/`, `simple/` (sub-dirs are stubs) | Graph generation and loading. Stage 1. |
+| `topology/` | 4 files + `csrc/` (C generator) + `network/`, `sequence/`, `simple/` (sub-dirs are stubs) | Graph generation and loading. Stage 1. |
 | `analysis/` | 2 files | Read-only graph statistics for the `topon analyze` CLI. **Not used by `Pipeline` stage 2** — that calls `AssignmentManager.analyze()`. |
 | `assignment/` | 8 files | Graph annotation: node/edge types, DP, defects, entanglements, copolymers. Stage 3. |
 | `chemistry/` | 4 files (`builder.py` is most of stage 4); `dreiding/`/`kg/`/`charmm/` are stubs | RDKit Mol construction with 3D coords. Stage 4. |

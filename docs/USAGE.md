@@ -846,6 +846,9 @@ For lower-level entry points (each stage individually), see ARCHITECTURE.md §2 
 | `generate_simbox_crosslink.py` | Drives `simbox.workflow.run_workflow` end-to-end |
 | `run_v41_matrix.py`, `run_v42_matrix.py`, `run_v43_core_topon.py` | Versioned sweep drivers — parameterise the workflows above and write into `tests/output/v<NN>/<cell>/` |
 | `analyze_v41_collapse.py` | Post-processing analysis for the v41 sweep |
+| `verify_lattice_box.py` | Audits the recorded periodic cell on all four lattices, then runs a BCC network through the pipeline + LAMMPS stage 1 |
+| `verify_mixed_lattice.py` | Builds a mixture end-to-end and reports the edge-length shells and bond-length tail against an SC baseline |
+| `compare_generators.py` | Sweeps the C searcher against the Python generator over lattices, sizes, mixtures and distribution modes; `--lammps` also builds and minimises a subset |
 
 Output goes to `tests/output/v<NN>/<cell>/` (gitignored). Don't introduce a parallel `runs/` folder — the convention is `tests/output/`.
 
@@ -902,14 +905,136 @@ Top-level sections:
 |---|---|---|---|
 | `exe_path` | string \| null | `null` | Path to `generator.exe`; `null` → use Python generator |
 | `lattice_size` | string | `"6x6x6"` | Lattice dimensions, e.g. `"8x8x8"` |
-| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` | `"SC"` | Lattice type |
-| `periodicity` | string | `"111"` | Periodicity per axis (`1`=periodic, `0`=open) |
+| `lattice_type` | `"SC"` \| `"BCC"` \| `"FCC"` \| `"Diamond"` \| `"MIX"` | `"SC"` | Lattice type; `MIX` overlays SC/BCC/FCC (see below) |
+| `mix_fractions` | object | `{"SC":1,"BCC":0,"FCC":0}` | Sublattice fractions for `MIX`; must sum to 1 |
+| `mix_cutoff` | float | `1.0` | Neighbour cutoff for `MIX`, in cell units |
+| `periodicity` | string | `"111"` | Periodicity per axis (`1`=periodic, `0`=open); see below |
 | `max_functionality` | int | `6` | Maximum crosslink degree per node |
 | `max_trials` | int | `1000000` | Trials before giving up |
 | `max_saves` | int | `1` | Number of networks to save |
 | `degree_distribution` | string | `"0:0,1:0"` | Target degree distribution |
 
 Degree distribution format: `"d:N"` requires N nodes of degree d; `"e:N"` requires N edges total; omitted degrees are unconstrained. Example: `"0:15,1:30,e:371"`.
+
+##### Diamond (`lattice_type: "Diamond"`)
+
+Two interpenetrating FCC sublattices offset by ¼ along the body diagonal:
+8 sites per cubic cell, **every site exactly 4-coordinated by
+construction**. A `max_functionality: 4` network therefore needs no
+pruning at all, which makes it the cleanest backbone for a tetrafunctional
+network and much faster to generate than sculpting SC or FCC down to 4.
+
+```json
+"generator": { "lattice_type": "Diamond", "lattice_size": "6x6x6",
+               "max_functionality": 4, "degree_distribution": "" }
+```
+
+An `NxNxN` Diamond has `8N³` sites and `16N³` bonds at a nearest-neighbour
+distance of `√3/4 ≈ 0.433` cells. Both generators build it identically.
+
+##### Boundaries (`periodicity`)
+
+One digit per axis, `1` periodic and `0` open. An open axis omits its
+wrap-around bonds, so the lattice grows a **free surface** there and the
+sites on it lose coordination. The site set is unchanged either way.
+
+```json
+"generator": { "lattice_size": "6x6x6", "periodicity": "110" }
+```
+
+That builds a slab: periodic in x and y, open in z. On a 4x4x4 SC lattice
+the bond count goes 192 → 176 → 160 → 144 as you open one, two and three
+axes, and the surface sites drop from degree 6 to 5.
+
+**Open boundaries interact with `degree_distribution`.** Corner and edge
+sites on a free surface have very low coordination, and the centred
+lattices lose the most:
+
+| lattice (4x4x4) | min degree, `"111"` | `"110"` | `"000"` |
+|---|---|---|---|
+| SC | 6 | 5 | 3 |
+| BCC | 8 | 4 | 1 (2 such sites) |
+| FCC | 12 | 8 | 3 |
+| Diamond | 4 | 2 | 1 (22 such sites) |
+
+So the usual `"0:0,1:0"` (no isolated nodes, no dangling ends) is
+**unsatisfiable** on a fully open BCC or Diamond: the only way to clear a
+degree-1 site is to cut its last bond, which makes it degree 0, and that
+is forbidden too. Both generators decline rather than claim success. On
+SC the minimum stays at 3, so the same request is fine. Either drop the
+`1:0` term on open lattices, or leave `degree_distribution` empty and let
+`max_functionality` do the work.
+
+`max_functionality` still applies on top, so a partially open lattice
+reaches the ceiling with less pruning than a closed one.
+
+**What an open axis does to the data file.** Coordinates are wrapped into
+the box only on periodic axes. An open axis keeps its atoms where they
+were placed and the box grows to contain them, so a junction on the free
+surface stays next to the chains bonded to it instead of being split
+across the cell. The `.nodes` file records the boundaries in a
+`# PERIODICITY 100` header (written only when an axis is open), and the
+conformation stage reads it.
+
+An open axis also gets **12 Å of vacuum** between the outermost atom and
+the box face, matching the pair cutoff the generated scripts use. That is
+not cosmetic: LAMMPS *deletes* atoms that leave a non-periodic (`f`) face,
+and the geometry handed to stage 1 is strained enough that surface atoms
+move several Å in the first few dozen steps. With only 1 Å of clearance a
+bonded atom was lost at step 49. Override with `open_axis_pad` if a run
+needs more, or less when the extra volume matters.
+
+The generated LAMMPS scripts still say `boundary p p p` — they are not
+periodicity-aware, and changing them is out of scope here. Set
+`boundary p f f` yourself to match; the data file is already correct for
+it. Verified on a Diamond `100` network: `p f f` and `p p p` both
+complete stage-1 minimization, with no bond crossing an open face.
+
+##### Mixed lattices (`lattice_type: "MIX"`)
+
+All three cubic lattices share the cell corner and each adds sites on top
+of it: BCC one body centre, FCC three face centres. `MIX` puts the corner
+in every cell, the body centre with probability `mix_fractions.BCC`, and
+each face centre with probability `mix_fractions.FCC`. The `SC` entry is
+the remainder and places no site of its own, which is what makes the
+three a partition summing to 1. Expected site count is
+`Nx*Ny*Nz * (1 + f_bcc + 3*f_fcc)`.
+
+```json
+"generator": {
+  "lattice_size": "6x6x6",
+  "lattice_type": "MIX",
+  "mix_fractions": {"SC": 0.2, "BCC": 0.4, "FCC": 0.4},
+  "max_functionality": 4
+}
+```
+
+The point of mixing is more neighbour distances. A pure SC lattice offers
+a single edge length; the mixture above offers four (0.5, 0.707, 0.866,
+1.0 cell units), which smooths the distribution of strand end-to-end
+distances. Three things to know before using it:
+
+- **`MIX` at `{"SC": 1}` reproduces `SC` exactly**, down to node ids. That
+  is *not* true at the other two corners. `MIX` connects by distance
+  cutoff rather than by a fixed neighbour pattern, so at `{"BCC": 1}` the
+  1.0 cutoff also admits the corner-corner shell and every node carries 14
+  neighbours instead of BCC's 8 (18 instead of 12 at `{"FCC": 1}`). Use
+  `lattice_type: "BCC"` or `"FCC"` when you want the canonical
+  coordination.
+- **Bond lengths spread.** A body centre and a face centre can land 0.5
+  cells apart, half the SC spacing. DP is assigned independently of edge
+  length, so strands of the same DP get built at bond lengths differing by
+  up to 2x. Watch for FENE strain on the long edges.
+- **The split is a coarse dial.** Per the strand-realism analysis the
+  SC/BCC/FCC percentages are a weak, ill-conditioned knob: many splits fit
+  a given target comparably well. Site jitter and a Gaussian-weighted edge
+  rule move the strand statistics much more. Treat the fractions as
+  SC-heavy for short strands shifting toward BCC/FCC as strand length
+  grows, and verify by measurement rather than by tuning percentages.
+
+Lowering `mix_cutoff` below 1.0 drops the corner-corner shell, which
+disconnects the always-present corner sublattice from itself. 1.0 is the
+default for that reason.
 
 #### `topology.existing_files`
 
@@ -920,6 +1045,30 @@ Provide either `gpickle_file` OR both `nodes_file` + `edges_file`.
 | `nodes_file` | string \| null | `null` | Path to `.nodes` file |
 | `edges_file` | string \| null | `null` | Path to `.edges` file |
 | `gpickle_file` | string \| null | `null` | Path to NetworkX `.gpickle` file |
+
+##### `.nodes` file format
+
+Whitespace-separated `NodeID X Y Z Degree`, with `#` starting a comment.
+An optional `# BOX Lx Ly Lz` header records the periodic cell in lattice
+units:
+
+```
+# BOX 6 6 6
+# NodeID X Y Z Degree
+0 0.000000 0.000000 0.000000 3
+1 1.000000 0.000000 0.000000 3
+```
+
+The header is optional and files without it load exactly as before, but
+**write it for any lattice whose sites are not integer-spaced.** Without
+it topon estimates the cell as `max - min + 1` over the coordinates,
+which is exact for SC but overshoots BCC, FCC and Diamond because their
+basis sites sit at fractional offsets and never reach the cell edge. A
+4x4x4 BCC or FCC is estimated at 4.5, and since that value drives every
+minimum-image calculation, about a third of BCC edges (a quarter of FCC)
+get built at twice their true bond length. Anything topon generates
+records the header for you; the caveat applies to hand-written or
+externally-produced files.
 
 ### `assignment`
 

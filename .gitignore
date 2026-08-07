@@ -59,3 +59,8 @@ _tmp_*
 # gallery render transients (systems + movie frames; scripts default here)
 assets/gallery/systems/
 assets/gallery/_frames/
+
+# compiled C generator; the source is tracked, the binary is built locally
+topon/topology/csrc/*.exe
+topon/topology/csrc/*.o
+topon/topology/csrc/generator

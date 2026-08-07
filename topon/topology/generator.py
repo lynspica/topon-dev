@@ -11,6 +11,30 @@ from typing import Optional, Union
 from topon.config.schema import GeneratorConfig
 
 
+def format_lattice_arg(config: GeneratorConfig) -> str:
+    """Render the ``<lattice_type>`` argument the C generator expects.
+
+    SC, BCC and FCC pass through unchanged. MIX carries its sublattice
+    fractions and cutoff inside the same argument, as
+    ``MIX:<sc>,<bcc>,<fcc>,<cutoff>``, so the executable keeps the
+    eight-positional-argument CLI that existing callers and SLURM scripts
+    already write.
+
+    Args:
+        config: Generator configuration.
+
+    Returns:
+        The argument string.
+    """
+    if config.lattice_type != "MIX":
+        return config.lattice_type
+    f = config.mix_fractions
+    return (
+        f"MIX:{f.get('SC', 0.0):g},{f.get('BCC', 0.0):g},"
+        f"{f.get('FCC', 0.0):g},{config.mix_cutoff:g}"
+    )
+
+
 def run_generator(
     config: GeneratorConfig,
     output_dir: Union[str, Path],
@@ -48,7 +72,7 @@ def run_generator(
         str(config.max_saves),
         str(config.degree_distribution),
         "0",  # extensive_logging
-        config.lattice_type,
+        format_lattice_arg(config),
     ]
     
     print(f"Running generator: {' '.join(cmd)}")
@@ -106,12 +130,12 @@ def generate_slurm_script(
     
     # Build job name from lattice config
     job_name = f"gen-{config.lattice_size}-{config.lattice_type}"
-    
+
     # Build command
     cmd = (
         f'"{exe_path}" {config.lattice_size} {config.periodicity} '
         f'{config.max_functionality} {config.max_trials} {config.max_saves} '
-        f'"{config.degree_distribution}" 0 {config.lattice_type}'
+        f'"{config.degree_distribution}" 0 "{format_lattice_arg(config)}"'
     )
     
     # Build script
