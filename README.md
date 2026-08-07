@@ -37,7 +37,7 @@ dashed target. This is the real algorithm, replayed from the edge-removal histor
 it recorded: 228 removals taking a 6x6x6 lattice from 648 edges to 420, mean degree
 6.00 to 3.89.</sub>
 
-It works from any of the three lattices, and gets to the same place from each:
+It works from any of the lattices, and gets to the same place from each:
 
 <p align="center">
   <img src="assets/gallery/anim/lattices_arc.gif" alt="Simple cubic, body-centred cubic and face-centred cubic lattices each pruned down to mean degree 4" width="880">
@@ -45,6 +45,12 @@ It works from any of the three lattices, and gets to the same place from each:
 
 <sub>SC, BCC and FCC start at 6-, 8- and 12-coordinate and all sculpt down to mean
 degree 4.0. You get a tetrafunctional network whichever lattice you begin with.</sub>
+
+Diamond is the fourth: 4-coordinate by construction, so a tetrafunctional
+network needs no pruning at all. A fifth, `MIX`, overlays SC, BCC and FCC
+sites at fractions you choose, which turns a single junction-spacing into
+several and spreads the strand end-to-end distances accordingly. Any axis
+can be made open instead of periodic, giving a slab with a free surface.
 
 ---
 
