@@ -552,7 +552,7 @@ def report_bonds(root):
 # Step 2: one pair, entangled once
 # ---------------------------------------------------------------------------
 
-def separation_bands(geo, max_units=0.8, tol=0.02):
+def separation_bands(geo, max_units=1.3, tol=0.02):
     """Chord pairs grouped into the lattice's discrete separation bands.
 
     On a lattice the closest-approach distance between two strands takes a
@@ -943,30 +943,81 @@ def step3(args):
 # Step 4: entanglements placed by hand, checked in the written data file
 # ---------------------------------------------------------------------------
 
-def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45):
+def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45,
+                         fene=1.5):
     """Every chain's path, with one pair wound at the sites given.
 
     The sites are positions along the chain, chosen by the caller. Nothing
     is searched for and nothing is refused; see
     topon.conformation.entanglement.waypoints.
+
+    The scale is pinned to the *straight* chains, not to the longest path.
+    Pinning the longest is right when every chain is a chord, and wrong once
+    one of them carries detours: an entangled chain is far longer than any
+    plain chord, so pinning it shrinks the box until all the others are
+    crushed. Measured with three sites on one pair, scale pinned to it: the
+    median chain sat at 0.146 sigma bonds, and stage 1 had to expand 354 of
+    them, leaving 438 past the FENE limit and a longest bond of 2.488.
+
+    The entangled chain then pays for its detours out of the slack it
+    already has -- at melt-like scales a chain has several times more
+    contour than its chord needs -- and ``reach`` is reduced if that is not
+    enough to keep it under ``fene``. Bead count stays the same for every
+    chain, so DP still means one thing.
     """
     ka, kb = pair
 
-    def make(g):
-        out = {}
-        for k, (c0, c1) in g["chords"].items():
-            if k not in (ka, kb):
-                out[k] = resample(np.stack([c0, c1]), dp + 2)
-        a0, a1 = g["chords"][ka]
-        b0, b1 = g["chords"][kb]
-        pa, pb, info = entangled_pair(a0, a1, b0, b1, sites,
-                                      n_beads=dp + 2, reach=reach)
-        out[ka], out[kb] = pa, pb
-        make.info = info
+    def straights(g):
+        out = {k: resample(np.stack([c0, c1]), dp + 2)
+               for k, (c0, c1) in g["chords"].items()}
         return apply_junction_shells(out, g["ends"], spacing=SHELL_SPACING)
 
-    geo, paths = pin_scale(graph, make, bond, dp)
-    return geo, paths, make.info
+    geo, _ = pin_scale(graph, straights, bond, dp)
+
+    def build(r):
+        out = {k: resample(np.stack([c0, c1]), dp + 2)
+               for k, (c0, c1) in geo["chords"].items() if k not in (ka, kb)}
+        a0, a1 = geo["chords"][ka]
+        b0, b1 = geo["chords"][kb]
+        pa, pb, nfo = entangled_pair(a0, a1, b0, b1, sites,
+                                     n_beads=dp + 2, reach=r)
+        out[ka], out[kb] = pa, pb
+        out = apply_junction_shells(out, geo["ends"], spacing=SHELL_SPACING)
+        worst = max(float(np.linalg.norm(np.diff(out[c], axis=0), axis=1).max())
+                    for c in (ka, kb))
+        return out, nfo, worst
+
+    reach_used = reach
+    for _ in range(8):
+        paths, info, worst = build(reach_used)
+        if worst <= fene * 0.85 or reach_used < 0.05:
+            break
+        reach_used *= 0.75
+    if reach_used < reach:
+        print(f"  reach reduced {reach:.2f} -> {reach_used:.2f} to keep the "
+              f"entangled chain under the FENE limit")
+    return geo, paths, info, reach_used
+
+
+def parse_sites(at, count, turns, span):
+    """Sites from an explicit list of positions, or evenly spread.
+
+    Explicit positions are the point of the waypoint construction: placement
+    is meant to be heterogeneous, and "evenly spread" is only the fallback
+    for when the caller has not said otherwise.
+    """
+    if at:
+        spec = []
+        for item in at:
+            if ":" in item:
+                pos, t = item.split(":", 1)
+                spec.append(Site(at=float(pos), turns=int(t), span=span))
+            else:
+                spec.append(Site(at=float(item), turns=turns, span=span))
+        return sorted(spec, key=lambda s: s.at)
+    n = max(1, count)
+    return [Site(at=(i + 1) / (n + 1), turns=turns, span=span)
+            for i in range(n)]
 
 
 def step4(args):
@@ -977,15 +1028,14 @@ def step4(args):
     band = bands[min(args.shell, len(bands)) - 1]
     _, ka, kb = band[0]
 
-    n = max(1, args.sites)
-    sites = [Site(at=(i + 1) / (n + 1), turns=args.windings) for i in range(n)]
+    sites = parse_sites(args.at, args.sites, args.windings, args.span)
     asked = sum(s.turns for s in sites)
-    print(f"  pair {ka}-{kb}, {n} site(s) at "
-          f"{', '.join(f'{s.at:.2f}' for s in sites)}, "
-          f"{args.windings} turn(s) each, {asked} in total")
+    print(f"  pair {ka}-{kb}: "
+          + ", ".join(f"{s.turns} turn(s) at {s.at:.2f}" for s in sites)
+          + f"  ({asked} in total)")
 
-    geo, paths, info = build_with_waypoints(graph, (ka, kb), sites,
-                                            args.bond, DP, args.reach)
+    geo, paths, info, reach_used = build_with_waypoints(
+        graph, (ka, kb), sites, args.bond, DP, args.reach)
     straight_a = resample(np.stack(geo["chords"][ka]), DP + 2)
     straight_b = resample(np.stack(geo["chords"][kb]), DP + 2)
     base = far_closed_linking(straight_a, straight_b)
@@ -997,7 +1047,7 @@ def step4(args):
     print(f"  as built: linking {lk:+.2f}, clearance {sep:.2f}, "
           f"longest bond {built.max():.3f}")
 
-    root = OUT / f"step4_{n}x{args.windings}"
+    root = OUT / f"step4_{LATTICE['lattice']}_{len(sites)}sites"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
     seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
     seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
@@ -1056,7 +1106,18 @@ def main():
     ap.add_argument("--max-windings", type=int, default=4,
                     help="step 3 sweeps 1 up to this")
     ap.add_argument("--sites", type=int, default=3,
-                    help="step 4: how many entanglement sites, spread evenly")
+                    help="step 4: how many sites, spread evenly, when --at "
+                         "is not given")
+    ap.add_argument("--at", nargs="*", default=None, metavar="POS[:TURNS]",
+                    help="step 4: place sites explicitly along the chain, "
+                         "e.g. --at 0.15 0.5:2 0.85. Positions are fractions "
+                         "of the chain and need not be evenly spread")
+    ap.add_argument("--span", type=float, default=None,
+                    help="step 4: how much of the chain each site occupies, "
+                         "as a fraction. Smaller keeps neighbouring sites "
+                         "from merging")
+    ap.add_argument("--lattice", default=None,
+                    help="override the lattice, e.g. SC")
     ap.add_argument("--reach", type=float, default=0.45,
                     help="step 4: how far each chain swings toward its "
                          "partner, as a fraction of their gap")
@@ -1078,6 +1139,22 @@ def main():
                     help="set the scale from bead density instead, e.g. 0.85 "
                          "for the melt comparison")
     args = ap.parse_args()
+
+    if args.lattice:
+        LATTICE["lattice"] = args.lattice
+        if args.lattice.upper() == "SC":
+            # SC 4x4x4 has 64 sites against the mix's 170, so the elaborate
+            # spec the mix needs is not reachable here -- every explicit
+            # mean-4 shape tried returned no graph. Capping functionality at
+            # 4 and forbidding dangling ends is enough on its own and gives
+            # {2:11, 3:22, 4:31}, mean 3.31.
+            #
+            # The geometry is the reason to try SC at all: every chord is
+            # one lattice unit along an axis, so neighbouring strands are
+            # parallel and evenly spaced, with none of the mix's collinear
+            # pairs or wildly varying gaps.
+            LATTICE["max_func"] = 4
+            LATTICE["degree_dist"] = "0:0,1:0"
 
     print("=" * 70)
     print(f"Step {args.step}: {STEPS[args.step].__doc__.splitlines()[0]}")
