@@ -1,0 +1,199 @@
+"""Draw a chain through points you choose, winding it round a partner.
+
+You say where along the chain an entanglement goes and how many turns it
+makes. This returns the two paths. It does not refuse: geometry that is
+tight or ugly is still built, on the view that a minimisation will tidy it
+and that design control matters more than a pretty starting structure.
+
+    sites = [Site(at=0.2, turns=1), Site(at=0.5, turns=2), Site(at=0.8, turns=1)]
+    path_a, path_b = entangled_pair(a0, a1, b0, b1, sites)
+
+Both chains are splines through waypoints. At each site the waypoints spiral
+about the line midway between the two chords, the partners in antiphase, so
+a site with ``turns`` turns contributes exactly that many crossings. Away
+from a site the waypoints are just the chord, so the chain runs straight.
+
+The sites are given as fractions of chain A's own length, which is the
+coordinate you actually want to place them in. Nothing here works in a
+shared frame, so nothing here compresses the range you can ask for.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+__all__ = ["Site", "catmull_rom", "site_frame", "winding_waypoints",
+           "chain_through", "entangled_pair"]
+
+
+@dataclass(frozen=True)
+class Site:
+    """One entanglement, placed by hand.
+
+    at      fraction along chain A, 0 at its first junction, 1 at its second
+    turns   how many times the two chains wind about each other here
+    radius  how far each chain swings from the midline; None takes a share
+            of the local gap, so partners that are far apart reach further
+    span    how much of the chain the site occupies, as a fraction; None
+            scales it with the turn count
+    """
+
+    at: float
+    turns: int = 1
+    radius: float | None = None
+    span: float | None = None
+
+
+def catmull_rom(points, n_out: int, closed: bool = False) -> np.ndarray:
+    """Smooth curve through every one of ``points``.
+
+    Interpolating rather than approximating: a waypoint is a place the chain
+    must go, so a spline that merely passes near it is the wrong tool. The
+    Catmull-Rom tangent at each point is set by its neighbours, which keeps
+    the curve from overshooting between widely spaced waypoints.
+    """
+    p = np.asarray(points, float)
+    if len(p) < 2:
+        return np.repeat(p[:1], n_out, axis=0)
+    if len(p) == 2:
+        t = np.linspace(0.0, 1.0, n_out)[:, None]
+        return p[0] + t * (p[1] - p[0])
+
+    # Duplicate the ends so the first and last segments have tangents too.
+    q = np.vstack([p[0] + (p[0] - p[1]), p, p[-1] + (p[-1] - p[-2])])
+    n_seg = len(p) - 1
+    per = max(2, int(np.ceil(n_out / n_seg)) + 1)
+
+    out = []
+    for i in range(n_seg):
+        p0, p1, p2, p3 = q[i], q[i + 1], q[i + 2], q[i + 3]
+        t = np.linspace(0.0, 1.0, per)[:, None]
+        t2, t3 = t * t, t * t * t
+        seg = 0.5 * ((2 * p1)
+                     + (-p0 + p2) * t
+                     + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+                     + (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+        out.append(seg if i == n_seg - 1 else seg[:-1])
+    curve = np.vstack(out)
+
+    # Re-space at equal arc length and hit the requested count exactly.
+    seg = np.linalg.norm(np.diff(curve, axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(seg)])
+    if s[-1] < 1e-12:
+        return np.repeat(curve[:1], n_out, axis=0)
+    want = np.linspace(0.0, s[-1], n_out)
+    return np.column_stack([np.interp(want, s, curve[:, d]) for d in range(3)])
+
+
+def site_frame(a0, a1, b0, b1, at: float):
+    """Local frame where chain A is at fraction ``at`` of its own chord.
+
+    Returns ``(mid, axis, toward, across, gap)``. ``mid`` is halfway to the
+    nearest point of B, so both chains reach it by moving the same distance.
+
+    Everything is computed at the position asked for. The alternative --
+    finding where the pair comes closest and working outward from there --
+    is what made placement unusable: the site's projection back onto the
+    chain covered only about a fifth of it, so two sites could not be told
+    apart however far apart they were asked to be.
+    """
+    a0, a1 = np.asarray(a0, float), np.asarray(b0, float) * 0 + np.asarray(a1, float)
+    b0, b1 = np.asarray(b0, float), np.asarray(b1, float)
+
+    pa = a0 + float(np.clip(at, 0.0, 1.0)) * (a1 - a0)
+
+    d = b1 - b0
+    L2 = float(d @ d)
+    u = float(np.clip(((pa - b0) @ d) / L2, 0.0, 1.0)) if L2 > 1e-12 else 0.0
+    pb = b0 + u * d
+
+    toward = pb - pa
+    gap = float(np.linalg.norm(toward))
+    toward = toward / gap if gap > 1e-9 else np.array([1.0, 0.0, 0.0])
+
+    axis = (a1 - a0)
+    axis = axis / (np.linalg.norm(axis) + 1e-12)
+    # Orthogonalise so the three directions are a proper frame.
+    toward = toward - (toward @ axis) * axis
+    n = np.linalg.norm(toward)
+    if n < 1e-9:
+        trial = np.array([0.0, 0.0, 1.0])
+        if abs(trial @ axis) > 0.9:
+            trial = np.array([1.0, 0.0, 0.0])
+        toward = trial - (trial @ axis) * axis
+        n = np.linalg.norm(toward)
+    toward /= n
+    across = np.cross(axis, toward)
+
+    return 0.5 * (pa + pb), axis, toward, across, gap
+
+
+def winding_waypoints(a0, a1, b0, b1, site: Site, per_turn: int = 8,
+                      reach: float = 0.45):
+    """Points the two chains must pass through to wind at one site.
+
+    Antiphase spiral about the midline: where A is on one side, B is on the
+    other. ``turns`` full revolutions therefore give ``turns`` crossings,
+    prescribed rather than hoped for.
+    """
+    mid, axis, toward, across, gap = site_frame(a0, a1, b0, b1, site.at)
+    chord = float(np.linalg.norm(np.asarray(a1, float) - np.asarray(a0, float)))
+
+    radius = site.radius if site.radius is not None else reach * gap
+    span = site.span if site.span is not None else min(
+        0.9, 0.10 + 0.13 * site.turns)
+    half = 0.5 * span * chord
+
+    n = max(3, per_turn * site.turns + 1)
+    phase = np.linspace(0.0, 2.0 * np.pi * site.turns, n)
+    along = np.linspace(-half, half, n)
+
+    # Phase 0 puts each chain on its own side, A at -toward and B at
+    # +toward, since toward points from A to B. Starting them the other way
+    # round has both diving for the midline at the same axial position on
+    # the way in, and they collide there before the winding begins: measured
+    # 0.22 apart on a pair whose steady state held them at 2*radius.
+    wa, wb = [], []
+    for ph, u in zip(phase, along):
+        radial = radius * (np.cos(ph) * toward + np.sin(ph) * across)
+        wa.append(mid + u * axis - radial)
+        wb.append(mid + u * axis + radial)
+    return np.array(wa), np.array(wb), mid, axis, half
+
+
+def chain_through(start, end, waypoints, n_beads: int) -> np.ndarray:
+    """One chain: its two junctions, everything it must pass through between."""
+    pts = [np.asarray(start, float)]
+    for w in waypoints:
+        pts.extend(np.asarray(w, float))
+    pts.append(np.asarray(end, float))
+    return catmull_rom(np.array(pts), n_beads)
+
+
+def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
+                   per_turn: int = 8, reach: float = 0.45):
+    """Both chains, wound at every site asked for.
+
+    Returns ``(path_a, path_b, info)`` where ``info`` carries each site's
+    midpoint, axis and half span, for drawing and for measurement.
+    """
+    sites = sorted(sites, key=lambda s: s.at)
+    wa_all, wb_all, info = [], [], []
+    for s in sites:
+        wa, wb, mid, axis, half = winding_waypoints(
+            a0, a1, b0, b1, s, per_turn, reach)
+        wa_all.append(wa)
+        wb_all.append(wb)
+        info.append(dict(at=s.at, turns=s.turns, mid=mid, axis=axis,
+                         half=half))
+
+    pa = chain_through(a0, a1, wa_all, n_beads)
+    # Chain B's waypoints are ordered along A, which is the order B meets
+    # them only when the two run the same way. Reverse if they do not, or
+    # B doubles back between sites.
+    same_way = float((np.asarray(a1, float) - np.asarray(a0, float))
+                     @ (np.asarray(b1, float) - np.asarray(b0, float))) >= 0.0
+    wb_ordered = wb_all if same_way else [w[::-1] for w in wb_all[::-1]]
+    pb = chain_through(b0, b1, wb_ordered, n_beads)
+    return pa, pb, info

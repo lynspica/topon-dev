@@ -104,6 +104,12 @@ class BraidShape:
 
         ``reach`` is the fraction of the gap the radius may take. The default
         0.4 keeps a visible margin below the 0.5 where the chords touch.
+
+        This only ever narrows. Widening a braid to fill a large gap is what
+        produced 4.05 sigma bonds against a FENE limit of 1.5: the reach
+        across the gap is paid for in contour, and contour is paid for in
+        bond length. A caller whose lattice is a different size should scale
+        the shape with :meth:`scaled` rather than rely on the gap to grow it.
         """
         if gap <= 0.0:
             return self
@@ -116,8 +122,47 @@ class BraidShape:
                           pitch=self.pitch,
                           ramp=self.ramp)
 
+    def scaled(self, factor: float) -> "BraidShape":
+        """The same braid, geometrically similar, ``factor`` times the size.
+
+        The defaults are absolute lengths calibrated for one lattice. Used
+        unchanged on a lattice of another size they are the wrong shape, and
+        worse, they make the allocation depend on the scale: asking for two
+        windings lengthens the chain, which shrinks the box that holds the
+        longest bond at target, which shrinks the axial room while the braid
+        keeps its size. Measured, that granted one winding where a request
+        for three was granted three. Nothing that solves for a scale by
+        iterating can converge against a braid that does not scale with it.
+        """
+        f = max(float(factor), 1e-9)
+        return BraidShape(n_radius=self.n_radius * f,
+                          m_radius=self.m_radius * f,
+                          pitch=self.pitch * f,
+                          ramp=self.ramp * f)
+
+    # Clearance between the two partners is set by how tight the helix is,
+    # and by nothing else. Measured on a parallel pair, sweeping pitch at
+    # fixed n_radius, for e = 1 to 4:
+    #
+    #   pitch/n_radius   0.9   1.4   1.8   2.4   3.0   3.6   4.4   5.5
+    #   clearance       0.40  0.62  0.78  1.01  1.21  1.40  1.59  1.76
+    #
+    # The same clearance at every winding count: a braid with four turns is
+    # no tighter than one with a single turn at the same pitch, it is only
+    # longer. So clearance and count are independent, and the way to keep a
+    # margin is to spend axial length rather than to ask for fewer turns.
+    #
+    # Below a ratio of about 3 the relation is close to linear at 0.42 per
+    # unit ratio, which is what pitch_for_clearance inverts. Above that it
+    # saturates and the inverse is conservative, which is the safe direction.
+    CLEARANCE_PER_RATIO = 0.42
+
+    def pitch_for_clearance(self, clearance: float) -> float:
+        """Pitch that keeps the partners at least ``clearance`` apart."""
+        return self.n_radius * clearance / self.CLEARANCE_PER_RATIO
+
     def fit_to_room(self, room: float, e: int = 1,
-                    min_pitch: float = 0.8) -> "BraidShape":
+                    min_clearance: float = 1.0) -> "BraidShape":
         """Shorten the braid axially so ``e`` turns fit in ``room``.
 
         ``fit_to_gap`` narrows the braid; this shortens it. Both are needed
@@ -129,19 +174,35 @@ class BraidShape:
         lattice the same braid is dwarfed by a 26 sigma gap.
 
         Pitch and ramp scale together, so the braid stays the same shape and
-        only gets tighter. ``min_pitch`` stops it collapsing into a spiral
-        so tight the beads on one turn touch those on the next; a request
-        that cannot be met above that floor is left over-long for the caller
-        to reject.
+        only gets tighter.
+
+        ``min_clearance`` is the floor, and it is the honest knob: tightening
+        the pitch is exactly how the partners are brought closer together, so
+        a braid squeezed to fit is a braid with a smaller safety margin. The
+        floor is not a tuning constant but a translation of that margin into
+        a pitch, via the measured relation above. A request that cannot be
+        met above it is left over-long, and the caller cuts the count
+        instead -- which is the right trade, since a chain wanting more
+        windings than one site can safely hold should be given a second site
+        rather than a tighter spiral.
         """
         need = self.span(e)
         if need <= room or need <= 0.0:
             return self
         f = room / need
+        floor = self.pitch_for_clearance(min_clearance)
+        pitch = max(floor, self.pitch * f)
+        # The ramp is floored with the pitch, at the same proportion it has
+        # by default. The blend is where each chain crosses from its own
+        # chord to the shared axis, and a blend shortened while the pitch
+        # holds brings the partners together on the way in, before the helix
+        # itself ever gets tight. Flooring only the pitch left a braid whose
+        # steady state cleared 1.0 but which measured 0.77 through its ramp.
+        ratio = (self.ramp / self.pitch) if self.pitch > 0 else 0.625
         return BraidShape(n_radius=self.n_radius,
                           m_radius=self.m_radius,
-                          pitch=max(min_pitch, self.pitch * f),
-                          ramp=self.ramp * f)
+                          pitch=pitch,
+                          ramp=max(ratio * pitch, self.ramp * f))
 
 
 # ---------------------------------------------------------------------------

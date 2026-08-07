@@ -36,6 +36,7 @@ from topon.conformation.entanglement.braid import (
     axial_room,
     braid_path,
     closest_approach,
+    far_closed_linking,
     feasible_window,
     gap_at,
     make_contact,
@@ -152,6 +153,13 @@ def _overlaps(iv: tuple[float, float],
                for t_lo, t_hi in taken)
 
 
+def _min_separation(pa, pb) -> float:
+    """Closest approach between two bead paths."""
+    d = np.linalg.norm(np.asarray(pa)[:, None, :] - np.asarray(pb)[None, :, :],
+                       axis=-1)
+    return float(d.min())
+
+
 def _obstructing_chain(contact: Contact, half_span: float, radius: float,
                        chords, exclude, samples: int = 21):
     """A third chain lying inside the braid volume, if there is one.
@@ -188,21 +196,40 @@ def _obstructing_chain(contact: Contact, half_span: float, radius: float,
     return None
 
 
-def _candidate_positions(a0, a1, b0, b1, samples: int) -> list[float]:
+def _candidate_positions(a0, a1, b0, b1, samples: int,
+                         taken: Sequence[tuple[float, float]] = (),
+                         tolerance: float = 0.35) -> list[float]:
     """Positions to try for a contact, best first.
 
-    The closest approach comes first, then positions spreading outward
-    through the window where the pair stays close. Ordering outward from the
-    centre keeps braids near the tightest part of the approach and only
-    drifts toward the ends when the middle is already occupied.
+    With nothing on the chord yet, the closest approach comes first and the
+    rest spread outward from it, so a lone braid sits at the tightest part
+    of the approach.
+
+    Once the chord carries braids, the order flips to farthest-first from
+    what is already there. That is what lets several entanglements between
+    the same pair sit at, say, a fifth, a half and four fifths of the chain
+    instead of piling up against each other in the middle. Spreading them is
+    also the only way to raise the count on a pair at all: clearance is set
+    by how tight the helix is, so more turns at one site means a tighter
+    spiral and a smaller margin, while more sites costs nothing.
     """
-    lo, hi = feasible_window(a0, a1, b0, b1)
+    lo, hi = feasible_window(a0, a1, b0, b1, tolerance=tolerance)
     s_star, _ = closest_approach(a0, a1, b0, b1)
     if hi - lo < 1e-6:
         return [s_star]
 
     grid = np.linspace(lo, hi, max(samples, 3))
-    return [float(s) for s in sorted(grid, key=lambda s: abs(s - s_star))]
+    if not taken:
+        return [float(s) for s in sorted(grid, key=lambda s: abs(s - s_star))]
+
+    centres = [0.5 * (t_lo + t_hi) for t_lo, t_hi in taken]
+
+    def spread(s):
+        # Farthest from any existing braid; the closest-approach distance
+        # breaks ties, so among equally free positions the tightest wins.
+        return (-min(abs(s - c) for c in centres), abs(s - s_star))
+
+    return [float(s) for s in sorted(grid, key=spread)]
 
 
 def allocate_contacts(
@@ -210,6 +237,9 @@ def allocate_contacts(
     chords: dict[ChainId, tuple[Sequence[float], Sequence[float]]],
     shape: Optional[BraidShape] = None,
     max_partners: Optional[int] = None,
+    min_clearance: float = 1.0,
+    verify_windings: bool = True,
+    window_tolerance: float = 0.35,
     separation: float = 0.02,
     window_samples: int = 25,
     check_obstruction: bool = True,
@@ -225,6 +255,25 @@ def allocate_contacts(
     shape : braid geometry; sets how much axial room a winding needs.
     max_partners : cap on distinct partners per chain. None means no cap
         beyond what the geometry allows.
+    verify_windings : reject a position whose built braid does not measure
+        the winding count it was planned for. The measure is the Gauss
+        integral over chords closed far away, which is exact for a pair
+        running parallel and unreliable for one whose chords diverge, since
+        the closure then contributes. Worth keeping on for parallel work and
+        worth turning off when the arbiter is a primitive-path analysis.
+    window_tolerance : how far the pair's gap may grow, as a fraction of its
+        minimum, for a position still to be considered. The default keeps
+        every braid near the tightest part of the approach, which is right
+        for one site and is exactly what stops a second: measured on a pair
+        whose chords diverge, a tolerance of 0.35 left a window covering 42%
+        of the chord while one site occupies 24%, so two could not fit
+        however much chord remained. Raising it to 1.0 opens 73% and room
+        for three, at the cost of siting the outer braids where the chains
+        are further apart and the detour to reach across is longer.
+    min_clearance : how close the two partners of a braid may come, in the
+        units of the chords. A braid squeezed into short chord is a braid
+        whose partners are closer together, so this is the floor on how much
+        squeezing is allowed; past it the winding count is cut instead.
     separation : minimum gap between two braids on one chord, as a fraction
         of that chord. Prevents adjacent blends from overlapping.
     check_obstruction : refuse a contact whose braid volume contains a third
@@ -282,7 +331,10 @@ def allocate_contacts(
         placed = None
         blocked_by = None
         too_far = False
-        for s_a in _candidate_positions(a0, a1, b0, b1, window_samples):
+        too_close = False
+        unrealised = False
+        for s_a in _candidate_positions(a0, a1, b0, b1, window_samples,
+                                        taken[req.chain_a], window_tolerance):
             gap, s_b = gap_at(a0, a1, b0, b1, s_a)
             contact = make_contact(a0, a1, b0, b1, s_a=s_a, s_b=s_b)
             # Two independent fits. Narrow the braid to this pair's gap so
@@ -298,7 +350,8 @@ def allocate_contacts(
             lb, hb = axial_room(b0, b1, contact)
             room = 2.0 * min(ha, hb, -la, -lb)
             if room > 0.0:
-                fitted = fitted.fit_to_room(room, req.windings)
+                fitted = fitted.fit_to_room(room, req.windings,
+                                            min_clearance)
             half, e_max = plan_braid(a0, a1, b0, b1, contact,
                                      req.windings, fitted)
             if e_max < 1:
@@ -306,6 +359,40 @@ def allocate_contacts(
 
             granted = min(req.windings, e_max)
             half, _ = plan_braid(a0, a1, b0, b1, contact, granted, fitted)
+
+            # Verify on the built paths rather than trusting the plan. Two
+            # things are checked, and both were caught by measurement rather
+            # than predicted.
+            #
+            # Clearance, because pitch_for_clearance inverts a relation
+            # measured on long chords and reads optimistic when the braid
+            # spans most of a short one, where the two ramps sit close
+            # enough to interact: planned for 1.0, one such braid measured
+            # 0.81. Dropping a winding lengthens the pitch, which is what
+            # clearance depends on, so that converges.
+            #
+            # The winding count, because a position can satisfy every budget
+            # and still not link. Away from the closest approach the pair is
+            # further apart, and a braid whose radius is capped for the
+            # tightest part of the window no longer spans the gap out at its
+            # edge: granted two, realised one. That is not recoverable by
+            # dropping a turn, so the position is abandoned for the next.
+            while granted >= 1:
+                pa = braid_path(a0, a1, contact, granted, -1, 400, half, fitted)
+                pb = braid_path(b0, b1, contact, granted, +1, 400, half, fitted)
+                if _min_separation(pa, pb) >= min_clearance:
+                    break
+                granted -= 1
+                if granted >= 1:
+                    half, _ = plan_braid(a0, a1, b0, b1, contact,
+                                         granted, fitted)
+            if granted < 1:
+                too_close = True
+                continue
+            if verify_windings and round(
+                    abs(far_closed_linking(pa, pb, contact))) != granted:
+                unrealised = True
+                continue
 
             iv_a = _interval_on(a0, a1, contact, half)
             iv_b = _interval_on(b0, b1, contact, half)
@@ -344,6 +431,10 @@ def allocate_contacts(
                 reason = "a third chain lies in the braid volume"
             elif too_far:
                 reason = "chains do not approach along a shared stretch"
+            elif too_close:
+                reason = "no winding fits without breaking the clearance floor"
+            elif unrealised:
+                reason = "no position where the braid realises its windings"
             else:
                 reason = "no free stretch with room for a winding"
             out.rejected.append(Rejection(req, reason))

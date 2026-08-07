@@ -40,6 +40,10 @@ from topon.conformation import ConformationManager  # noqa: E402
 from topon.conformation.junction_shell import (  # noqa: E402
     apply_junction_shells,
 )
+from topon.conformation.entanglement.waypoints import (  # noqa: E402
+    Site,
+    entangled_pair,
+)
 from topon.conformation.entanglement import (  # noqa: E402
     BraidShape,
     ContactRequest,
@@ -73,7 +77,14 @@ OUT = ROOT / "tests/output/entangle_steps"
 LATTICE = dict(lattice="MIX", dims=(4, 4, 4), mix={"SC": 0.2, "BCC": 0.4, "FCC": 0.4},
                cutoff=1.0, max_func=8, seed=42,
                degree_dist="0:0,1:0,2:15,3:40,4:55,5:35,6:15,7:7,8:3")
-DP = 40                 # beads per chain between its two junctions
+# Beads per chain between its two junctions.
+#
+# 80 rather than 40 because several entanglements on one pair need the two
+# chains to run alongside each other for long enough to hold them. At DP 40
+# the chord came out 23.5 sigma, the stretch over which the pair stayed
+# close was 14.2, and one site costs 7.8 -- room for one, whatever else was
+# tuned. The limit was the length of the chain, not the braid.
+DP = 80
 DENSITY = 0.85          # melt density, for the --density comparison run
 
 # Bond length every chain is built at, and the number that fixes the scale:
@@ -81,13 +92,20 @@ DENSITY = 0.85          # melt density, for the --density comparison run
 #
 # The scale follows from the geometry, not from a chosen density; the density
 # is reported instead. 0.90 sits just under the Kremer-Grest equilibrium of
-# ~0.97, so the protocol has nothing to stretch.
-BOND = 0.90
+# ~0.97, so the protocol has nothing to stretch. 0.95 rather than 0.90 buys
+# a little more room for the braid to spend on clearance.
+BOND = 0.95
 
 # Minimum separation asked of the first beads of chains sharing a junction.
 # Set to 0 to build without the shell, which is how the overlap counts in
 # junction_shell's docstring were measured.
 SHELL_SPACING = 1.0
+
+# Lattice scale, in sigma per lattice unit, that BraidShape's default lengths
+# were calibrated against. The braid is scaled by scale/REF_SCALE so it keeps
+# the same proportions on any lattice, which is what makes the granted
+# winding count independent of the box the scale search happens to be at.
+REF_SCALE = 25.0
 
 # The scale is pinned by the LONGEST path in the system, not by the longest
 # chord and not per chain. Only the longest path can reach the FENE limit, so
@@ -114,14 +132,38 @@ class _Cfg:
         self.mix_cutoff = spec["cutoff"]
 
 
-def build_network(spec=LATTICE):
-    """The shared network. Deterministic, so every step gets the same one."""
+def build_network(spec=LATTICE, cache=True):
+    """The shared network, cached to disk after the first search.
+
+    Every step in the series has to get the *same* network or comparisons
+    between them mean nothing. Seeding alone is not enough: sculpting to a
+    mean-4 target on this mix is a search that succeeds on a different trial
+    each run and sometimes runs out of time, so the graph is written once
+    and reloaded. Delete the cache file to search again.
+    """
+    OUT.mkdir(parents=True, exist_ok=True)
+    key = (f"{spec['lattice']}_{'x'.join(str(d) for d in spec['dims'])}"
+           f"_f{spec['max_func']}_s{spec['seed']}")
+    path = OUT / f"network_{key}.gpickle"
+
+    if cache and path.exists():
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
     random.seed(spec["seed"])
     np.random.seed(spec["seed"])
     gen = PythonTopologyGenerator(_Cfg(spec))
-    graphs = gen.generate(trials=4000, max_saves=1, time_limit=120)
+    graphs = gen.generate(trials=20000, max_saves=1, time_limit=900)
     if not graphs:
-        raise SystemExit(f"sculpting produced no {spec['lattice']} network")
+        raise SystemExit(
+            f"sculpting produced no {spec['lattice']} network for "
+            f"{spec['degree_dist']}. Not every degree distribution is "
+            f"reachable on this lattice; try a broader one.")
+    if cache:
+        import pickle
+        with open(path, "wb") as f:
+            pickle.dump(graphs[0], f)
     return graphs[0]
 
 
@@ -548,7 +590,7 @@ def separation_bands(geo, max_units=0.8, tol=0.02):
 
 
 def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4,
-                      density=None):
+                      density=None, verify=True, tolerance=0.35):
     """Paths for every chain, with the scale pinned to the longest of them.
 
     Braid size follows the gap and the gap follows the scale, so pinning the
@@ -561,7 +603,8 @@ def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4,
         # the chains carry far more contour than their chord needs and the
         # braid is paid for out of that slack rather than by stretching.
         geo = geometry(graph, density=density)
-        alloc = allocate_contacts(requests, geo["chords"], BraidShape())
+        alloc = allocate_contacts(requests, geo["chords"], BraidShape(),
+                                  verify_windings=verify)
         raw = {k: compose_chain_path(k, alloc, geo["chords"], 4000)
                for k in geo["chords"]}
         return geo, alloc, place_beads(raw, dp, geo["ends"])
@@ -569,7 +612,15 @@ def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4,
     holder = {}
 
     def braided(g):
-        holder["alloc"] = allocate_contacts(requests, g["chords"], BraidShape())
+        # Scale the braid with the lattice. BraidShape's defaults are
+        # absolute lengths; left absolute they make the granted winding
+        # count depend on the scale, and pin_scale changes the scale, so the
+        # iteration chases itself. REF_SCALE is the lattice those defaults
+        # were calibrated on.
+        shape = BraidShape().scaled(g["scale"] / REF_SCALE)
+        holder["alloc"] = allocate_contacts(requests, g["chords"], shape,
+                                            verify_windings=verify,
+                                            window_tolerance=tolerance)
         raw = {k: compose_chain_path(k, holder["alloc"], g["chords"], 4000)
                for k in g["chords"]}
         return place_beads(raw, dp, g["ends"])
@@ -746,7 +797,250 @@ def step2(args):
     return 0
 
 
-STEPS = {1: step1, 2: step2}
+# ---------------------------------------------------------------------------
+# Z1+ driver
+# ---------------------------------------------------------------------------
+
+def _wsl_path(p):
+    """Windows path to the /mnt/<drive> form WSL uses."""
+    p = Path(p).resolve()
+    drive = p.drive.rstrip(":").lower()
+    rest = str(p)[len(p.drive):].replace("\\", "/")
+    return f"/mnt/{drive}{rest}"
+
+
+def run_z1(z1_dir, runner=None):
+    """Z1+ over every .Z1 file in a directory. Returns {name: [Z per chain]}.
+
+    Z1+ is not vendored: its README asks that it not be re-distributed, and
+    only a Linux binary ships for the core module, so on Windows it runs
+    under WSL. Returns None when it cannot be reached, since the rest of the
+    step is still worth having without it.
+    """
+    import subprocess
+
+    runner = runner or (Path(__file__).resolve().parent / "run_z1.sh")
+    try:
+        out = subprocess.run(
+            ["wsl.exe", "-d", "Ubuntu", "--", "bash",
+             _wsl_path(runner), _wsl_path(z1_dir)],
+            capture_output=True, text=True, timeout=900)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+    text = out.stdout.replace("\x00", "")
+    results, name = {}, None
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("===") and s.endswith("==="):
+            name = s.strip("= ").strip()
+        elif s.startswith("per-chain Z:") and name:
+            results[name] = [int(v) for v in s.split(":", 1)[1].split()]
+    return results or None
+
+
+# ---------------------------------------------------------------------------
+# Step 3: several windings on one pair
+# ---------------------------------------------------------------------------
+
+def step3(args):
+    """Several windings on one pair: does delivered track requested."""
+    graph = build_network()
+    probe = geometry(graph, bond=args.bond)
+    bands = separation_bands(probe)
+    band = bands[min(args.shell, len(bands)) - 1]
+
+    z1_dir = OUT / "step3_z1"
+    if z1_dir.exists():
+        for f in z1_dir.glob("*.Z1"):
+            f.unlink()
+    z1_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+    pair = None
+    for want in range(1, args.max_windings + 1):
+        # Keep the same pair across the sweep, so the only thing changing is
+        # the number asked for. The first winding chooses it.
+        candidates = [(g, a, b) for g, a, b in band] if pair is None else [pair]
+        for gap_u, ka, kb in candidates:
+            # `want` separate single-winding sites, not one braid wound
+            # `want` times. Clearance is set by how tight the helix is and
+            # does not depend on the count, so turns crammed into one site
+            # are bought with the safety margin while extra sites cost only
+            # chord. Allocation spreads them along the shared stretch.
+            reqs = [ContactRequest(ka, kb, windings=1, priority=-i)
+                    for i in range(want)]
+            geo, alloc, paths = build_with_braids(graph, reqs, args.bond)
+            if alloc.accepted:
+                pair = (gap_u, ka, kb)
+                break
+        else:
+            rows.append((want, None, None, None, None, "no pair could be built"))
+            continue
+
+        sites = len(alloc.accepted)
+        total = sum(x.windings for x in alloc.accepted)
+        built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                                for p in paths.values()])
+        sep = min_separation(paths[ka], paths[kb])
+
+        root = OUT / f"step3_e{want}"
+        n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+        seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
+        seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
+        sim_dir = conform_and_script(root, graph, geo,
+                                     pair_style=args.pair_style,
+                                     protocol=args.protocol)
+        z1_export(root / "03_Conformation/system_conformed.data",
+                  [seq_a, seq_b], z1_dir / f"e{want}_1built.Z1")
+
+        if args.run_md:
+            run_md(sim_dir, args.stages)
+            final = root / "04_Simulation/system_equilibrated.data"
+            if final.exists():
+                z1_export(final, [seq_a, seq_b], z1_dir / f"e{want}_2equil.Z1")
+
+        # Where along the chain each site landed, as a fraction of the chord.
+        c0, c1 = geo["chords"][ka]
+        chord = c1 - c0
+        at = sorted(float((x.contact.origin - c0) @ chord / (chord @ chord))
+                    for x in alloc.accepted)
+        rows.append((want, total, sites, at, sep, built.max(), None))
+        print(f"  asked {want}: {sites} sites carrying {total} windings at "
+              f"{', '.join(f'{v:.2f}' for v in at)} along the chain; "
+              f"clearance {sep:.2f}")
+
+    print()
+    print(f"  running Z1+ on {len(list(z1_dir.glob('*.Z1')))} configurations...")
+    z = run_z1(z1_dir)
+
+    print()
+    print("  " + "-" * 66)
+    print(f"  {'asked':>6} {'sites':>6} {'total':>6} {'Z built':>9} "
+          f"{'Z equil':>9} {'clearance':>10} {'placed at':>20}")
+    print("  " + "-" * 66)
+    for want, total, sites, at, sep, mx, err in rows:
+        if err:
+            print(f"  {want:6d}   {err}")
+            continue
+        zb = z.get(f"e{want}_1built") if z else None
+        ze = z.get(f"e{want}_2equil") if z else None
+        fb = "/".join(str(v) for v in zb) if zb else "  -"
+        fe = "/".join(str(v) for v in ze) if ze else "  -"
+        where = ",".join(f"{v:.2f}" for v in at)
+        print(f"  {want:6d} {sites:6d} {total:6d} {fb:>9} {fe:>9} "
+              f"{sep:10.2f} {where:>20}")
+    print("  " + "-" * 66)
+    if z is None:
+        print("  Z1+ unavailable; the .Z1 files are in", z1_dir.name)
+    print()
+    print("  Z is entanglements per chain, one number per partner. Two chains")
+    print("  wound around each other e times should each report e.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Step 4: entanglements placed by hand, checked in the written data file
+# ---------------------------------------------------------------------------
+
+def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45):
+    """Every chain's path, with one pair wound at the sites given.
+
+    The sites are positions along the chain, chosen by the caller. Nothing
+    is searched for and nothing is refused; see
+    topon.conformation.entanglement.waypoints.
+    """
+    ka, kb = pair
+
+    def make(g):
+        out = {}
+        for k, (c0, c1) in g["chords"].items():
+            if k not in (ka, kb):
+                out[k] = resample(np.stack([c0, c1]), dp + 2)
+        a0, a1 = g["chords"][ka]
+        b0, b1 = g["chords"][kb]
+        pa, pb, info = entangled_pair(a0, a1, b0, b1, sites,
+                                      n_beads=dp + 2, reach=reach)
+        out[ka], out[kb] = pa, pb
+        make.info = info
+        return apply_junction_shells(out, g["ends"], spacing=SHELL_SPACING)
+
+    geo, paths = pin_scale(graph, make, bond, dp)
+    return geo, paths, make.info
+
+
+def step4(args):
+    """Entanglements placed by hand, checked in the written data file."""
+    graph = build_network()
+    probe = geometry(graph, bond=args.bond)
+    bands = separation_bands(probe)
+    band = bands[min(args.shell, len(bands)) - 1]
+    _, ka, kb = band[0]
+
+    n = max(1, args.sites)
+    sites = [Site(at=(i + 1) / (n + 1), turns=args.windings) for i in range(n)]
+    asked = sum(s.turns for s in sites)
+    print(f"  pair {ka}-{kb}, {n} site(s) at "
+          f"{', '.join(f'{s.at:.2f}' for s in sites)}, "
+          f"{args.windings} turn(s) each, {asked} in total")
+
+    geo, paths, info = build_with_waypoints(graph, (ka, kb), sites,
+                                            args.bond, DP, args.reach)
+    straight_a = resample(np.stack(geo["chords"][ka]), DP + 2)
+    straight_b = resample(np.stack(geo["chords"][kb]), DP + 2)
+    base = far_closed_linking(straight_a, straight_b)
+    lk = far_closed_linking(paths[ka], paths[kb]) - base
+    sep = min_separation(paths[ka], paths[kb])
+    built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                            for p in paths.values()])
+    print(f"  box {geo['L'][0]:.1f} sigma, density {geo['density']:.4f}")
+    print(f"  as built: linking {lk:+.2f}, clearance {sep:.2f}, "
+          f"longest bond {built.max():.3f}")
+
+    root = OUT / f"step4_{n}x{args.windings}"
+    n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+    seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
+    seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
+    sim_dir = conform_and_script(root, graph, geo,
+                                 pair_style=args.pair_style,
+                                 protocol=args.protocol)
+
+    z1_dir = OUT / "step4_z1"
+    if z1_dir.exists():
+        for f in z1_dir.glob("*.Z1"):
+            f.unlink()
+    z1_dir.mkdir(parents=True, exist_ok=True)
+    z1_export(root / "03_Conformation/system_conformed.data",
+              [seq_a, seq_b], z1_dir / "1built.Z1")
+
+    if args.run_md:
+        print("\n--- LAMMPS stage 1 only ---")
+        run_md(sim_dir, 1)
+        after = root / "04_Simulation/system_after_soft.data"
+        if after.exists():
+            z1_export(after, [seq_a, seq_b], z1_dir / "2stage1.Z1")
+            print()
+            report_bonds(root)
+
+    print()
+    z = run_z1(z1_dir)
+    print("  " + "-" * 52)
+    print(f"  {'':16s} {'asked':>7} {'Z per chain':>14}")
+    print("  " + "-" * 52)
+    for label, key in (("as built", "1built"), ("after stage 1", "2stage1")):
+        got = z.get(key) if z else None
+        shown = "/".join(str(v) for v in got) if got else "-"
+        print(f"  {label:16s} {asked:7d} {shown:>14}")
+    print("  " + "-" * 52)
+    if z is None:
+        print(f"  Z1+ unavailable; .Z1 files are in {z1_dir.name}")
+    print()
+    print("  Z is entanglements per chain, measured on the written data file")
+    print("  with the rest of the network removed, so it counts only these two.")
+    return 0
+
+
+STEPS = {1: step1, 2: step2, 3: step3, 4: step4}
 
 
 def main():
@@ -759,6 +1053,13 @@ def main():
                          "from the junction shell, which is how chains leave "
                          "a crosslink.")
     ap.add_argument("--windings", type=int, default=1)
+    ap.add_argument("--max-windings", type=int, default=4,
+                    help="step 3 sweeps 1 up to this")
+    ap.add_argument("--sites", type=int, default=3,
+                    help="step 4: how many entanglement sites, spread evenly")
+    ap.add_argument("--reach", type=float, default=0.45,
+                    help="step 4: how far each chain swings toward its "
+                         "partner, as a fraction of their gap")
     ap.add_argument("--protocol", default="generated",
                     choices=("generated", "hardcore"),
                     help="generated uses the pipeline's own scripts; "

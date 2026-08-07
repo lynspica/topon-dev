@@ -30,14 +30,23 @@ def _parallel_chords(n, length=60.0, spacing=3.0):
 
 
 def _build(alloc, chords, n_beads=400):
-    """Realise every accepted contact. Returns {(pair): (path_a, path_b)}."""
+    """Realise every accepted contact. Returns {(pair): (path_a, path_b)}.
+
+    Builds with ``a.shape``, the shape the contact was actually planned
+    with, not the caller's original. Allocation narrows a braid to the
+    pair's gap and shortens it to the chord's room, so the two differ
+    whenever either fit did anything -- and rebuilding with the original
+    measures a braid that was never allocated.
+    """
     out = {}
     for a in alloc.accepted:
         r = a.request
         a0, a1 = chords[r.chain_a]
         b0, b1 = chords[r.chain_b]
-        pa = braid_path(a0, a1, a.contact, a.windings, -1, n_beads, a.half_span)
-        pb = braid_path(b0, b1, a.contact, a.windings, +1, n_beads, a.half_span)
+        pa = braid_path(a0, a1, a.contact, a.windings, -1, n_beads,
+                        a.half_span, a.shape)
+        pb = braid_path(b0, b1, a.contact, a.windings, +1, n_beads,
+                        a.half_span, a.shape)
         out[(r.chain_a, r.chain_b)] = (pa, pb)
     return out
 
@@ -114,21 +123,46 @@ def test_max_partners_is_enforced():
     assert any(r.reason == "partner budget full" for r in alloc.rejected)
 
 
-def test_windings_are_reduced_not_refused_when_room_is_short():
-    """A request too ambitious for the chord is granted at the count that
-    fits, and the shortfall stays visible.
+def test_a_tight_braid_is_preferred_to_a_reduced_count():
+    """Short chord, ambitious request: tighten the braid before cutting the
+    count, but only as far as the clearance floor allows.
 
-    Refusing outright would silently drop an entanglement the user asked
-    for; serving the full count would silently compress the braid and cost
-    clearance. Granting less and saying so keeps both facts.
+    The count is what the caller asked for and the pitch is not, so pitch is
+    the cheaper concession -- up to a point. Tightening the pitch is exactly
+    how the two partners are brought closer, so past the floor the count has
+    to give instead.
     """
     chords = _parallel_chords(2, length=14.0)
     alloc = allocate_contacts([ContactRequest(0, 1, windings=6)],
-                              chords, SHAPE)
+                              chords, SHAPE, min_clearance=1.0)
     assert len(alloc.accepted) == 1
     granted = alloc.accepted[0]
-    assert granted.windings < granted.request.windings
+    assert granted.shape.pitch < SHAPE.pitch          # did tighten
+    assert granted.windings < 6                       # but not past the floor
     assert granted.windings >= 1
+
+
+def test_every_granted_braid_meets_its_clearance_floor():
+    """The floor is a promise, not a preference.
+
+    Clearance is set by pitch/n_radius and by nothing else -- measured, the
+    same at one winding as at four -- so a braid that was squeezed to fit is
+    a braid whose partners are closer. Asking for more than a chord can hold
+    must never quietly buy the extra turns with the safety margin.
+    """
+    for length in (12.0, 14.0, 20.0, 40.0):
+        for want in (1, 3, 6, 12):
+            chords = _parallel_chords(2, length=length)
+            alloc = allocate_contacts([ContactRequest(0, 1, windings=want)],
+                                      chords, SHAPE, min_clearance=1.0)
+            if not alloc.accepted:
+                continue
+            granted = alloc.accepted[0]
+            built = _build(alloc, chords, n_beads=1500)[(0, 1)]
+            sep = min_separation(*built)
+            assert sep > 0.9, (
+                f"length {length}, asked {want}, granted "
+                f"{granted.windings}: clearance {sep:.2f}")
 
 
 def test_priority_decides_who_gets_the_room():
