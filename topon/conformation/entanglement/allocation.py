@@ -33,6 +33,7 @@ import numpy as np
 from topon.conformation.entanglement.braid import (
     BraidShape,
     Contact,
+    axial_room,
     braid_path,
     closest_approach,
     feasible_window,
@@ -284,9 +285,20 @@ def allocate_contacts(
         for s_a in _candidate_positions(a0, a1, b0, b1, window_samples):
             gap, s_b = gap_at(a0, a1, b0, b1, s_a)
             contact = make_contact(a0, a1, b0, b1, s_a=s_a, s_b=s_b)
-            # Shrink an over-wide braid to this pair's gap before planning,
-            # so it cannot reach past the partner's chord.
+            # Two independent fits. Narrow the braid to this pair's gap so
+            # it cannot reach past the partner's chord, then shorten it to
+            # the axial room this chord actually has. A braid carrying one
+            # absolute size is wrong at both ends of a lattice's range: too
+            # long for a melt chord of 4.4 sigma, too narrow to reach across
+            # a dilute gap of 26.
             fitted = shape.fit_to_gap(contact.gap)
+            # Room is what BOTH chords can spare: a braid is one shared
+            # axis, so the shorter partner's budget is the binding one.
+            la, ha = axial_room(a0, a1, contact)
+            lb, hb = axial_room(b0, b1, contact)
+            room = 2.0 * min(ha, hb, -la, -lb)
+            if room > 0.0:
+                fitted = fitted.fit_to_room(room, req.windings)
             half, e_max = plan_braid(a0, a1, b0, b1, contact,
                                      req.windings, fitted)
             if e_max < 1:

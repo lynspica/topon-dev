@@ -124,7 +124,7 @@ def junction_directions(chord_dirs: np.ndarray) -> np.ndarray:
 
 def apply_junction_shells(paths, ends, spacing: float = 1.0,
                           blend: int = 4, max_radius: float | None = None,
-                          carry: bool = True):
+                          carry: bool = False):
     """Seat the beads next to each junction on a spread shell.
 
     ``paths`` maps chain id to its bead array, first and last bead sitting
@@ -139,11 +139,18 @@ def apply_junction_shells(paths, ends, spacing: float = 1.0,
     as soon as the blend releases them, and 3826 of the remaining overlaps
     were between chains sharing a junction.
 
-    With ``carry`` true, the default, the offset is instead carried the
-    whole length of the chain: it rises over one bond, holds while
-    interpolating between the two ends' seats, and falls over one bond at
-    the far junction. Collinear siblings then stay a shell diameter apart
-    for their whole length rather than only at the ends.
+    With ``carry`` true the offset is instead carried the whole length of
+    the chain: it rises over one bond, holds while interpolating between the
+    two ends' seats, and falls over one bond at the far junction. Collinear
+    siblings then stay a shell diameter apart for their whole length rather
+    than only at the ends.
+
+    Carry is off by default because it is visible. Translating a chain
+    sideways for its whole length means it no longer heads straight at the
+    junction it is bonded to, which reads as wrong even where the numbers
+    improve. It is worth switching on only where collinear siblings actually
+    occur, which is a high-functionality mix; at functionality 4 a junction
+    has few enough chains that the local seat is sufficient.
 
     Junctions themselves never move. They carry the network's topology and
     the box, and a junction that drifts changes the network rather than

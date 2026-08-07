@@ -60,8 +60,18 @@ OUT = ROOT / "tests/output/entangle_steps"
 # that a chain has neighbours in every shell but small enough to look at, and
 # the SC/BCC/FCC mix gives strand pairs at several different separations,
 # which is exactly what "1st, 2nd, 3rd neighbour" needs to mean something.
+# Functionality up to 8, mean near 4. Twelve is reachable on this mix but it
+# makes every other problem worse: a junction with twelve chains cannot seat
+# their first beads a sigma apart, the mix puts some of those chains on the
+# same ray so they never separate, and a braid between any two of them
+# usually has a third lying in its volume.
+#
+# The distribution is spelled out because most mean-4 targets are not
+# reachable by sculpting this lattice: of four shapes tried, three returned
+# no graph. This one lands on 354 chains, mean f 4.16, max 8.
 LATTICE = dict(lattice="MIX", dims=(4, 4, 4), mix={"SC": 0.2, "BCC": 0.4, "FCC": 0.4},
-               cutoff=1.0, max_func=12, degree_dist="0:0,1:0", seed=42)
+               cutoff=1.0, max_func=8, seed=42,
+               degree_dist="0:0,1:0,2:15,3:40,4:55,5:35,6:15,7:7,8:3")
 DP = 40                 # beads per chain between its two junctions
 DENSITY = 0.85          # melt density, for the --density comparison run
 
@@ -211,6 +221,36 @@ def linear_paths_unit(geo):
     return {k: np.stack([a0 / s, a1 / s]) for k, (a0, a1) in geo["chords"].items()}
 
 
+def longest_built_bond(paths):
+    return max(float(np.linalg.norm(np.diff(p, axis=0), axis=1).max())
+               for p in paths.values())
+
+
+def pin_scale(graph, make_paths, bond=BOND, dp=DP, rounds=6, tol=1e-3):
+    """Settle the scale so the longest bond actually built comes out at ``bond``.
+
+    ``make_paths(geo)`` returns the finished bead paths for a geometry,
+    junction shell and braids included.
+
+    A formula is not enough here. The scale was being pinned from the chords
+    alone, then the shell displaced beads afterwards and stretched the very
+    bonds the rule was meant to bound -- built at a nominal 0.90 the longest
+    bond came out at 1.210. Both the shell and the braid add length after the
+    fact, so the rule has to be applied to what is built rather than to what
+    was planned. Scaling the lattice scales those features with it, so this
+    converges in a few rounds.
+    """
+    geo = geometry(graph, bond=bond, dp=dp)
+    for _ in range(rounds):
+        paths = make_paths(geo)
+        built = longest_built_bond(paths)
+        if abs(built - bond) <= tol * bond:
+            break
+        geo = geometry(graph, bond=bond, dp=dp,
+                       scale=geo["scale"] * (bond / built))
+    return geo, make_paths(geo)
+
+
 # ---------------------------------------------------------------------------
 # Chemistry and coordinates
 # ---------------------------------------------------------------------------
@@ -322,15 +362,18 @@ def step1(args):
     graph = build_network()
     geo = geometry(graph, density=args.density, bond=args.bond)
 
-    # Step 1 has no braids, so a path is its chord and the longest path is
-    # the longest chord. From step 2 on the same call re-pins the scale to
-    # whatever the braids made longest, with no change here.
+    # Step 1 has no braids, so a path is just its chord -- but the junction
+    # shell still lengthens the bonds next to every crosslink, so the scale
+    # is settled against the bonds actually built rather than against the
+    # chords.
+    def straight(g):
+        return place_beads({k: np.stack(c) for k, c in g["chords"].items()},
+                           ends=g["ends"])
+
     if args.density is None:
-        unit = linear_paths_unit(geo)
-        geo = geometry(graph, bond=args.bond,
-                       scale=scale_for_longest(unit, DP, args.bond))
-    paths = place_beads({k: np.stack(c) for k, c in geo["chords"].items()},
-                        ends=geo["ends"])
+        geo, paths = pin_scale(graph, straight, args.bond)
+    else:
+        paths = straight(geo)
 
     tag = "melt" if args.density is not None else f"b{int(round(args.bond*100))}"
     root = OUT / f"step1_{tag}"
@@ -437,7 +480,7 @@ def report_bonds(root):
 # Step 2: one pair, entangled once
 # ---------------------------------------------------------------------------
 
-def neighbour_shells(geo, max_units=0.8, tol=0.02):
+def separation_bands(geo, max_units=0.8, tol=0.02):
     """Chord pairs grouped into the lattice's discrete separation bands.
 
     On a lattice the closest-approach distance between two strands takes a
@@ -474,7 +517,8 @@ def neighbour_shells(geo, max_units=0.8, tol=0.02):
     return bands
 
 
-def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4):
+def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4,
+                      density=None):
     """Paths for every chain, with the scale pinned to the longest of them.
 
     Braid size follows the gap and the gap follows the scale, so pinning the
@@ -482,21 +526,26 @@ def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4):
     contraction -- the braid is nearly scale-free in lattice units -- so a
     few rounds settle it.
     """
-    geo = geometry(graph, bond=bond)
-    alloc = None
-    for _ in range(rounds):
+    if density is not None:
+        # Density fixes the scale outright, so there is nothing to re-pin:
+        # the chains carry far more contour than their chord needs and the
+        # braid is paid for out of that slack rather than by stretching.
+        geo = geometry(graph, density=density)
         alloc = allocate_contacts(requests, geo["chords"], BraidShape())
-        raw = {k: compose_chain_path(k, alloc, geo["chords"], 400)
+        raw = {k: compose_chain_path(k, alloc, geo["chords"], 4000)
                for k in geo["chords"]}
-        unit = {k: p / geo["scale"] for k, p in raw.items()}
-        new_scale = scale_for_longest(unit, dp, bond)
-        if abs(new_scale - geo["scale"]) < 1e-6 * geo["scale"]:
-            break
-        geo = geometry(graph, bond=bond, scale=new_scale)
+        return geo, alloc, place_beads(raw, dp, geo["ends"])
 
-    raw = {k: compose_chain_path(k, alloc, geo["chords"], 4000)
-           for k in geo["chords"]}
-    return geo, alloc, place_beads(raw, dp, geo["ends"])
+    holder = {}
+
+    def braided(g):
+        holder["alloc"] = allocate_contacts(requests, g["chords"], BraidShape())
+        raw = {k: compose_chain_path(k, holder["alloc"], g["chords"], 4000)
+               for k in g["chords"]}
+        return place_beads(raw, dp, g["ends"])
+
+    geo, paths = pin_scale(graph, braided, bond, dp, rounds=rounds)
+    return geo, holder["alloc"], paths
 
 
 def unwrap_chain(ids_seq, xyz, box):
@@ -530,26 +579,42 @@ def measure_pair(data_file, seq_a, seq_b, contact=None):
 def step2(args):
     """One pair of chains, entangled once."""
     graph = build_network()
-    probe = geometry(graph, bond=args.bond)
-    bands = neighbour_shells(probe)
+    probe = geometry(graph, density=args.density, bond=args.bond)
+    bands = separation_bands(probe)
     if not bands:
         raise SystemExit("no chord pairs close enough to consider")
 
-    print(f"  neighbour shells found (gap in lattice units):")
+    print(f"  separation bands found (gap in lattice units):")
     for i, band in enumerate(bands[:6], start=1):
-        print(f"    shell {i}: gap {band[0][0]:.2f}  ({len(band)} pairs)")
+        print(f"    band {i}: gap {band[0][0]:.2f}  ({len(band)} pairs)")
 
+    # Take the first pair in the shell that can actually be built. Pairs in
+    # one shell are all the same distance apart, so the choice among them is
+    # arbitrary -- but they are not interchangeable, since a third chain may
+    # lie in the braid volume of one and not the next.
     band = bands[min(args.shell, len(bands)) - 1]
-    gap_u, ka, kb = band[0]
-    print(f"\n  picked shell {args.shell}: chains {ka} and {kb}, "
-          f"gap {gap_u:.2f} lattice units")
-
-    req = [ContactRequest(ka, kb, windings=args.windings)]
-    geo, alloc, paths = build_with_braids(graph, req, args.bond)
-
-    if not alloc.accepted:
+    tried = {}
+    for gap_u, ka, kb in band:
+        req = [ContactRequest(ka, kb, windings=args.windings)]
+        geo, alloc, paths = build_with_braids(graph, req, args.bond,
+                                              density=args.density)
+        if alloc.accepted:
+            break
         why = alloc.rejected[0].reason if alloc.rejected else "unknown"
-        raise SystemExit(f"  contact refused: {why}")
+        tried[why] = tried.get(why, 0) + 1
+    else:
+        print(f"\n  no pair in band {args.shell} could be built "
+              f"({len(band)} tried):")
+        for why, n in sorted(tried.items(), key=lambda kv: -kv[1]):
+            print(f"    {n:4d}  {why}")
+        return 1
+
+    if tried:
+        print(f"\n  skipped {sum(tried.values())} pairs in this band:")
+        for why, n in sorted(tried.items(), key=lambda kv: -kv[1]):
+            print(f"    {n:4d}  {why}")
+    print(f"\n  picked band {args.shell}: chains {ka} and {kb}, "
+          f"gap {gap_u:.2f} lattice units")
     a = alloc.accepted[0]
 
     built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
@@ -574,7 +639,8 @@ def step2(args):
           f"{lk:+.2f} with it")
     print(f"  separation     {sep:.2f} sigma at closest approach")
 
-    root = OUT / f"step2_shell{args.shell}"
+    tag = "melt" if args.density is not None else "ext"
+    root = OUT / f"step2_band{args.shell}_{tag}"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
     seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
     seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
@@ -619,7 +685,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--step", type=int, default=1, choices=sorted(STEPS))
     ap.add_argument("--shell", type=int, default=1,
-                    help="which neighbour shell to entangle (step 2+)")
+                    metavar="BAND",
+                    help="which separation band to entangle (step 2+): 1 is "
+                         "the closest pair of strands, 2 the next. Distinct "
+                         "from the junction shell, which is how chains leave "
+                         "a crosslink.")
     ap.add_argument("--windings", type=int, default=1)
     ap.add_argument("--run-md", action="store_true")
     ap.add_argument("--stages", type=int, default=3, choices=(1, 2, 3))

@@ -116,6 +116,33 @@ class BraidShape:
                           pitch=self.pitch,
                           ramp=self.ramp)
 
+    def fit_to_room(self, room: float, e: int = 1,
+                    min_pitch: float = 0.8) -> "BraidShape":
+        """Shorten the braid axially so ``e`` turns fit in ``room``.
+
+        ``fit_to_gap`` narrows the braid; this shortens it. Both are needed
+        because the two are set by different things: the radius by how far
+        apart the strands are, the span by how much chord the chain can
+        spare between its junctions. The defaults here are one absolute
+        size, and a fixed size is wrong at both ends of the range -- a span
+        of 7.19 sigma does not fit a melt chord of 4.4, while on a dilute
+        lattice the same braid is dwarfed by a 26 sigma gap.
+
+        Pitch and ramp scale together, so the braid stays the same shape and
+        only gets tighter. ``min_pitch`` stops it collapsing into a spiral
+        so tight the beads on one turn touch those on the next; a request
+        that cannot be met above that floor is left over-long for the caller
+        to reject.
+        """
+        need = self.span(e)
+        if need <= room or need <= 0.0:
+            return self
+        f = room / need
+        return BraidShape(n_radius=self.n_radius,
+                          m_radius=self.m_radius,
+                          pitch=max(min_pitch, self.pitch * f),
+                          ramp=self.ramp * f)
+
 
 # ---------------------------------------------------------------------------
 # Contact
