@@ -36,6 +36,9 @@ sys.path.insert(0, str(ROOT))
 from rdkit import Chem  # noqa: E402
 
 from topon.conformation import ConformationManager  # noqa: E402
+from topon.conformation.junction_shell import (  # noqa: E402
+    apply_junction_shells,
+)
 from topon.conformation.entanglement import (  # noqa: E402
     BraidShape,
     ContactRequest,
@@ -69,6 +72,11 @@ DENSITY = 0.85          # melt density, for the --density comparison run
 # is reported instead. 0.90 sits just under the Kremer-Grest equilibrium of
 # ~0.97, so the protocol has nothing to stretch.
 BOND = 0.90
+
+# Minimum separation asked of the first beads of chains sharing a junction.
+# Set to 0 to build without the shell, which is how the overlap counts in
+# junction_shell's docstring were measured.
+SHELL_SPACING = 1.0
 
 # The scale is pinned by the LONGEST path in the system, not by the longest
 # chord and not per chain. Only the longest path can reach the FENE limit, so
@@ -183,9 +191,18 @@ def scale_for_longest(paths_unit, dp=DP, bond=BOND):
     return bond * (dp + 1) / longest
 
 
-def place_beads(paths, dp=DP):
-    """Re-space every path onto the same dp+2 beads, ends included."""
-    return {k: resample(p, dp + 2) for k, p in paths.items()}
+def place_beads(paths, dp=DP, ends=None, shell=SHELL_SPACING):
+    """Re-space every path onto the same dp+2 beads, ends included.
+
+    With ``ends`` given, the beads nearest each junction are also seated on
+    a spread shell, so the chains meeting there do not start on top of one
+    another. See topon.conformation.junction_shell for why that decides
+    whether a prescribed entanglement survives the protocol.
+    """
+    out = {k: resample(p, dp + 2) for k, p in paths.items()}
+    if ends is not None and shell:
+        out = apply_junction_shells(out, ends, spacing=shell)
+    return out
 
 
 def linear_paths_unit(geo):
@@ -312,7 +329,8 @@ def step1(args):
         unit = linear_paths_unit(geo)
         geo = geometry(graph, bond=args.bond,
                        scale=scale_for_longest(unit, DP, args.bond))
-    paths = place_beads({k: np.stack(c) for k, c in geo["chords"].items()})
+    paths = place_beads({k: np.stack(c) for k, c in geo["chords"].items()},
+                        ends=geo["ends"])
 
     tag = "melt" if args.density is not None else f"b{int(round(args.bond*100))}"
     root = OUT / f"step1_{tag}"
@@ -478,7 +496,7 @@ def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4):
 
     raw = {k: compose_chain_path(k, alloc, geo["chords"], 4000)
            for k in geo["chords"]}
-    return geo, alloc, place_beads(raw, dp)
+    return geo, alloc, place_beads(raw, dp, geo["ends"])
 
 
 def unwrap_chain(ids_seq, xyz, box):
@@ -583,7 +601,11 @@ def step2(args):
             if not p.exists():
                 continue
             l2, s2 = measure_pair(p, seq_a, seq_b, a.contact)
-            keep = "kept" if round(abs(l2)) == a.windings else "LOST"
+            # Signed, against the value as built. Comparing magnitudes would
+            # call a destroyed +1 that came back as -1 a success, and that is
+            # exactly what happens here: the strands cross and re-link the
+            # other way round.
+            keep = "kept" if abs(l2 - lk) < 0.5 else "LOST"
             print(f"  {label:14s} {l2:8.2f} {s2:11.2f}   {keep}")
     else:
         print(f"\n  scripts in {sim_dir}  (add --run-md to run them)")
