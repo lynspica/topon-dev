@@ -52,17 +52,26 @@ LATTICE = dict(lattice="MIX", dims=(4, 4, 4), mix={"SC": 0.2, "BCC": 0.4, "FCC":
 DP = 40                 # beads per chain between its two junctions
 DENSITY = 0.85          # melt density, for the --density comparison run
 
-# Default: fix the scale from the geometry instead of the density, so the
-# longest chain drawn straight has bonds of this length.
+# Bond length every chain is built at, and the number that fixes the scale:
+# the longest chain, drawn straight with DP beads, gets bonds this long.
 #
-# Why 0.40 and not 1.0. A braid costs contour: measured on BraidShape(), one
-# winding covers 7.19 sigma of chord with 12.50 sigma of path, so the braided
-# stretch needs about 2.4x the bond length of the straight stretch it
-# replaces. At full extension (1.0) that puts the braid's own bonds at 2.4
-# sigma, past the FENE limit of 1.5, and the chain breaks. At 0.40 the braid
-# lands at 0.96 sigma, right at equilibrium, and the rest of the chain is
-# only 2.5x compressed instead of the 6.5x that melt density gives.
-EXTENSION = 0.40
+# The scale follows from the geometry, not from a chosen density; the density
+# is reported instead. 0.90 sits just under the Kremer-Grest equilibrium of
+# ~0.97, so the protocol has nothing to stretch.
+BOND = 0.90
+
+# The scale is pinned by the LONGEST path in the system, not by the longest
+# chord and not per chain. Only the longest path can reach the FENE limit, so
+# holding it at BOND puts every other chain below BOND automatically: shorter
+# path, same bead count, shorter bonds. One DP for the whole network, and no
+# bond anywhere can break.
+#
+# Once entanglements exist the longest path is a braided chain, not a chord,
+# because a braid adds contour. Measured on BraidShape(): one winding covers
+# 7.19 sigma of chord with 12.50 sigma of path. Sizing from chords instead
+# would leave exactly those chains over the limit -- with DP fixed at 40 and
+# the scale set from the longest chord, braids came out needing 4.05 sigma
+# bonds against a limit of 1.5.
 
 
 class _Cfg:
@@ -87,19 +96,19 @@ def build_network(spec=LATTICE):
     return graphs[0]
 
 
-def geometry(graph, dp=DP, density=None, extension=EXTENSION):
+def geometry(graph, dp=DP, density=None, bond=BOND, scale=None):
     """Junction positions and chain chords in sigma, plus the lattice scale.
 
-    Two ways to fix the scale, and they are the same equation solved for
-    different unknowns:
+    Two ways to fix the scale, the same equation solved for different
+    unknowns:
 
-    ``density``   the melt route. Volume follows from bead count, and the
-                  bond length is whatever falls out -- 0.150 sigma here,
-                  which is a chain collapsed onto its own chord.
+    ``density``  the melt route. Volume follows from bead count, and the
+                 bond length is whatever falls out -- 0.150 sigma here,
+                 which is a chain collapsed onto its own chord.
 
-    ``extension`` the geometric route. The scale is set so the longest
-                  chain, drawn straight, has bonds of ``extension`` sigma.
-                  Density is then reported, not chosen.
+    ``bond``     the geometric route. The scale is set so the longest chain,
+                 drawn straight with ``dp`` beads, has bonds this long.
+                 Density is reported rather than chosen.
 
     Chords use the minimum image, so a chain whose junctions sit on
     opposite faces is the short one that crosses the boundary, not a line
@@ -114,10 +123,11 @@ def geometry(graph, dp=DP, density=None, extension=EXTENSION):
         np.linalg.norm((raw[v] - raw[u]) - box * np.round((raw[v] - raw[u]) / box))
         for u, v in graph.edges())
 
-    if density is not None:
-        scale = ((n_beads / density) / cells) ** (1.0 / 3.0)
-    else:
-        scale = extension * (dp + 1) / c_max
+    if scale is None:
+        if density is not None:
+            scale = ((n_beads / density) / cells) ** (1.0 / 3.0)
+        else:
+            scale = bond * (dp + 1) / c_max
     density_out = n_beads / (cells * scale ** 3)
 
     pos = {n: p * scale for n, p in raw.items()}
@@ -134,18 +144,55 @@ def geometry(graph, dp=DP, density=None, extension=EXTENSION):
                 bond=c_max * scale / (dp + 1))
 
 
-def linear_paths(geo, dp=DP):
-    """Straight bead paths, dp+2 points per chain including both junctions."""
-    t = np.linspace(0.0, 1.0, dp + 2)[:, None]
-    return {k: a0 + t * (a1 - a0) for k, (a0, a1) in geo["chords"].items()}
+def path_length(p):
+    return float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
+
+
+def resample(p, n):
+    """Re-space a polyline onto ``n`` points at equal arc length.
+
+    Bead count follows the path, so a detour has to be walked at the same
+    bond length as a straight run rather than covered by stretching.
+    """
+    seg = np.linalg.norm(np.diff(p, axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(seg)])
+    if s[-1] < 1e-12:
+        return np.repeat(p[:1], n, axis=0)
+    want = np.linspace(0.0, s[-1], n)
+    return np.column_stack([np.interp(want, s, p[:, d]) for d in range(3)])
+
+
+def scale_for_longest(paths_unit, dp=DP, bond=BOND):
+    """Scale in sigma per lattice unit that puts the longest path at ``bond``.
+
+    ``paths_unit`` are the paths in lattice units. The longest of them is the
+    only one that can reach the FENE limit, so it sets the scale and every
+    other chain lands below ``bond`` on its own.
+    """
+    longest = max(path_length(p) for p in paths_unit.values())
+    return bond * (dp + 1) / longest
+
+
+def place_beads(paths, dp=DP):
+    """Re-space every path onto the same dp+2 beads, ends included."""
+    return {k: resample(p, dp + 2) for k, p in paths.items()}
+
+
+def linear_paths_unit(geo):
+    """Straight chain paths in lattice units: just the two endpoints."""
+    s = geo["scale"]
+    return {k: np.stack([a0 / s, a1 / s]) for k, (a0, a1) in geo["chords"].items()}
 
 
 # ---------------------------------------------------------------------------
 # Chemistry and coordinates
 # ---------------------------------------------------------------------------
 
-def write_system(graph, geo, paths, root, dp=DP):
+def write_system(graph, geo, paths, root):
     """Build the CG molecule and hand the bead coordinates to the pipeline.
+
+    Each chain gets exactly as many interior beads as its path has interior
+    points, so the chemistry follows the geometry rather than the reverse.
 
     Coordinates go out in lattice units and are scaled back up by the
     conformation stage, which is how the rest of the pipeline does it; that
@@ -164,7 +211,7 @@ def write_system(graph, geo, paths, root, dp=DP):
     chain_atoms = {}
     for k, (u, v) in sorted(geo["ends"].items()):
         prev, atoms = node_atom[u], []
-        for _ in range(dp):
+        for _ in range(len(paths[k]) - 2):
             idx = mol.AddAtom(Chem.Atom("Si"))
             mol.GetAtomWithIdx(idx).SetProp("bead_type", "A")
             mol.AddBond(prev, idx, Chem.BondType.SINGLE)
@@ -246,41 +293,52 @@ def run_md(sim_dir, stages=3):
 def step1(args):
     """The network itself. No entanglements: this is the control."""
     graph = build_network()
-    geo = geometry(graph, density=args.density, extension=args.extension)
-    paths = linear_paths(geo)
+    geo = geometry(graph, density=args.density, bond=args.bond)
 
-    tag = ("melt" if args.density is not None
-           else f"ext{int(round(args.extension * 100))}")
+    # Step 1 has no braids, so a path is its chord and the longest path is
+    # the longest chord. From step 2 on the same call re-pins the scale to
+    # whatever the braids made longest, with no change here.
+    if args.density is None:
+        unit = linear_paths_unit(geo)
+        geo = geometry(graph, bond=args.bond,
+                       scale=scale_for_longest(unit, DP, args.bond))
+    paths = place_beads({k: np.stack(c) for k, c in geo["chords"].items()})
+
+    tag = "melt" if args.density is not None else f"b{int(round(args.bond*100))}"
     root = OUT / f"step1_{tag}"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
 
     L = geo["L"]
     deg = sorted(dict(graph.degree()).values())
     hist = {d: deg.count(d) for d in sorted(set(deg))}
+    dps = np.array([len(p) - 2 for p in paths.values()])
+    built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                            for p in paths.values()])
     print()
     print(f"  lattice        MIX {'x'.join(str(d) for d in LATTICE['dims'])}, "
           f"mix {LATTICE['mix']}")
-    print(f"  junctions      {graph.number_of_nodes()}   "
-          f"functionality {hist}")
-    print(f"  chains         {graph.number_of_edges()}  (DP {DP})   "
-          f"beads {n_atoms}")
+    print(f"  junctions      {graph.number_of_nodes()}   functionality {hist}")
+    print(f"  chains         {graph.number_of_edges()}   beads {n_atoms}")
     print(f"  scale set by   "
-          f"{'density' if args.density is not None else 'extension'}")
+          f"{'density' if args.density is not None else 'bond length'}")
     print(f"  box            {L[0]:.1f} sigma cube "
           f"(junction spacing {geo['scale']:.1f})")
     print(f"  density        {geo['density']:.4f}")
-    print(f"  longest chain  chord {geo['c_max']:.1f} sigma -> "
-          f"straight bond {geo['bond']:.3f} sigma")
-    print(f"  braid headroom bond inside a braid would be "
-          f"{geo['bond'] * 2.4:.2f} sigma  "
-          f"({'ok' if geo['bond'] * 2.4 < 1.5 else 'PAST FENE LIMIT'})")
+    print(f"  DP             {int(np.median(dps))} for every chain")
+    print(f"  bond as built  longest path {built.max():.3f}  "
+          f"median {np.median(built):.3f}  shortest {built.min():.3f} sigma")
+    print(f"  FENE headroom  longest bond {built.max():.3f} of 1.5 limit  "
+          f"({'ok' if built.max() < 1.5 else 'OVER'})")
     print()
 
     sim_dir = conform_and_script(root, graph, geo)
     (root / "network.json").write_text(json.dumps(
         {"junctions": graph.number_of_nodes(), "chains": graph.number_of_edges(),
-         "dp": DP, "beads": n_atoms, "scale": geo["scale"],
-         "density": geo["density"], "straight_bond": geo["bond"],
+         "dp": int(np.median(dps)), "beads": n_atoms,
+         "scale": geo["scale"], "density": geo["density"],
+         "target_bond": args.bond,
+         "built_bond_median": float(np.median(built)),
+         "built_bond_max": float(built.max()),
          "box_sigma": L.tolist(), "functionality": hist}, indent=2))
 
     if args.run_md:
@@ -355,9 +413,9 @@ def main():
     ap.add_argument("--step", type=int, default=1, choices=sorted(STEPS))
     ap.add_argument("--run-md", action="store_true")
     ap.add_argument("--stages", type=int, default=3, choices=(1, 2, 3))
-    ap.add_argument("--extension", type=float, default=EXTENSION,
-                    help="straight-line bond length of the longest chain, "
-                         "in sigma; the scale follows from it")
+    ap.add_argument("--bond", type=float, default=BOND,
+                    help="bond length every chain is built at, in sigma; "
+                         "the scale follows from it")
     ap.add_argument("--density", type=float, default=None,
                     help="set the scale from bead density instead, e.g. 0.85 "
                          "for the melt comparison")
