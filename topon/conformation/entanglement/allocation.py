@@ -137,6 +137,12 @@ def _interval_on(chord_start, chord_end, contact: Contact,
     return max(t_lo, 0.0), min(t_hi, 1.0)
 
 
+def _span_fraction(iv: tuple[float, float]) -> float:
+    """How much of a chord an interval covers, after clamping to it."""
+    lo, hi = iv
+    return max(0.0, hi - lo)
+
+
 def _overlaps(iv: tuple[float, float],
               taken: Sequence[tuple[float, float]],
               clearance: float) -> bool:
@@ -207,6 +213,7 @@ def allocate_contacts(
     window_samples: int = 25,
     check_obstruction: bool = True,
     clearance: float = 0.5,
+    min_overlap: float = 0.05,
 ) -> Allocation:
     """Grant room to as many requests as the chords can carry.
 
@@ -225,6 +232,9 @@ def allocate_contacts(
         between them lies.
     clearance : margin added to the braid radius when testing for an
         obstructing chain.
+    min_overlap : least fraction of each chord the braid must occupy. Guards
+        against a contact whose origin falls in empty space between two
+        chains that never come near one another.
 
     Notes
     -----
@@ -270,6 +280,7 @@ def allocate_contacts(
         # on the same midpoint and only the first is ever placed.
         placed = None
         blocked_by = None
+        too_far = False
         for s_a in _candidate_positions(a0, a1, b0, b1, window_samples):
             gap, s_b = gap_at(a0, a1, b0, b1, s_a)
             contact = make_contact(a0, a1, b0, b1, s_a=s_a, s_b=s_b)
@@ -286,6 +297,21 @@ def allocate_contacts(
 
             iv_a = _interval_on(a0, a1, contact, half)
             iv_b = _interval_on(b0, b1, contact, half)
+
+            # The braid must actually land on both chords. When two chains
+            # pass nowhere near each other -- perpendicular strands a full
+            # lattice spacing apart, say -- the closest approach is at their
+            # far ends and the contact origin falls in empty space between
+            # them. Planning still succeeds and the braid is built, but not
+            # one bead of either chain lies inside its span, so the chains
+            # are left straight and the pair reads as unlinked. Measured on a
+            # 4x4x4 SC lattice: ten of fourteen accepted contacts realised
+            # nothing at all, every one of them this case.
+            if (_span_fraction(iv_a) < min_overlap
+                    or _span_fraction(iv_b) < min_overlap):
+                too_far = True
+                continue
+
             if (_overlaps(iv_a, taken[req.chain_a], separation)
                     or _overlaps(iv_b, taken[req.chain_b], separation)):
                 continue
@@ -302,9 +328,12 @@ def allocate_contacts(
             break
 
         if placed is None:
-            reason = ("a third chain lies in the braid volume"
-                      if blocked_by is not None
-                      else "no free stretch with room for a winding")
+            if blocked_by is not None:
+                reason = "a third chain lies in the braid volume"
+            elif too_far:
+                reason = "chains do not approach along a shared stretch"
+            else:
+                reason = "no free stretch with room for a winding"
             out.rejected.append(Rejection(req, reason))
             continue
 

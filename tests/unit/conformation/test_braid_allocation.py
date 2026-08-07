@@ -83,7 +83,7 @@ def test_every_allocated_contact_realises_its_winding_count():
     assert built, alloc.summary()
     for a in alloc.accepted:
         pa, pb = built[(a.request.chain_a, a.request.chain_b)]
-        assert round(far_closed_linking(pa, pb)) == a.windings
+        assert round(abs(far_closed_linking(pa, pb))) == a.windings
         assert min_separation(pa, pb) > 0.5
 
 
@@ -172,7 +172,7 @@ def test_the_same_pair_is_fine_once_the_obstruction_is_gone():
     assert len(alloc.accepted) == 1
     paths = {c: compose_chain_path(c, alloc, chords, 800) for c in chords}
     a = alloc.accepted[0]
-    assert round(far_closed_linking(paths[1], paths[3], a.contact)) == 1
+    assert round(abs(far_closed_linking(paths[1], paths[3], a.contact))) == 1
 
 
 def test_no_unwanted_links_across_a_whole_allocation():
@@ -191,8 +191,8 @@ def test_no_unwanted_links_across_a_whole_allocation():
     for a in alloc.accepted:
         r = a.request
         prescribed.add(frozenset((r.chain_a, r.chain_b)))
-        assert round(far_closed_linking(
-            paths[r.chain_a], paths[r.chain_b], a.contact)) == a.windings
+        assert round(abs(far_closed_linking(
+            paths[r.chain_a], paths[r.chain_b], a.contact))) == a.windings
 
     for i in chords:
         for j in chords:

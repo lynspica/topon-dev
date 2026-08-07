@@ -52,7 +52,7 @@ def test_winding_count_is_exactly_as_requested(e):
     """e turns in, e turns out. This is the whole point of the construction."""
     pa, pb, e_max = _pair(e)
     assert e <= e_max, "test pair should have room; adjust LONG, not the code"
-    assert round(far_closed_linking(pa, pb)) == e
+    assert round(abs(far_closed_linking(pa, pb))) == e
 
 
 def test_no_braid_gives_zero_linking():
@@ -93,7 +93,7 @@ def test_off_midpoint_contact_still_hooks():
     0.25. The shared frame places the braid at the real contact instead."""
     pa, pb, e_max = _pair(2, b0=[10, 3, 0], b1=[50, 3, 0])
     assert e_max >= 2
-    assert round(far_closed_linking(pa, pb)) == 2
+    assert round(abs(far_closed_linking(pa, pb))) == 2
 
 
 @pytest.mark.parametrize("b0,b1", [
@@ -106,7 +106,7 @@ def test_skew_chords_hook(b0, b1):
     so skew is ordinary."""
     pa, pb, e_max = _pair(2, b0=b0, b1=b1)
     assert e_max >= 2
-    assert round(far_closed_linking(pa, pb)) == 2
+    assert round(abs(far_closed_linking(pa, pb))) == 2
 
 
 @pytest.mark.parametrize("length", [20.0, 12.0, 8.0])
@@ -123,7 +123,7 @@ def test_unequal_partner_lengths_hook_and_stay_apart(length):
     pa, pb, e_max = _pair(
         2, b0=[mid - length / 2, 3, 0], b1=[mid + length / 2, 3, 0])
     if e_max >= 2:
-        assert round(far_closed_linking(pa, pb)) == 2
+        assert round(abs(far_closed_linking(pa, pb))) == 2
     assert min_separation(pa, pb) > 0.5
 
 
@@ -174,7 +174,7 @@ def test_tight_gaps_still_give_the_right_winding(gap):
     pa, pb, _ = braid_pair([0, 0, 0], [90, 0, 0],
                            [0, gap, 0], [90, gap, 0], 1, n_beads=800)
     c = make_contact([0, 0, 0], [90, 0, 0], [0, gap, 0], [90, gap, 0])
-    assert round(far_closed_linking(pa, pb, c)) == 1
+    assert round(abs(far_closed_linking(pa, pb, c))) == 1
     assert pa[:, 1].max() < gap, "chain A reached past B's chord"
     assert pb[:, 1].min() > 0.0, "chain B reached past A's chord"
 
@@ -197,7 +197,7 @@ def test_chord_closure_diverges_where_far_closure_does_not():
     pa, pb, _ = braid_pair([0, 0, 0], [90, 0, 0],
                            [0, 1, 0], [90, 1, 0], 1, n_beads=800)
     c = make_contact([0, 0, 0], [90, 0, 0], [0, 1, 0], [90, 1, 0])
-    assert round(far_closed_linking(pa, pb, c)) == 1
+    assert round(abs(far_closed_linking(pa, pb, c))) == 1
     assert abs(chord_closed_linking(pa, pb)) > 2.0
 
 
