@@ -36,6 +36,16 @@ sys.path.insert(0, str(ROOT))
 from rdkit import Chem  # noqa: E402
 
 from topon.conformation import ConformationManager  # noqa: E402
+from topon.conformation.entanglement import (  # noqa: E402
+    BraidShape,
+    ContactRequest,
+    allocate_contacts,
+    closest_approach,
+    compose_chain_path,
+    far_closed_linking,
+    gap_at,
+    min_separation,
+)
 from topon.simulation import SimulationRunner  # noqa: E402
 from topon.topology.generator_python import PythonTopologyGenerator  # noqa: E402
 from topon.utils import write_lammps_displacement_file  # noqa: E402
@@ -405,12 +415,190 @@ def report_bonds(root):
               f"{int((d > 1.5).sum()):7d}")
 
 
-STEPS = {1: step1}
+# ---------------------------------------------------------------------------
+# Step 2: one pair, entangled once
+# ---------------------------------------------------------------------------
+
+def neighbour_shells(geo, max_units=0.8, tol=0.02):
+    """Chord pairs grouped into the lattice's discrete separation bands.
+
+    On a lattice the closest-approach distance between two strands takes a
+    handful of values, not a continuum -- 0.20, 0.35, 0.41, 0.50, 0.61,
+    0.71 lattice units for this mix. Those bands are what "first neighbour,
+    second neighbour" actually means here, so shells are read off the
+    geometry rather than assumed.
+    """
+    s, ch = geo["scale"], geo["chords"]
+    ids = sorted(ch)
+    found = []
+    for i, ka in enumerate(ids):
+        a0, a1 = ch[ka]
+        mid_a = 0.5 * (a0 + a1)
+        for kb in ids[i + 1:]:
+            b0, b1 = ch[kb]
+            if np.linalg.norm(mid_a - 0.5 * (b0 + b1)) > 2.5 * s:
+                continue
+            t, _ = closest_approach(a0, a1, b0, b1)
+            gap, _ = gap_at(a0, a1, b0, b1, t)
+            u = gap / s
+            if 1e-6 < u <= max_units:
+                found.append((u, ka, kb))
+    found.sort()
+
+    bands, cur = [], []
+    for rec in found:
+        if cur and rec[0] - cur[0][0] > tol:
+            bands.append(cur)
+            cur = []
+        cur.append(rec)
+    if cur:
+        bands.append(cur)
+    return bands
+
+
+def build_with_braids(graph, requests, bond=BOND, dp=DP, rounds=4):
+    """Paths for every chain, with the scale pinned to the longest of them.
+
+    Braid size follows the gap and the gap follows the scale, so pinning the
+    scale to a braided path is a fixed point rather than a formula. It is a
+    contraction -- the braid is nearly scale-free in lattice units -- so a
+    few rounds settle it.
+    """
+    geo = geometry(graph, bond=bond)
+    alloc = None
+    for _ in range(rounds):
+        alloc = allocate_contacts(requests, geo["chords"], BraidShape())
+        raw = {k: compose_chain_path(k, alloc, geo["chords"], 400)
+               for k in geo["chords"]}
+        unit = {k: p / geo["scale"] for k, p in raw.items()}
+        new_scale = scale_for_longest(unit, dp, bond)
+        if abs(new_scale - geo["scale"]) < 1e-6 * geo["scale"]:
+            break
+        geo = geometry(graph, bond=bond, scale=new_scale)
+
+    raw = {k: compose_chain_path(k, alloc, geo["chords"], 4000)
+           for k in geo["chords"]}
+    return geo, alloc, place_beads(raw, dp)
+
+
+def unwrap_chain(ids_seq, xyz, box):
+    """Bead path of one chain, unwrapped so a boundary crossing stays whole."""
+    out = [xyz[ids_seq[0]]]
+    for aid in ids_seq[1:]:
+        d = xyz[aid] - out[-1]
+        out.append(out[-1] + (d - box * np.round(d / box)))
+    return np.array(out)
+
+
+def chain_ids(chain, node_atom, chain_atoms, ends):
+    u, v = ends[chain]
+    return ([node_atom[u] + 1]
+            + [i + 1 for i in chain_atoms[chain]]
+            + [node_atom[v] + 1])
+
+
+def measure_pair(data_file, seq_a, seq_b, contact=None):
+    """Linking number and closest approach of two chains in a data file."""
+    box, xyz, _ = read_data(data_file)
+    pa = unwrap_chain(seq_a, xyz, box)
+    pb = unwrap_chain(seq_b, xyz, box)
+    # Bring b into the image nearest a, or the linking integral sees two
+    # curves that never interact.
+    d = pa.mean(axis=0) - pb.mean(axis=0)
+    pb = pb + box * np.round(d / box)
+    return far_closed_linking(pa, pb, contact), min_separation(pa, pb)
+
+
+def step2(args):
+    """One pair of chains, entangled once."""
+    graph = build_network()
+    probe = geometry(graph, bond=args.bond)
+    bands = neighbour_shells(probe)
+    if not bands:
+        raise SystemExit("no chord pairs close enough to consider")
+
+    print(f"  neighbour shells found (gap in lattice units):")
+    for i, band in enumerate(bands[:6], start=1):
+        print(f"    shell {i}: gap {band[0][0]:.2f}  ({len(band)} pairs)")
+
+    band = bands[min(args.shell, len(bands)) - 1]
+    gap_u, ka, kb = band[0]
+    print(f"\n  picked shell {args.shell}: chains {ka} and {kb}, "
+          f"gap {gap_u:.2f} lattice units")
+
+    req = [ContactRequest(ka, kb, windings=args.windings)]
+    geo, alloc, paths = build_with_braids(graph, req, args.bond)
+
+    if not alloc.accepted:
+        why = alloc.rejected[0].reason if alloc.rejected else "unknown"
+        raise SystemExit(f"  contact refused: {why}")
+    a = alloc.accepted[0]
+
+    built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                            for p in paths.values()])
+    braid_bond = np.linalg.norm(np.diff(paths[ka], axis=0), axis=1)
+    lk = far_closed_linking(paths[ka], paths[kb], a.contact)
+    sep = min_separation(paths[ka], paths[kb])
+
+    t = np.linspace(0, 1, DP + 2)[:, None]
+    sa = geo["chords"][ka][0] + t * (geo["chords"][ka][1] - geo["chords"][ka][0])
+    sb = geo["chords"][kb][0] + t * (geo["chords"][kb][1] - geo["chords"][kb][0])
+    lk0 = far_closed_linking(sa, sb, a.contact)
+
+    print(f"\n  box            {geo['L'][0]:.1f} sigma "
+          f"(spacing {geo['scale']:.1f}), density {geo['density']:.4f}")
+    print(f"  contact gap    {a.contact.gap:.2f} sigma, "
+          f"windings asked {args.windings}, granted {a.windings}")
+    print(f"  bond as built  longest path {built.max():.3f}  "
+          f"median {np.median(built):.3f} sigma   "
+          f"(in the braid: max {braid_bond.max():.3f})")
+    print(f"  linking number {lk0:+.2f} without the braid  ->  "
+          f"{lk:+.2f} with it")
+    print(f"  separation     {sep:.2f} sigma at closest approach")
+
+    root = OUT / f"step2_shell{args.shell}"
+    n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+    seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
+    seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
+
+    sim_dir = conform_and_script(root, graph, geo)
+    (root / "pair.json").write_text(json.dumps(
+        {"chain_a": ka, "chain_b": kb, "shell": args.shell,
+         "gap_lattice_units": gap_u, "gap_sigma": a.contact.gap,
+         "windings": a.windings, "linking_before": lk0, "linking_built": lk,
+         "separation_built": sep, "scale": geo["scale"],
+         "density": geo["density"], "beads": n_atoms}, indent=2))
+
+    if args.run_md:
+        print("\n--- LAMMPS ---")
+        run_md(sim_dir, args.stages)
+        report_bonds(root)
+        print()
+        print(f"  {'':14s} {'linking':>8} {'separation':>11}")
+        print(f"  {'as built':14s} {lk:8.2f} {sep:11.2f}")
+        for label, rel in [("stage 1 soft", "04_Simulation/system_after_soft.data"),
+                           ("stage 2 ramp", "04_Simulation/system_ramped.data"),
+                           ("stage 3 equil", "04_Simulation/system_equilibrated.data")]:
+            p = root / rel
+            if not p.exists():
+                continue
+            l2, s2 = measure_pair(p, seq_a, seq_b, a.contact)
+            keep = "kept" if round(abs(l2)) == a.windings else "LOST"
+            print(f"  {label:14s} {l2:8.2f} {s2:11.2f}   {keep}")
+    else:
+        print(f"\n  scripts in {sim_dir}  (add --run-md to run them)")
+    return 0
+
+
+STEPS = {1: step1, 2: step2}
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--step", type=int, default=1, choices=sorted(STEPS))
+    ap.add_argument("--shell", type=int, default=1,
+                    help="which neighbour shell to entangle (step 2+)")
+    ap.add_argument("--windings", type=int, default=1)
     ap.add_argument("--run-md", action="store_true")
     ap.add_argument("--stages", type=int, default=3, choices=(1, 2, 3))
     ap.add_argument("--bond", type=float, default=BOND,
