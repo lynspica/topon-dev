@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import shutil
 import sys
 from pathlib import Path
 
@@ -314,6 +315,20 @@ def write_system(graph, geo, paths, root):
 SIM_CONFIG = {"cg": {"soft_push_steps": 20000, "ramp_steps": 20000,
                      "equil_steps": 20000}}
 
+# "attractive" is lj/cut 2.5, the pipeline default. "repulsive" is lj/cut
+# 1.122462, the WCA truncation: purely repulsive, no cohesion. Which one is
+# right depends on the density the network is built at. An attractive system
+# held at rho 0.014 is far below where LJ holds together, so it contracts and
+# carries the chains with it -- measured, a prescribed pair ended stage 2
+# 16.73 sigma apart. WCA removes that driver.
+PAIR_STYLE = "attractive"
+
+# An alternative three-stage set that runs WCA throughout instead of the soft
+# push. See tests/workflows/lammps_hardcore/README.md. Selected with
+# --protocol hardcore; the generated scripts remain the default and are not
+# modified.
+HARDCORE_DIR = Path(__file__).resolve().parent / "lammps_hardcore"
+
 
 # Matches examples/demos/polymer/coarse_grained/basic/config.json. Not a
 # tuning knob: straight chains at melt density start with bonds near 0.15
@@ -327,7 +342,8 @@ SIM_CONFIG = {"cg": {"soft_push_steps": 20000, "ramp_steps": 20000,
 CG_OVERLAP_CUTOFF = 0.01
 
 
-def conform_and_script(root, graph, geo, overlap_cutoff=CG_OVERLAP_CUTOFF):
+def conform_and_script(root, graph, geo, overlap_cutoff=CG_OVERLAP_CUTOFF,
+                       pair_style=PAIR_STYLE, protocol="generated"):
     study = root.name
     cm = ConformationManager(str(root.parent), study)
     conformed, roles = cm.apply_displacements(
@@ -335,12 +351,22 @@ def conform_and_script(root, graph, geo, overlap_cutoff=CG_OVERLAP_CUTOFF):
     noisy = cm.apply_noise(conformed, magnitude=1e-4)
     cm.resolve_overlaps(noisy, roles, cutoff=overlap_cutoff, max_iters=10)
 
-    gen = LammpsInputGenerator(str(root.parent), study, config=SIM_CONFIG)
+    cfg = dict(SIM_CONFIG, pair_style=pair_style)
+    gen = LammpsInputGenerator(str(root.parent), study, config=cfg)
     gen.write_serial_soft_minimization(settings_file="system.in.settings",
                                        model_type="cg")
     gen.write_parallel_production(settings_file="system.in.settings",
                                   model_type="cg")
-    return root / "04_Simulation"
+
+    sim = root / "04_Simulation"
+    if protocol == "hardcore":
+        # Overwrite the generated scripts in this run's directory only. The
+        # generator itself is untouched, so every other caller keeps the
+        # scripts it has always had.
+        for src in sorted(HARDCORE_DIR.glob("*.in")):
+            shutil.copyfile(src, sim / src.name)
+        print(f"  using the hard-core protocol from {HARDCORE_DIR.name}/")
+    return sim
 
 
 def run_md(sim_dir, stages=3):
@@ -376,6 +402,8 @@ def step1(args):
         paths = straight(geo)
 
     tag = "melt" if args.density is not None else f"b{int(round(args.bond*100))}"
+    tag += "" if args.pair_style == "attractive" else "_wca"
+    tag += "" if args.protocol == "generated" else "_hard"
     root = OUT / f"step1_{tag}"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
 
@@ -402,7 +430,9 @@ def step1(args):
           f"({'ok' if built.max() < 1.5 else 'OVER'})")
     print()
 
-    sim_dir = conform_and_script(root, graph, geo)
+    sim_dir = conform_and_script(root, graph, geo,
+                                 pair_style=args.pair_style,
+                                 protocol=args.protocol)
     (root / "network.json").write_text(json.dumps(
         {"junctions": graph.number_of_nodes(), "chains": graph.number_of_edges(),
          "dp": int(np.median(dps)), "beads": n_atoms,
@@ -639,13 +669,17 @@ def step2(args):
           f"{lk:+.2f} with it")
     print(f"  separation     {sep:.2f} sigma at closest approach")
 
-    tag = "melt" if args.density is not None else "ext"
+    tag = ("melt" if args.density is not None else "b90")
+    tag += "" if args.pair_style == "attractive" else "_wca"
+    tag += "" if args.protocol == "generated" else "_hard"
     root = OUT / f"step2_band{args.shell}_{tag}"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
     seq_a = chain_ids(ka, node_atom, chain_atoms, geo["ends"])
     seq_b = chain_ids(kb, node_atom, chain_atoms, geo["ends"])
 
-    sim_dir = conform_and_script(root, graph, geo)
+    sim_dir = conform_and_script(root, graph, geo,
+                                 pair_style=args.pair_style,
+                                 protocol=args.protocol)
     (root / "pair.json").write_text(json.dumps(
         {"chain_a": ka, "chain_b": kb, "shell": args.shell,
          "gap_lattice_units": gap_u, "gap_sigma": a.contact.gap,
@@ -691,6 +725,15 @@ def main():
                          "from the junction shell, which is how chains leave "
                          "a crosslink.")
     ap.add_argument("--windings", type=int, default=1)
+    ap.add_argument("--protocol", default="generated",
+                    choices=("generated", "hardcore"),
+                    help="generated uses the pipeline's own scripts; "
+                         "hardcore uses tests/workflows/lammps_hardcore, "
+                         "which runs WCA throughout instead of the soft push")
+    ap.add_argument("--pair-style", default=PAIR_STYLE,
+                    choices=("attractive", "repulsive"),
+                    help="attractive is lj/cut 2.5 (pipeline default); "
+                         "repulsive is lj/cut 1.122462, i.e. WCA")
     ap.add_argument("--run-md", action="store_true")
     ap.add_argument("--stages", type=int, default=3, choices=(1, 2, 3))
     ap.add_argument("--bond", type=float, default=BOND,
