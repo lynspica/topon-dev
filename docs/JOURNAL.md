@@ -14,6 +14,76 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Designed entanglements: one per pair, delivered and verified
+
+**Change:** New `topon/conformation/entanglement/waypoints.py` draws a chain
+through points the caller chooses, winding it round a partner a prescribed
+number of times. `Site(at, turns)` says where along the chain an entanglement
+goes; `entangled_pair` and `entangled_group` return the paths. New
+`topon/conformation/junction_shell.py` spreads the chains leaving a crosslink
+so their first beads do not overlap, with the radius growing with
+functionality. `tests/workflows/entangle_steps.py` builds the whole thing
+step by step, `entangle_validate.py` measures the hit rate, and
+`tests/workflows/lammps_hardcore/` holds an alternative three-stage script
+set that runs WCA throughout instead of the soft push.
+
+Verified with Z1+ (Kröger, CPC 283 (2023) 108567) on the written data file
+with the network stripped, so counts are between the named chains only. One
+designed entanglement between a chosen pair is delivered exactly and holds
+through all three stages. A chain can carry two different partners, one
+winding each, with nothing appearing between the two partners.
+
+**Why:** the previous entanglement path put a Gaussian bulge at the midpoint
+of each chain and hoped; the winding count was whatever the shape happened to
+produce, and there was no way to say where an entanglement should go or how
+many there should be.
+
+**Issue / solution:** several, all found by measurement rather than
+predicted.
+
+*The soft push destroys prescribed topology.* `pair_style soft` has finite
+energy at zero separation, which is what lets it resolve a tangled start by
+passing chains through each other, and that is the one move that undoes an
+entanglement. Z1+ on the same build: the stock protocol reads 1/1 as built
+and 0/0 after stage 1; WCA throughout holds 1/1. The generated scripts are
+unchanged and remain the default; the alternative is opt-in and experimental
+until it has been run against the atomistic side-chain cases.
+
+*Contour over chord governs whether any of this is controllable.* Every chain
+carries `(DP+1)*bond` of path whatever its chord is, and above a ratio of
+about 2.5 the coil makes more crossings than the design does. Measured across
+1.7x to 7.8x, asking for one, two and three sites: below 2.5 asked is
+delivered, above it nothing tracks. Density now follows from the coil and is
+reported rather than chosen.
+
+*Sizing the box so the longest chain hits the target bond crushes the rest.*
+An entangled chain is much longer than a plain chord, so pinning it shrank the
+box until the median chain sat at 0.146 sigma bonds and stage 1 had to expand
+354 of them, 438 past the FENE limit. Each path is now drawn at the length its
+own beads need, by waving the free stretches where it is short and shrinking
+the sites where it is long.
+
+*Slack sent in an arbitrary direction becomes entanglements nobody asked
+for.* The wave now points away from the chains it is entangled with. Before
+that, a pair asked for one winding delivered two to three.
+
+*Two results reported earlier were wrong, and both are corrected in the log.*
+A "three sites reading 3/3" was built at a reach of 0.086, below the minimum
+for a winding: the chains were lying against each other rather than winding,
+and Z1+ counted three because they were on top of one another. Both builders
+now refuse below `MIN_REACH`. Separately, `apply_noise` perturbs every atom
+with `np.random` and nothing seeded it once the network came from cache, so
+the same configuration gave 3/3 one run and 2/4 the next; it is seeded now
+and runs repeat exactly.
+
+**Follow-up:** more than one site per pair is not yet reliable —
+`entangled_group` refuses cases `entangled_pair` allows, and that difference
+is not understood. SC lattices do not work at all: every chord is one lattice
+unit so the nearest strands are as far apart as the chains are long
+(gap/chord 1.00 against the mix's 0.29), and bridging that costs more contour
+than a chain has. Neighbour-shell weighting in the assignment stage, the
+original ask, is not started.
+
 ## 2026-08-06 — Open axes are no longer wrapped, so molecules stay whole
 
 **Change** [topon/conformation/manager.py](../topon/conformation/manager.py)

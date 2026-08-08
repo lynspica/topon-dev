@@ -397,6 +397,17 @@ def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
             if hi_r - lo_r < 1e-4:
                 break
         reach = 0.5 * (lo_r + hi_r)
+        if reach < MIN_REACH:
+            # Same guard entangled_group has. Without it this built sites of
+            # almost no radius and said nothing: a three-site request came
+            # out at reach 0.086, which is two chains lying against each
+            # other rather than winding, and still measured as three
+            # entanglements because they were on top of one another.
+            raise ValueError(
+                f"not enough contour: solving for the sites gives a reach of "
+                f"{reach:.3f}, below {MIN_REACH}, which is not a winding. "
+                f"Give the chains more slack (a larger coil), fewer sites, "
+                f"or a closer partner.")
         pa, pb, info = draw(reach)
 
     protect = []
