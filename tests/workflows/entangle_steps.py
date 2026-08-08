@@ -42,6 +42,7 @@ from topon.conformation.junction_shell import (  # noqa: E402
 )
 from topon.conformation.entanglement.waypoints import (  # noqa: E402
     Site,
+    entangled_group,
     entangled_pair,
     meander_to_length,
     resample_path,
@@ -1143,7 +1144,237 @@ def step4(args):
     return 0
 
 
-STEPS = {1: step1, 2: step2, 3: step3, 4: step4}
+# ---------------------------------------------------------------------------
+# Step 5: a plan of several pairs, chains carrying several partners
+# ---------------------------------------------------------------------------
+
+def build_group(graph, plan, bond=BOND, dp=DP, reach=0.45, coil=COIL):
+    """Every chain in the network, with ``plan``'s pairs entangled.
+
+    ``plan`` is ``[(chain_a, chain_b, [Site, ...]), ...]``. A chain may
+    appear in several entries; it gets one path carrying all of them.
+    """
+    geo = geometry(graph, dp=dp, bond=bond, coil=coil)
+    named = {k for a, b, _ in plan for k in (a, b)}
+    sub = {k: geo["chords"][k] for k in named}
+    ent, info = entangled_group(sub, plan, n_beads=dp + 2, reach=reach,
+                                bond=bond)
+
+    target = (dp + 1) * bond
+    paths = dict(ent)
+    for k, (c0, c1) in geo["chords"].items():
+        if k in named:
+            continue
+        dense = resample(np.stack([c0, c1]), max(6 * dp, 600))
+        paths[k] = resample_path(meander_to_length(dense, target), dp + 2)
+
+    paths = apply_junction_shells(paths, geo["ends"], spacing=SHELL_SPACING)
+    return geo, paths, info
+
+
+def pick_plan(geo, spec, partners=2):
+    """Turn a short description into a concrete plan on this network.
+
+    ``spec`` is one of:
+      "hub"       one chain entangled with as many close partners as it has
+      "chain"     A-B, B-C, C-D, a run of pairs
+      "composite" A-B, A-C, D-B twice, D-E once -- a chain that is both a
+                  requester and someone else's partner, which is the case
+                  the whole allocation question was about
+
+    Partners are drawn from the closest separation band. That is not a
+    detail: the contour a site costs is set by how far the two chains have
+    to reach for each other, so distant partners are what make a chain run
+    out of slack. Measured, one chain with two partners: from the closest
+    band it builds at a coil of 1.8, from bands one to three it needs 2.5,
+    which is already at the limit where control is lost.
+    """
+    from collections import defaultdict
+
+    bands = separation_bands(geo)
+    close = bands[0] + (bands[1] if len(bands) > 1 else [])
+    # Keep the gap with each neighbour: a site costs contour in proportion
+    # to how far the two chains reach for each other, so which partners a
+    # hub takes decides whether it can afford them at all. Measured, one
+    # chain with two partners: the two closest fit at a coil of 1.8, an
+    # arbitrary two of the same neighbours need more than 91 sigma against
+    # the 77 the chain has.
+    nbrs = defaultdict(list)
+    for gap, ka, kb in close:
+        nbrs[ka].append((gap, kb))
+        nbrs[kb].append((gap, ka))
+    for k in nbrs:
+        nbrs[k].sort()
+
+    def sites(n):
+        return [Site(at=(i + 1) / (n + 1), turns=1) for i in range(n)]
+
+    if spec == "hub":
+        # Cheapest hub, not the busiest one. A site costs contour in
+        # proportion to the gap it bridges, and a chain has only so much, so
+        # the chain that can afford several partners is the one whose
+        # nearest few are nearest -- not the one with the longest list.
+        # Measured: the busiest chain's own two closest partners still
+        # needed 85 sigma before any winding, against the 77 it had.
+        able = [k for k in nbrs if len(nbrs[k]) >= partners]
+        if not able:
+            raise SystemExit(f"no chain has {partners} close partners")
+        hub = min(able, key=lambda k: sum(g for g, _ in nbrs[k][:partners]))
+        picks = [p for _, p in nbrs[hub][:partners]]
+        n = len(picks)
+        return [(hub, p, [Site(at=(i + 1) / (n + 1), turns=1)])
+                for i, p in enumerate(picks)], f"hub {hub} with {picks}"
+
+    if spec == "chain":
+        start = max(nbrs, key=lambda k: len(nbrs[k]))
+        run, seen = [start], {start}
+        while len(run) < 4:
+            nxt = [p for _, p in nbrs.get(run[-1], []) if p not in seen]
+            if not nxt:
+                break
+            run.append(nxt[0])
+            seen.add(nxt[0])
+        return ([(run[i], run[i + 1], [Site(0.5, 1)])
+                 for i in range(len(run) - 1)],
+                "run " + "-".join(str(x) for x in run))
+
+    # composite
+    able = [k for k in nbrs if len(nbrs[k]) >= 2]
+    if not able:
+        raise SystemExit("no chain has two close partners")
+    hub = min(able, key=lambda k: sum(g for g, _ in nbrs[k][:2]))
+    picks = [p for _, p in nbrs[hub][:2]]
+    if len(picks) < 2:
+        raise SystemExit("no chain has two close partners")
+    B, C = picks
+    other = [k for _, k in nbrs.get(B, []) if k not in (hub, C)]
+    D = other[0] if other else None
+    plan = [(hub, B, [Site(0.3, 1)]), (hub, C, [Site(0.7, 1)])]
+    label = f"{hub}-{B}, {hub}-{C}"
+    if D is not None:
+        plan.append((D, B, [Site(0.3, 1), Site(0.7, 1)]))
+        label += f", {D}-{B} twice"
+        more = [k for _, k in nbrs.get(D, []) if k not in (hub, B, C)]
+        if more:
+            plan.append((D, more[0], [Site(0.5, 1)]))
+            label += f", {D}-{more[0]}"
+    return plan, label
+
+
+def step5(args):
+    """A plan of several pairs, with chains carrying several partners."""
+    graph = build_network()
+    probe = geometry(graph, dp=DP, bond=args.bond, coil=args.coil)
+    plan, label = pick_plan(probe, args.plan, args.partners)
+    print(f"  plan ({args.plan}): {label}")
+    for a, b, sites in plan:
+        print(f"    {a}-{b}: " + ", ".join(
+            f"{s.turns} turn(s) at {s.at:.2f}" for s in sites))
+
+    wanted = {}
+    for a, b, sites in plan:
+        n = sum(s.turns for s in sites)
+        wanted[a] = wanted.get(a, 0) + n
+        wanted[b] = wanted.get(b, 0) + n
+
+    try:
+        geo, paths, info = build_group(graph, plan, args.bond, DP,
+                                       args.reach, args.coil)
+    except ValueError as exc:
+        print(f"\n  {exc}")
+        return 1
+
+    print(f"\n  box {geo['L'][0]:.1f} sigma, density {geo['density']:.4f}, "
+          f"coil {args.coil}, reach solved to {info[0]['reach']:.2f}")
+    built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                            for p in paths.values()])
+    print(f"  bonds {built.min():.3f} to {built.max():.3f}")
+
+    root = OUT / f"step5_{args.plan}{args.partners}"
+    n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+    chains = sorted(wanted)
+    seqs = [chain_ids(k, node_atom, chain_atoms, geo["ends"]) for k in chains]
+    sim_dir = conform_and_script(root, graph, geo,
+                                 pair_style=args.pair_style,
+                                 protocol=args.protocol)
+
+    z1_dir = OUT / f"step5_{args.plan}{args.partners}_z1"
+    if z1_dir.exists():
+        for f in z1_dir.glob("*.Z1"):
+            f.unlink()
+    z1_dir.mkdir(parents=True, exist_ok=True)
+    # Every pair on its own as well as all of them together. Z1+ counts
+    # entanglements among whatever chains it is given, so a file holding
+    # three chains cannot say whether a chain's count came from the partner
+    # it was asked to entangle or from the other one wandering past. One
+    # file per pair answers that; the combined file gives the total.
+    seq_of = dict(zip(chains, seqs))
+    want_pair = {}
+    for a, b, sites in plan:
+        key = (min(a, b), max(a, b))
+        want_pair[key] = want_pair.get(key, 0) + sum(s.turns for s in sites)
+    pairs = [(a, b) for i, a in enumerate(chains) for b in chains[i + 1:]]
+
+    stage_files = [("1built", "03_Conformation/system_conformed.data")]
+    if args.run_md:
+        print(f"\n--- LAMMPS, {args.stages} stage(s) ---")
+        run_md(sim_dir, args.stages)
+        stage_files += [
+            ("2stage1", "04_Simulation/system_after_soft.data"),
+            ("3stage2", "04_Simulation/system_ramped.data"),
+            ("4stage3", "04_Simulation/system_equilibrated.data")]
+
+    for tag, rel in stage_files:
+        out_file = root / rel
+        if not out_file.exists():
+            continue
+        z1_export(out_file, seqs, z1_dir / f"{tag}_all.Z1")
+        for a, b in pairs:
+            z1_export(out_file, [seq_of[a], seq_of[b]],
+                      z1_dir / f"{tag}_p{a}_{b}.Z1")
+    if args.run_md:
+        print()
+        report_bonds(root)
+
+    print()
+    z = run_z1(z1_dir)
+    print("  " + "-" * 60)
+    head = "  ".join(f"{k:>5}" for k in chains)
+    print(f"  {'':16s} {head}")
+    print(f"  {'asked':16s} " + "  ".join(f"{wanted[k]:5d}" for k in chains))
+    print("  " + "-" * 60)
+    for lbl, key in (("as built", "1built"), ("after stage 1", "2stage1"),
+                     ("after stage 2", "3stage2"),
+                     ("after stage 3", "4stage3")):
+        if not (z1_dir / f"{key}_all.Z1").exists():
+            continue
+        got = z.get(f"{key}_all") if z else None
+        cells = ("  ".join(f"{v:5d}" for v in got) if got
+                 else "  ".join("    -" for _ in chains))
+        print(f"  {lbl:16s} {cells}")
+    print("  " + "-" * 60)
+    print("  Z per chain with all the named chains in one file: the total,")
+    print("  including anything two of them do to each other unasked.")
+
+    print()
+    print("  " + "-" * 60)
+    print(f"  {'pair on its own':20s} {'asked':>6}  " + "  ".join(
+        f"{lbl:>9}" for lbl in ("built", "stage 1", "stage 2", "stage 3")))
+    print("  " + "-" * 60)
+    for a, b in pairs:
+        cells = []
+        for key in ("1built", "2stage1", "3stage2", "4stage3"):
+            got = z.get(f"{key}_p{a}_{b}") if z else None
+            cells.append("/".join(str(v) for v in got) if got else "-")
+        want = want_pair.get((a, b))
+        tag = f"{a}-{b}" if want is not None else f"{a}-{b} (not asked)"
+        print(f"  {tag:20s} {want or 0:6d}  "
+              + "  ".join(f"{c:>9}" for c in cells))
+    print("  " + "-" * 60)
+    return 0
+
+
+STEPS = {1: step1, 2: step2, 3: step3, 4: step4, 5: step5}
 
 
 def main():
@@ -1165,6 +1396,12 @@ def main():
                     help="step 4: place sites explicitly along the chain, "
                          "e.g. --at 0.15 0.5:2 0.85. Positions are fractions "
                          "of the chain and need not be evenly spread")
+    ap.add_argument("--partners", type=int, default=2,
+                    help="step 5: how many partners the hub carries. Each "
+                         "costs contour, so more needs a larger coil")
+    ap.add_argument("--plan", default="hub",
+                    choices=("hub", "chain", "composite"),
+                    help="step 5: which shape of plan to build")
     ap.add_argument("--coil", type=float, default=COIL,
                     help="contour over chord, the knob that sets whether a "
                          "designed entanglement can be told apart from the "

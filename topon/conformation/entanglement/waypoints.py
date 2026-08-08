@@ -24,7 +24,13 @@ from dataclasses import dataclass
 import numpy as np
 
 __all__ = ["Site", "catmull_rom", "site_frame", "winding_waypoints",
-           "chain_through", "entangled_pair"]
+           "chain_through", "entangled_pair", "entangled_group",
+           "meander_to_length", "resample_path", "MIN_REACH"]
+
+# Below this the site has no radius worth the name: both chains sit on the
+# midline together, which is not a winding, though it still reads as a
+# plausible linking number because they are on top of each other.
+MIN_REACH = 0.12
 
 
 @dataclass(frozen=True)
@@ -356,6 +362,106 @@ def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
     for d in info:
         d["reach"] = reach
     return resample_path(pa, n_beads), resample_path(pb, n_beads), info
+
+
+def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
+                    reach: float = 0.45, bond: float | None = None):
+    """Many chains at once, any of them carrying several partners.
+
+    ``plan`` is a list of ``(chain_a, chain_b, sites)``. A chain appearing in
+    more than one entry collects the waypoints from all of them, ordered
+    along its own length, and is drawn as one path through the lot. That is
+    the whole reason this exists: a chain entangled with two different
+    partners has one path, not two, and building the pairs separately gives
+    two paths that disagree about where the chain goes.
+
+    Chains not named in ``plan`` are drawn straight, at the same length.
+
+    Returns ``(paths, info)``; ``info`` lists every site with the pair it
+    belongs to and where it landed on each partner.
+    """
+    dense = max(n_beads * 6, 600)
+    target = None if bond is None else (n_beads - 1) * float(bond)
+
+    def lay(r):
+        marks = {k: [] for k in chords}
+        nfo = []
+        for ka, kb, sites in plan:
+            a0, a1 = chords[ka]
+            b0, b1 = chords[kb]
+            b0v = np.asarray(b0, float)
+            db = np.asarray(b1, float) - b0v
+            Lb2 = float(db @ db)
+            for s in sorted(sites, key=lambda x: x.at):
+                wa, wb, mid, axis, half = winding_waypoints(
+                    a0, a1, b0, b1, s, per_turn, r)
+                # Where this site falls along B, so B meets its waypoints in
+                # the order B travels rather than the order A does.
+                at_b = (float((mid - b0v) @ db) / Lb2) if Lb2 > 1e-12 else 0.5
+                marks[ka].append((s.at, wa))
+                marks[kb].append((at_b, wb))
+                nfo.append(dict(pair=(ka, kb), at_a=s.at, at_b=at_b,
+                                turns=s.turns, mid=mid, axis=axis, half=half,
+                                reach=r))
+
+        out = {}
+        for k, (c0, c1) in chords.items():
+            items = sorted(marks[k], key=lambda x: x[0])
+            if items:
+                out[k] = chain_through(c0, c1, [p for _, p in items], dense)
+            else:
+                out[k] = resample_path(
+                    np.stack([np.asarray(c0, float), np.asarray(c1, float)]),
+                    dense)
+        return out, nfo, marks
+
+    def longest(paths):
+        return max(float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
+                   for p in paths.values())
+
+    paths, info, marks = lay(reach)
+
+    if target is not None:
+        # Solve the site size so no path overshoots. A chain carrying two
+        # partners detours twice and overshoots where a chain carrying one
+        # would not, and every chain has the same bead count, so the
+        # busiest chain sets the size. Without this, a chain with two
+        # partners came out at 2.30 to 2.50 sigma bonds against a limit of
+        # 1.5.
+        if longest(paths) > target:
+            lo_r, hi_r = 0.0, reach
+            for _ in range(40):
+                mid_r = 0.5 * (lo_r + hi_r)
+                if longest(lay(mid_r)[0]) > target:
+                    hi_r = mid_r
+                else:
+                    lo_r = mid_r
+                if hi_r - lo_r < 1e-4:
+                    break
+            solved = 0.5 * (lo_r + hi_r)
+            if solved < MIN_REACH:
+                # Even a site of no size overshoots, so there is not enough
+                # contour for what was asked. Building it anyway produces a
+                # site of zero radius, which is not an entanglement at all
+                # but still reads as a plausible linking number because the
+                # two chains end up on top of each other.
+                bare = longest(lay(0.0)[0])
+                at_min = longest(lay(MIN_REACH)[0])
+                raise ValueError(
+                    f"not enough contour: the busiest chain has "
+                    f"{target:.1f} sigma, but a site big enough to be a "
+                    f"winding (reach {MIN_REACH}) would need {at_min:.1f}. "
+                    f"Sites of no size at all would need {bare:.1f}. "
+                    f"Give the chains more slack (a larger coil), fewer "
+                    f"sites, or partners that are closer.")
+            paths, info, marks = lay(solved)
+
+        for k, p in paths.items():
+            protect = [(at - 0.08, at + 0.08)
+                       for at, _ in sorted(marks[k], key=lambda x: x[0])]
+            paths[k] = meander_to_length(p, target, protect)
+
+    return {k: resample_path(p, n_beads) for k, p in paths.items()}, info
 
 
 def resample_path(p, n: int) -> np.ndarray:
