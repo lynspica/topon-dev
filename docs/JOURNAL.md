@@ -14,6 +14,43 @@ Newest first.
 
 ---
 
+## 2026-08-08 — As-built robustness does not predict survival, so the cheap screen is not worth building
+
+**Change:** No code. A negative result, recorded so it is not attempted
+again.
+
+**Why:** an earlier entry noticed that whether a site realises is a property
+of the pair rather than of the reach, and that it can be checked as-built in
+seconds with Z1+ and no MD. The obvious next move was to screen candidates
+that way and keep only the robust ones.
+
+**Issue / solution:** measured both sides for all seven first-shell pairs in
+the standard plan. Robustness is how many of three reaches (0.20, 0.25, 0.30)
+give exactly one winding as built; the outcome is Z1+ after the full
+three-stage protocol.
+
+| pair | robust as built | after the protocol |
+|---|---|---|
+| 134-140 | 2 of 3 | 1/1 |
+| 88-94 | 3 of 3 | 1/1 |
+| 38-45 | 1 of 3 | 1/1 |
+| 42-75 | 3 of 3 | 1/1 |
+| 334-341 | 3 of 3 | 1/1 |
+| 232-236 | 3 of 3 | 1/1 |
+| 191-195 | 2 of 3 | 2/2 |
+
+The one that fails is not the least robust, and the least robust succeeds.
+Screening on this would have discarded 38-45, which is fine, and kept
+191-195, which is the one that goes wrong. It has no predictive value here.
+
+The sample is small -- seven pairs and one failure -- so this rules the screen
+out rather than proving anything general about what does predict survival.
+But it rules it out cheaply, before the selection code was written.
+
+**Follow-up:** none pursued. What decides whether an entanglement survives
+the protocol is still unknown, and the honest position is that the delivered
+rate is 6 of 7 with no way yet to tell in advance which one will miss.
+
 ## 2026-08-08 — The meander helps, which is the opposite of what the last entry guessed
 
 **Change:** No code. Two measurements, the second of which corrects the
