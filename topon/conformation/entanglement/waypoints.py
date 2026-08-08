@@ -474,9 +474,20 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
                 # Where this site falls along B, so B meets its waypoints in
                 # the order B travels rather than the order A does.
                 at_b = (float((mid - b0v) @ db) / Lb2) if Lb2 > 1e-12 else 0.5
+                # A site is placed along A, and where it falls on B is
+                # whatever the geometry gives. Off B's end there is no chain
+                # to wind around, so B is sent past its own junction to meet
+                # a partner that is not there: measured at -0.05, which read
+                # as no entanglement. Clamp into B and record the shortfall
+                # so the caller can see the site is not where it was asked
+                # for.
+                at_b_raw = at_b
+                at_b = float(np.clip(at_b, 0.02, 0.98))
                 marks[ka].append((s.at, wa))
                 marks[kb].append((at_b, wb))
                 nfo.append(dict(pair=(ka, kb), at_a=s.at, at_b=at_b,
+                                at_b_raw=at_b_raw,
+                                off_end=abs(at_b_raw - at_b) > 1e-9,
                                 turns=s.turns, mid=mid, axis=axis, half=half,
                                 reach=r))
 
