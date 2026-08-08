@@ -1142,6 +1142,46 @@ Or distribution mode (average per chain):
 | `z_amp` | `0.5` | Out-of-plane amplitude of the Gaussian kink |
 | `sigma` | `0.15` | Width of the Gaussian kink |
 
+##### Choosing which neighbour shell to entangle
+
+`shell_weights` biases the draw toward particular neighbour shells. Shells are
+numbered from 1, closest first, and are read off the lattice rather than
+assumed: the closest approach between two strands takes a handful of discrete
+values (0.20, 0.35, 0.41, 0.50 lattice units on a mixed SC/BCC/FCC network),
+and those bands are what "first neighbour" and "second neighbour" mean.
+
+```json
+"entanglements": {
+  "enabled": true,
+  "avg_crosslinks_per_chain": 2.0,
+  "shell_weights": { "1": 0.7, "2": 0.3 }
+}
+```
+
+Naming a shell restricts the draw to the shells named and weights them in
+proportion. Omitting the key entirely, which is the default, draws from every
+shell equally and is the behaviour of every earlier version. It multiplies
+into `placement_bias_kind` rather than replacing it, so spatial and shell
+biasing compose.
+
+**Only the first shell reliably produces an entanglement.** Measured with a
+primitive-path analysis, each pair checked on its own after the full
+three-stage protocol:
+
+| shell | gap | realised as asked |
+|---|---|---|
+| 1 | 12.3 σ | 5 of 7 |
+| 2 | 21.4 σ | 2 of 16 |
+| 3 | 24.7 σ | 0 of 16 |
+
+The reason is the pair's gap divided by the chain's chord: 0.29 in the first
+shell, 0.50 in the second. A chain has to spend contour reaching its partner,
+and past about a third of a chord it runs out. That ratio is scale-free and
+so a property of the lattice: it is 0.29 / 0.50 / 0.58 for every SC/BCC/FCC
+mixture whatever the fractions, unchanged by box size, and worse for the pure
+lattices (FCC 0.71, BCC 0.82). Weighting the outer shells up is allowed and
+will not give you more entanglements there.
+
 #### `assignment.grafts`
 
 ```json
