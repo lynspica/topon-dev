@@ -14,6 +14,51 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Reach is not the governing variable; the pair is
+
+**Change:** No code. A one-variable sweep, which is what the previous entry
+said to do instead of trying a fourth reach scheme.
+
+**Why:** three attempts to change how the reach is solved each made something
+worse, and none was based on knowing what a correct reach is.
+
+**Issue / solution:** measured realised winding against reach on one pair
+with everything else held still, Z1+ on the built paths with no MD, so
+nothing but the site geometry varies. On the first pair it looked like a
+window -- 0/0 at a reach of 0.10 and 0.14 where the chains lie against each
+other, 1/1 at 0.25, 0/0 again at 0.30 and above where they never cross.
+Separation grows monotonically with reach, 0.17 to 2.87, so that part is
+simple.
+
+Repeating on three different first-shell pairs at the same 15.1 sigma gap
+kills the window:
+
+| reach | 91-94 | 191-195 | 334-341 |
+|---|---|---|---|
+| 0.16 | 2/2 | 0/2 | 1/1 |
+| 0.19 | 1/3 | 1/1 | 1/1 |
+| 0.22 | 0/0 | 0/0 | 1/1 |
+| 0.25 | 1/1 | 1/1 | 1/1 |
+| 0.28 | 1/1 | 0/0 | 1/1 |
+| 0.31 | 1/1 | 1/1 | 1/1 |
+
+334-341 is exact at every reach from 0.16 to 0.31. 191-195 is erratic at all
+of them. So reach is not what decides whether a site realises; the pair is,
+and reach only matters on the pairs that are marginal anyway.
+
+The asymmetric readings are the lead worth following. A pair reading 1/3 or
+0/2 has one chain carrying kinks its partner does not, and linking between
+two curves is symmetric, so those extra kinks are not against the partner --
+they come from the chain's own meander. That points at the slack-absorbing
+wave rather than at the site, which is consistent with the earlier finding
+that the wave had to be steered away from partners at all.
+
+**Follow-up:** two things follow. Robustness is a property of a pair and is
+measurable as-built in seconds with no MD, so candidate selection could
+simply prefer pairs that realise across a range of reaches. And the meander
+is the next thing to measure: build the same pair with and without it and
+compare Z1+.
+
 ## 2026-08-08 — A silent drop found, and three attempts to fix it that were worse
 
 **Change:** `step5` now reports pairs that the builder could not afford and
