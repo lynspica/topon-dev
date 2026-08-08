@@ -141,9 +141,21 @@ def winding_waypoints(a0, a1, b0, b1, site: Site, per_turn: int = 8,
     chord = float(np.linalg.norm(np.asarray(a1, float) - np.asarray(a0, float)))
 
     radius = site.radius if site.radius is not None else reach * gap
-    span = site.span if site.span is not None else min(
-        0.9, 0.10 + 0.13 * site.turns)
-    half = 0.5 * span * chord
+
+    # Span follows the radius, not the chain. A turn of radius r needs about
+    # 2r of axial length to be a turn at all; give it less and the spiral is
+    # wider than it is long, which is a flat loop that does not wind. That is
+    # what a fixed fraction produces on a short chord: at density 0.30 the
+    # chords come out near 10 sigma, so a span of 0.12 is 1.2 sigma against a
+    # radius of 1.3, and the site read as no entanglement at all.
+    #
+    # An explicit span still wins, since the caller may be packing several
+    # sites onto one chain and know what it is trading away.
+    if site.span is not None:
+        half = 0.5 * site.span * chord
+    else:
+        half = 0.5 * max(2.2 * radius * site.turns, 0.06 * chord)
+    half = min(half, 0.45 * chord)
 
     n = max(3, per_turn * site.turns + 1)
     phase = np.linspace(0.0, 2.0 * np.pi * site.turns, n)

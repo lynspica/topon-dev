@@ -103,6 +103,13 @@ BOND = 0.95
 # junction_shell's docstring were measured.
 SHELL_SPACING = 1.0
 
+# How much contour each chain folds into its chord: (DP+1)*BOND over the
+# typical chord. This is the knob that decides whether a designed
+# entanglement is distinguishable from the ones a coiled chain makes by
+# accident. See geometry() for the measurement; 1.8 sits safely under the
+# 2.5 where control is lost.
+COIL = 1.8
+
 # Lattice scale, in sigma per lattice unit, that BraidShape's default lengths
 # were calibrated against. The braid is scaled by scale/REF_SCALE so it keeps
 # the same proportions on any lattice, which is what makes the granted
@@ -169,7 +176,8 @@ def build_network(spec=LATTICE, cache=True):
     return graphs[0]
 
 
-def geometry(graph, dp=DP, density=None, bond=BOND, scale=None):
+def geometry(graph, dp=DP, density=None, bond=BOND, scale=None,
+             coil=None):
     """Junction positions and chain chords in sigma, plus the lattice scale.
 
     Two ways to fix the scale, the same equation solved for different
@@ -197,7 +205,32 @@ def geometry(graph, dp=DP, density=None, bond=BOND, scale=None):
         for u, v in graph.edges())
 
     if scale is None:
-        if density is not None:
+        if coil is not None:
+            # Set the scale from how much the chains have to fold up. Each
+            # chain carries (dp+1)*bond of contour whatever its chord, so
+            # the ratio of the two is what says whether a designed
+            # entanglement can be told apart from the coil's own accidental
+            # crossings. Measured on one pair, asked one, two and three
+            # sites:
+            #
+            #   coil   1 site   2 sites  3 sites
+            #   7.8x    -1.15    +1.97    -1.17
+            #   5.4x    -1.45    -0.23    +0.45
+            #   3.6x    +0.71    +2.43    -0.58
+            #   2.5x    +1.10    +2.13    +3.09
+            #   1.7x    -0.96    -2.01    -3.05
+            #
+            # Below about 2.5 the count is what was asked for. Above it the
+            # coil makes more crossings than the design does and nothing is
+            # controllable. Density is then reported, not chosen -- which is
+            # the right way round, since the density here only has to let the
+            # simulation run, and the topology is the thing being designed.
+            c_typ = float(np.median([
+                np.linalg.norm((raw[v] - raw[u])
+                               - box * np.round((raw[v] - raw[u]) / box))
+                for u, v in graph.edges()]))
+            scale = bond * (dp + 1) / (coil * c_typ)
+        elif density is not None:
             scale = ((n_beads / density) / cells) ** (1.0 / 3.0)
         else:
             scale = bond * (dp + 1) / c_max
@@ -214,7 +247,8 @@ def geometry(graph, dp=DP, density=None, bond=BOND, scale=None):
         ends[k] = (u, v)
     return dict(box=box, scale=scale, L=L, pos=pos, chords=chords, ends=ends,
                 density=density_out, c_max=c_max * scale,
-                bond=c_max * scale / (dp + 1))
+                bond=c_max * scale / (dp + 1),
+                coil=(dp + 1) * bond / (c_max * scale))
 
 
 def path_length(p):
@@ -946,7 +980,7 @@ def step3(args):
 # ---------------------------------------------------------------------------
 
 def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45,
-                         fene=1.5, density=0.30):
+                         fene=1.5, density=None, coil=COIL):
     """Every chain's path, with one pair wound at the sites given.
 
     The sites are positions along the chain, chosen by the caller. Nothing
@@ -980,7 +1014,8 @@ def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45,
     #
     # Once each path carries its own length the scale stops being determined
     # by bond length at all, and density becomes a free choice again.
-    geo = geometry(graph, dp=dp, density=density)
+    geo = geometry(graph, dp=dp, density=density, bond=bond,
+                   coil=coil)
 
     target = (dp + 1) * bond
 
@@ -1046,7 +1081,7 @@ def step4(args):
 
     geo, paths, info, reach_used = build_with_waypoints(
         graph, (ka, kb), sites, args.bond, DP, args.reach,
-        density=args.density if args.density is not None else 0.30)
+        density=args.density, coil=args.coil)
     straight_a = resample(np.stack(geo["chords"][ka]), DP + 2)
     straight_b = resample(np.stack(geo["chords"][kb]), DP + 2)
     base = far_closed_linking(straight_a, straight_b)
@@ -1075,21 +1110,28 @@ def step4(args):
               [seq_a, seq_b], z1_dir / "1built.Z1")
 
     if args.run_md:
-        print("\n--- LAMMPS stage 1 only ---")
-        run_md(sim_dir, 1)
-        after = root / "04_Simulation/system_after_soft.data"
-        if after.exists():
-            z1_export(after, [seq_a, seq_b], z1_dir / "2stage1.Z1")
-            print()
-            report_bonds(root)
+        print(f"\n--- LAMMPS, {args.stages} stage(s) ---")
+        run_md(sim_dir, args.stages)
+        for tag, rel in (("2stage1", "04_Simulation/system_after_soft.data"),
+                         ("3stage2", "04_Simulation/system_ramped.data"),
+                         ("4stage3", "04_Simulation/system_equilibrated.data")):
+            out_file = root / rel
+            if out_file.exists():
+                z1_export(out_file, [seq_a, seq_b], z1_dir / f"{tag}.Z1")
+        print()
+        report_bonds(root)
 
     print()
     z = run_z1(z1_dir)
     print("  " + "-" * 52)
     print(f"  {'':16s} {'asked':>7} {'Z per chain':>14}")
     print("  " + "-" * 52)
-    for label, key in (("as built", "1built"), ("after stage 1", "2stage1")):
+    for label, key in (("as built", "1built"), ("after stage 1", "2stage1"),
+                       ("after stage 2", "3stage2"),
+                       ("after stage 3", "4stage3")):
         got = z.get(key) if z else None
+        if got is None and key != "1built" and not (z1_dir / f"{key}.Z1").exists():
+            continue
         shown = "/".join(str(v) for v in got) if got else "-"
         print(f"  {label:16s} {asked:7d} {shown:>14}")
     print("  " + "-" * 52)
@@ -1123,6 +1165,10 @@ def main():
                     help="step 4: place sites explicitly along the chain, "
                          "e.g. --at 0.15 0.5:2 0.85. Positions are fractions "
                          "of the chain and need not be evenly spread")
+    ap.add_argument("--coil", type=float, default=COIL,
+                    help="contour over chord, the knob that sets whether a "
+                         "designed entanglement can be told apart from the "
+                         "coil's own crossings. Above ~2.5 it cannot")
     ap.add_argument("--span", type=float, default=None,
                     help="step 4: how much of the chain each site occupies, "
                          "as a fraction. Smaller keeps neighbouring sites "
