@@ -1347,6 +1347,8 @@ def step5(args):
     # worth saying out loud rather than leaving to be discovered in the Z1+
     # table: it can land off the partner's chain, or the two chains can end
     # up lying against each other instead of winding.
+    for a, b in getattr(build_group, "dropped", []) or []:
+        print(f"  DROPPED: {a}-{b} could not be afforded and was not built")
     for d in info:
         a, b = d["pair"]
         if d.get("off_end"):

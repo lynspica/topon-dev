@@ -14,6 +14,49 @@ Newest first.
 
 ---
 
+## 2026-08-08 — A silent drop found, and three attempts to fix it that were worse
+
+**Change:** `step5` now reports pairs that the builder could not afford and
+did not build. Nothing else was kept.
+
+**Why:** re-running the committed cases from clean to check the branch still
+worked, a hub with two partners came back reading 1/1 on one pair and 0/0 on
+the other, where both had read 1/1 when it was committed. The second pair had
+been dropped by the reach solve and nothing said so, so the failure looked
+like an entanglement that had been built and then lost rather than one that
+was never built. That silence was the real defect.
+
+**Issue / solution:** the drop itself is a genuine outcome, and three
+attempts to remove it all made something else worse.
+
+*One reach for every pair.* Set by whichever chain is worst, so every site is
+as large as that chain allows -- and a larger site sweeps more space and
+picks up crossings nobody asked for. First shell at scale went from 6 of 7
+exact to 2 of 7, four of them over-winding. It does let the hub build both
+pairs.
+
+*Global first, then raise individual pairs toward the contour limit.* Same
+failure, for the same reason: it maximises every site.
+
+*Shrink all the pairs on an over-budget chain together.* Fixes the hub, and
+leaves the first shell at 2 of 7, because pairs that are not sharing a chain
+never shrink at all and stay at full reach.
+
+What all three have in common is treating the contour budget as the thing
+that sets the site size. It is not: contour is an upper bound, and
+correctness wants a value well under it. The per-pair solve that was already
+committed produces small reaches as a side effect of being pessimistic, which
+is why it measures best. Capping the reach directly was tried at 0.30, 0.20
+and 0.14 and gives 3, 4 and 4 of 7 -- better than 2, short of 6 -- so
+magnitude alone is not the whole story either.
+
+Reverted to the committed solve. First shell at scale is 6 of 7 again, and
+the hub reports its drop instead of hiding it.
+
+**Follow-up:** what actually sets a correct reach is not understood. The
+next step is to measure realised winding against reach on a single pair with
+everything else held still, rather than to try a fourth scheme.
+
 ## 2026-08-08 — Regression suite run against the entanglement branch: no new failures
 
 **Change:** No code. Recording the regression result, since this branch adds
