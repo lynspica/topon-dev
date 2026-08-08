@@ -14,6 +14,68 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Shell weighting works; shells beyond the first are out of reach on every lattice we have
+
+**Change:** Step 6 draws entanglement pairs from named separation bands in
+proportions the caller chooses (`--weights 1:0.2 2:0.4 3:0.4`), reports what
+each band could actually supply, and measures every prescribed pair on its
+own with Z1+ after the full protocol. Reach is now solved per pair rather
+than once for all, and pairs that cannot be afforded are dropped rather than
+refusing the plan. The network cache key gained the mix fractions and the
+degree target, which were missing.
+
+**Why:** this is the original request — a realistic mix of first, second and
+third neighbours entangled at rates you choose.
+
+**Issue / solution:** the machinery does what it says, and the physics only
+cooperates for the first shell. Each pair measured alone after
+equilibration:
+
+| band | gap | exact |
+|---|---|---|
+| 1 | 12.3 sigma | 5 of 7 |
+| 2 | 21.4 sigma | 2 of 16 |
+| 3 | 24.7 sigma | 0 of 16 |
+
+Band 1 on its own, at scale: 6 of 7 exact, 1 over, none missing. Bands 2 and
+3 at a coil of 3.0 rather than 1.8: 5 of 20.
+
+The governing quantity is gap over chord, which is scale-free and therefore a
+property of the topology rather than the box. Band 1 sits at 0.29 and works;
+band 2 at 0.50 and does not, because a site has to bridge the gap and the
+reach solve shrinks it until it no longer winds.
+
+Swept across the lattice repertoire to see whether any of it lowers that
+ratio:
+
+| lattice | band 1 | band 2 | band 3 |
+|---|---|---|---|
+| MIX 0.2/0.4/0.4 | 0.29 | 0.50 | 0.58 |
+| MIX 0.1/0.3/0.6 | 0.29 | 0.50 | 0.58 |
+| MIX 0/0.5/0.5 | 0.29 | 0.50 | 0.58 |
+| MIX, 5x5x5 | 0.29 | 0.50 | 0.58 |
+| FCC | 0.71 | 0.82 | 0.87 |
+| BCC | 0.82 | 0.94 | 1.00 |
+
+The ratios do not move. Any mix containing all three lattices gives the same
+0.29 / 0.50 / 0.58 whatever the fractions, box size does not enter, and the
+pure lattices are strictly worse. So designed entanglement beyond nearest
+neighbours is not available on any lattice topon currently builds; it would
+need a lattice with a finer set of neighbour distances, not a different mix
+of the ones we have.
+
+Three reach fixes were needed to build a plan at that scale. One reach for
+every pair is set by the widest of them, so close pairs were shrunk for a
+problem they did not have: 39 pairs wanted 119.3 sigma against 77 available
+on a plan where every chain carried one site. One unaffordable pair should
+cost that pair, not the other thirty-eight. And widening the site span to
+cover the sideways travel was tried and reverted, since the span costs
+contour of its own and took the same plan from 91.9 sigma to 120.8.
+
+**Follow-up:** promoting this out of `tests/workflows` and into a config-level
+interface under `topon/assignment/`, where shell weights would naturally be
+specified.
+
 ## 2026-08-08 — Why several entanglements on one pair are not available, and what is
 
 **Change:** No code beyond one fix; this entry records a measurement that
