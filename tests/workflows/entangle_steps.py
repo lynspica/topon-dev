@@ -424,6 +424,13 @@ CG_OVERLAP_CUTOFF = 0.01
 def conform_and_script(root, graph, geo, overlap_cutoff=CG_OVERLAP_CUTOFF,
                        pair_style=PAIR_STYLE, protocol="generated"):
     study = root.name
+    # Seed before the conformation stage. apply_noise perturbs every atom
+    # with np.random and nothing else here sets the seed once the network
+    # comes from cache, so two runs of an identical configuration diverged:
+    # the same build gave 3/3 one time and 2/4 the next, and the difference
+    # was the noise, not the design.
+    np.random.seed(LATTICE["seed"])
+    random.seed(LATTICE["seed"])
     cm = ConformationManager(str(root.parent), study)
     conformed, roles = cm.apply_displacements(
         "system.data", lattice_box=tuple(geo["box"]), periodicity=(1, 1, 1))
