@@ -92,11 +92,19 @@ def catmull_rom(points, n_out: int, closed: bool = False) -> np.ndarray:
     return np.column_stack([np.interp(want, s, curve[:, d]) for d in range(3)])
 
 
-def site_frame(a0, a1, b0, b1, at: float):
+def site_frame(a0, a1, b0, b1, at: float, bias: float = 0.5):
     """Local frame where chain A is at fraction ``at`` of its own chord.
 
-    Returns ``(mid, axis, toward, across, gap)``. ``mid`` is halfway to the
-    nearest point of B, so both chains reach it by moving the same distance.
+    Returns ``(mid, axis, toward, across, gap)``. ``mid`` sits a fraction
+    ``bias`` of the way from A to B, so at the default of 0.5 both chains
+    travel the same distance to meet.
+
+    Moving the meeting point matters once a chain has more than one partner.
+    Its excursion toward one of them sweeps through space, and if it reaches
+    halfway every time, that sweep is large enough to catch the others in
+    passing: measured on a chain with two partners, both asked for one
+    winding, the isolated pairs read two. A small bias keeps the busy chain
+    near its own chord and sends the partners to it instead.
 
     Everything is computed at the position asked for. The alternative --
     finding where the pair comes closest and working outward from there --
@@ -113,6 +121,7 @@ def site_frame(a0, a1, b0, b1, at: float):
     L2 = float(d @ d)
     u = float(np.clip(((pa - b0) @ d) / L2, 0.0, 1.0)) if L2 > 1e-12 else 0.0
     pb = b0 + u * d
+    bias = float(np.clip(bias, 0.05, 0.95))
 
     toward = pb - pa
     gap = float(np.linalg.norm(toward))
@@ -132,18 +141,18 @@ def site_frame(a0, a1, b0, b1, at: float):
     toward /= n
     across = np.cross(axis, toward)
 
-    return 0.5 * (pa + pb), axis, toward, across, gap
+    return pa + bias * (pb - pa), axis, toward, across, gap
 
 
 def winding_waypoints(a0, a1, b0, b1, site: Site, per_turn: int = 8,
-                      reach: float = 0.45):
+                      reach: float = 0.45, bias: float = 0.5):
     """Points the two chains must pass through to wind at one site.
 
     Antiphase spiral about the midline: where A is on one side, B is on the
     other. ``turns`` full revolutions therefore give ``turns`` crossings,
     prescribed rather than hoped for.
     """
-    mid, axis, toward, across, gap = site_frame(a0, a1, b0, b1, site.at)
+    mid, axis, toward, across, gap = site_frame(a0, a1, b0, b1, site.at, bias)
     chord = float(np.linalg.norm(np.asarray(a1, float) - np.asarray(a0, float)))
 
     radius = site.radius if site.radius is not None else reach * gap
@@ -212,8 +221,45 @@ def _frames(path):
     return tan, out
 
 
+def _away_from(path, others, tan):
+    """At each point, a unit vector pointing away from the nearest neighbour.
+
+    The wave has to go somewhere, and an arbitrary direction is as likely to
+    carry the chain into a neighbour as away from it. Waving *away* is what
+    keeps the slack from turning into entanglements nobody asked for:
+    measured on a pair asked for one winding, a blind wave delivered two to
+    three, all of the excess made by the wave rather than by the site.
+
+    Falls back to the transported normal where there is no neighbour near
+    enough to matter.
+    """
+    _, normal = _frames(path)
+    if not others:
+        return normal
+
+    pts = np.vstack([np.asarray(o, float) for o in others])
+    out = np.array(normal, copy=True)
+    for i, q in enumerate(path):
+        d = pts - q
+        j = int(np.argmin((d * d).sum(axis=1)))
+        v = q - pts[j]
+        v = v - float(v @ tan[i]) * tan[i]      # keep it off the tangent
+        n = np.linalg.norm(v)
+        if n > 1e-9:
+            out[i] = v / n
+    # Smooth, or the direction flips point to point and the wave becomes a
+    # zigzag that is longer than it looks and does not clear anything.
+    k = 9
+    ker = np.ones(k) / k
+    for d in range(3):
+        out[:, d] = np.convolve(out[:, d], ker, mode="same")
+    n = np.linalg.norm(out, axis=1, keepdims=True)
+    return np.where(n < 1e-9, normal, out / np.where(n < 1e-9, 1.0, n))
+
+
 def meander_to_length(path, target: float, protect=(), waves: float = 6.0,
-                      tol: float = 1e-3, iters: int = 60) -> np.ndarray:
+                      tol: float = 1e-3, iters: int = 60,
+                      avoid=()) -> np.ndarray:
     """Wave the path sideways until it is ``target`` long.
 
     A chain has a fixed number of beads and wants a fixed spacing, so its
@@ -245,9 +291,10 @@ def meander_to_length(path, target: float, protect=(), waves: float = 6.0,
         d = np.clip(np.abs(t - mid) / (1.6 * half), 0.0, 1.0)
         w = w * (0.5 - 0.5 * np.cos(np.pi * d))
 
-    _, normal = _frames(p)
+    tan, _ = _frames(p)
+    direction = _away_from(p, avoid, tan)
     phase = np.sin(2.0 * np.pi * waves * t)[:, None]
-    shape = (w[:, None] * phase) * normal
+    shape = (w[:, None] * phase) * direction
 
     def length(a):
         q = p + a * shape
@@ -383,6 +430,12 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
     dense = max(n_beads * 6, 600)
     target = None if bond is None else (n_beads - 1) * float(bond)
 
+    load = {}
+    for ka, kb, sites in plan:
+        n = len(sites)
+        load[ka] = load.get(ka, 0) + n
+        load[kb] = load.get(kb, 0) + n
+
     def lay(r):
         marks = {k: [] for k in chords}
         nfo = []
@@ -392,9 +445,13 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
             b0v = np.asarray(b0, float)
             db = np.asarray(b1, float) - b0v
             Lb2 = float(db @ db)
+            # Send the meeting point toward whichever chain has fewer
+            # partners, so the busy one stays near its own chord.
+            na, nb = load.get(ka, 1), load.get(kb, 1)
+            bias = float(np.clip(nb / float(na + nb), 0.15, 0.85))
             for s in sorted(sites, key=lambda x: x.at):
                 wa, wb, mid, axis, half = winding_waypoints(
-                    a0, a1, b0, b1, s, per_turn, r)
+                    a0, a1, b0, b1, s, per_turn, r, bias)
                 # Where this site falls along B, so B meets its waypoints in
                 # the order B travels rather than the order A does.
                 at_b = (float((mid - b0v) @ db) / Lb2) if Lb2 > 1e-12 else 0.5
@@ -456,10 +513,19 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
                     f"sites, or partners that are closer.")
             paths, info, marks = lay(solved)
 
+        # Each chain waves away from the ones it is entangled with, so the
+        # slack does not become entanglements nobody asked for.
+        partners = {k: set() for k in chords}
+        for ka, kb, _ in plan:
+            partners[ka].add(kb)
+            partners[kb].add(ka)
+        settled = dict(paths)
         for k, p in paths.items():
             protect = [(at - 0.08, at + 0.08)
                        for at, _ in sorted(marks[k], key=lambda x: x[0])]
-            paths[k] = meander_to_length(p, target, protect)
+            near = [settled[o] for o in partners.get(k, ()) if o in settled]
+            settled[k] = meander_to_length(p, target, protect, avoid=near)
+        paths = settled
 
     return {k: resample_path(p, n_beads) for k, p in paths.items()}, info
 

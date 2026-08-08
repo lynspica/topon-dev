@@ -449,6 +449,18 @@ def conform_and_script(root, graph, geo, overlap_cutoff=CG_OVERLAP_CUTOFF,
 
 
 def run_md(sim_dir, stages=3):
+    # Clear the stage outputs first. They are named for the stage, not the
+    # run, so a shorter run leaves the previous run's later stages sitting
+    # there and every later measurement reads them as if they were fresh --
+    # a --stages 1 run reported stage 2 and stage 3 results it never
+    # produced.
+    for stale in ("min_stage_A.data", "min_stage_B.data",
+                  "system_after_soft.data", "system_ramped.data",
+                  "system_equilibrated.data"):
+        f = Path(sim_dir) / stale
+        if f.exists():
+            f.unlink()
+
     scripts = ["minimize_1_serial.in", "minimize_2_parallel.in",
                "minimize_3_parallel.in"][:stages]
     runner = SimulationRunner(sim_dir=sim_dir, executable="lmp",
