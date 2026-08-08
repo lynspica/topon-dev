@@ -14,6 +14,41 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Regression suite run against the entanglement branch: no new failures
+
+**Change:** No code. Recording the regression result, since this branch adds
+a field to `EntanglementsConfig` and that is live pipeline surface.
+
+**Result:** 43 passed, 8 failed, 3 errors, 14 skipped. Every failure is
+pre-existing and none is attributable to this branch.
+
+*Six simbox failures* (`test_system_data_identical` and
+`test_minimize_script_identical` across the crosslink and two POSS configs)
+were reproduced at `main`, commit 6aa3711, in a throwaway worktree with the
+same reference set: 6 failed, 29 passed, the identical six. This branch
+touches no simbox code and the simbox regression tests reference neither
+`assignment` nor `conformation`.
+
+*Two failures and all three errors* come from
+`examples/config_cg_combined.json`, which `tests/workflows/generate_cg_combined.py`
+and `generate_atomistic_combined.py` still load. That file exists neither in
+this worktree, nor in the main checkout, nor in git. The workflow scripts and
+the regression tests that drive them were left behind when the example
+configs moved under `examples/demos/`.
+
+**Issue / solution:** running the suite in a worktree needs the reference
+outputs, and `tests/output/` is gitignored so a fresh worktree has none of
+them. Copied `v21_cg_combined`, `v21_atomistic_combined`,
+`v33_protein_network_resilin_dry` and `simbox_crosslink` in from the main
+checkout, read-only. Worth knowing before anyone concludes a worktree has
+broken the suite: the first run here reported 13 failures, five of which were
+only missing references.
+
+**Follow-up:** the missing `examples/config_cg_combined.json` is a real gap,
+independent of this work. Either the file should be restored or those two
+workflow scripts and their regression tests should be pointed at the configs
+under `examples/demos/`.
+
 ## 2026-08-08 — Shell weighting works; shells beyond the first are out of reach on every lattice we have
 
 **Change:** Step 6 draws entanglement pairs from named separation bands in
