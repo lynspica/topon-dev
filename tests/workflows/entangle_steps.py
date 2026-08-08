@@ -1257,26 +1257,49 @@ def pick_plan(geo, spec, partners=2):
                  for i in range(len(run) - 1)],
                 "run " + "-".join(str(x) for x in run))
 
-    # composite
-    able = [k for k in nbrs if len(nbrs[k]) >= 2]
-    if not able:
-        raise SystemExit("no chain has two close partners")
-    hub = min(able, key=lambda k: sum(g for g, _ in nbrs[k][:2]))
-    picks = [p for _, p in nbrs[hub][:2]]
-    if len(picks) < 2:
-        raise SystemExit("no chain has two close partners")
-    B, C = picks
-    other = [k for _, k in nbrs.get(B, []) if k not in (hub, C)]
-    D = other[0] if other else None
-    plan = [(hub, B, [Site(0.3, 1)]), (hub, C, [Site(0.7, 1)])]
-    label = f"{hub}-{B}, {hub}-{C}"
-    if D is not None:
-        plan.append((D, B, [Site(0.3, 1), Site(0.7, 1)]))
-        label += f", {D}-{B} twice"
-        more = [k for _, k in nbrs.get(D, []) if k not in (hub, B, C)]
-        if more:
-            plan.append((D, more[0], [Site(0.5, 1)]))
-            label += f", {D}-{more[0]}"
+    # composite: A-B, A-C, D-B, D-E, all single sites.
+    #
+    # B is both A's partner and D's partner, which is the case the whole
+    # allocation question was about: a chain that appears in someone else's
+    # plan while carrying its own. D-B was originally to be asked for twice,
+    # but two sites on one pair need chains that run alongside each other and
+    # this lattice's close pairs cross instead -- so every pair here gets one.
+    #
+    # Chosen by the worst chain, not the total. A site costs contour in
+    # proportion to the gap it bridges, and every chain has the same bead
+    # count, so what decides whether a plan can be built is the busiest
+    # chain's own bill -- here A and D, each carrying two partners. Summing
+    # over all four pairs picked a quintet needing 98.8 sigma against the 77
+    # available, because a cheap pair elsewhere hid an expensive one.
+    best = None
+    for A in nbrs:
+        if len(nbrs[A]) < 2:
+            continue
+        (gab, B), (gac, C) = nbrs[A][0], nbrs[A][1]
+        for gdb, D in nbrs[B]:
+            if D in (A, C) or len(nbrs.get(D, [])) < 2:
+                continue
+            rest = [(gg, k) for gg, k in nbrs[D] if k not in (A, B, C)]
+            if not rest:
+                continue
+            gde, E = rest[0]
+            cost = max(gab + gac, gdb + gde)
+            if best is None or cost < best[0]:
+                best = (cost, A, B, C, D, E)
+    if best is None:
+        raise SystemExit("no quintet supports the composite shape")
+
+    _, A, B, C, D, E = best
+    # A chain with two partners meets them at different points along
+    # itself. Putting both at the midpoint makes it detour to two places at
+    # once, which costs as much as one very long detour and reads as one
+    # entanglement: the same quintet needed 98.8 sigma that way against the
+    # 77 it had.
+    plan = [(A, B, [Site(0.35, 1)]),
+            (A, C, [Site(0.65, 1)]),
+            (D, B, [Site(0.35, 1)]),
+            (D, E, [Site(0.65, 1)])]
+    label = f"{A}-{B}, {A}-{C}, {D}-{B}, {D}-{E}  (B={B} serves two)"
     return plan, label
 
 
