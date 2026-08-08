@@ -23,6 +23,7 @@ special case written for this script.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 import random
@@ -153,8 +154,15 @@ def build_network(spec=LATTICE, cache=True):
     and reloaded. Delete the cache file to search again.
     """
     OUT.mkdir(parents=True, exist_ok=True)
+    # Everything that changes the network goes in the key. The mix fractions
+    # and the degree target were missing, so two different mixes shared a
+    # cache entry and the second silently got the first one's graph.
+    mix = "-".join(f"{k}{spec['mix'].get(k, 0):.2f}"
+                   for k in sorted(spec.get("mix") or {}))
+    dd = hashlib.sha1(str(spec["degree_dist"]).encode()).hexdigest()[:6]
     key = (f"{spec['lattice']}_{'x'.join(str(d) for d in spec['dims'])}"
-           f"_f{spec['max_func']}_s{spec['seed']}")
+           f"_f{spec['max_func']}_s{spec['seed']}"
+           f"{('_' + mix) if mix else ''}_{dd}")
     path = OUT / f"network_{key}.gpickle"
 
     if cache and path.exists():
