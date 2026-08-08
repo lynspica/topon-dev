@@ -14,6 +14,49 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Why several entanglements on one pair are not available, and what is
+
+**Change:** No code beyond one fix; this entry records a measurement that
+settles what the waypoint construction can and cannot be asked for.
+
+`entangled_pair` sized its sites from chain A's path length alone. A site is
+placed by its position along A, but B has to reach it too, and where it lands
+on B is whatever the geometry says. Fixed to check both chains, after which
+it agrees exactly with `entangled_group`, which had been refusing cases the
+pair builder accepted.
+
+**Why:** two sites on one pair kept refusing or measuring wrong, and three
+separate attempts to fix it had each addressed something that was not the
+binding constraint.
+
+**Issue / solution:** the binding constraint is the lattice, not the code.
+Every position along chain A maps to the *same* position along B for the
+close pairs, because those pairs are perpendicular — the strands that come
+nearest each other on this mix cross rather than run alongside, and two
+perpendicular chains meet in exactly one place. Of 822 close pairs, 336 are
+perpendicular and 33 exactly parallel; the parallel ones sit 30.2 sigma apart
+against chords of 42.8 and are staggered rather than overlapping, so sites
+placed along A project to -0.06 and -0.19 along B, past its end. Close,
+parallel and overlapping is what several sites on one pair needs, and this
+network has no pairs that are all three.
+
+That also says the target was aimed slightly wrong. A chain in a real melt
+carries many entanglements with different partners rather than several with
+the same one, and a perpendicular crossing pair is exactly right for one
+apiece. Measured on the hub plan, each pair read on its own after
+equilibration with the network stripped:
+
+| partners | asked pairs delivered | pairs never asked for |
+|---|---|---|
+| 2 | 2 of 2 | all 0/0 |
+| 3 | 2 of 3 | all 0/0 |
+| 4 | refused: needs 109 sigma, has 77 | — |
+
+**Follow-up:** several sites on one pair would need a network whose chains
+run alongside each other, which is a topology question rather than a
+conformation one. Distributing single entanglements across many partners is
+the direction that works and is the one worth extending.
+
 ## 2026-08-08 — Designed entanglements: one per pair, delivered and verified
 
 **Change:** New `topon/conformation/entanglement/waypoints.py` draws a chain
