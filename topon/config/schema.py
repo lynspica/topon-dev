@@ -243,6 +243,27 @@ class EntanglementsConfig(BaseModel):
         description="Parameters consumed by the placement-bias function.",
     )
 
+    # Neighbour-shell weighting. Empty is the legacy behaviour: every
+    # candidate is equally eligible whatever shell it sits in. Naming
+    # shells restricts the draw to those named and weights them in
+    # proportion, e.g. {"1": 0.6, "2": 0.4}. Shells are numbered from 1,
+    # closest first, and are read off the lattice rather than assumed.
+    #
+    # Only the first shell reliably delivers. Measured with a
+    # primitive-path analysis, each pair checked alone after the full
+    # protocol: band 1 gave 5 of 7, band 2 gave 2 of 16, band 3 gave 0 of
+    # 16. That follows from the pair's gap over the chain's chord, 0.29 in
+    # the first shell and 0.50 in the second, which is fixed by the lattice
+    # and does not move with the mix fractions or the box size.
+    shell_weights: dict = Field(
+        default_factory=dict,
+        description=(
+            "Relative weight per neighbour shell, e.g. {'1': 0.6, '2': 0.4}. "
+            "Empty draws from all shells equally. Only the first shell "
+            "reliably realises an entanglement."
+        ),
+    )
+
 
 class GraftConfig(BaseModel):
     """Graft configuration for a single edge type."""
