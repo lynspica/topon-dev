@@ -32,11 +32,11 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V49** | 2026-08-08 | **Designed entanglements: place them where you want and get the count you asked for.** New `conformation/entanglement/waypoints.py` draws a chain through points the caller chooses, winding it round a partner a prescribed number of times; `conformation/junction_shell.py` spreads the chains leaving a crosslink. Verified with Z1+ on the written data file, network stripped: one entanglement per pair is delivered exactly through all three stages, a chain carries two partners at 2 of 2, and across a five-chain composite plan nothing appears in any pair that was not asked for. Three findings drive it: the stage-1 soft push destroys prescribed topology (finite energy at zero separation lets chains pass through each other), contour-over-chord above ~2.5 makes the coil's own crossings swamp the design, and this lattice's close strand pairs cross rather than run alongside, so several sites on one pair are not geometrically available. |
 | **V48** | 2026-08-06 | **Open axes are no longer wrapped in the data file.** The conformation stage folded every axis with `% box`, so a junction on a free surface ended up at one end of the box with the chains bonded to it at the other. Invisible under `p p p`, wrong under `p f f`. On the flagged run the wraps across the open y and z axes go **98 → 0**. `.nodes` gained a `# PERIODICITY` header; the LAMMPS scripts are untouched. |
 | **V47** | 2026-08-05 | **Diamond added to C, per-axis periodicity added to Python** — the last two asymmetries. Both are deterministic, so parity is now exact: all 16 lattice x periodicity combinations produce identical edge sets, and Diamond matches node-for-node including ids. `lattice_type: "Diamond"` works through the config on both paths. Also fixed a C seeding bug that made **every run started in the same second produce the same network**. Found that open boundaries make `"0:0,1:0"` unsatisfiable on BCC and Diamond (free-surface sites have degree 1). |
 | **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
 | **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
-| **V44** | 2026-08-05 | **Mixed SC/BCC/FCC lattices** (`lattice_type: "MIX"`) in both generators, and the C generator vendored into `topon/topology/csrc/`. Mixing takes a lattice from one edge-length shell to four. `MIX` at `{"SC": 1}` reproduces `SC` exactly; the other corners deliberately do not match the canonical builders. 40 new tests, including C-vs-Python parity checks that compile the source on the fly. |
 
 ---
 
@@ -64,6 +64,77 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 ## 4. Changelog (V1 – V48)
 
 Notable changes are documented in reverse chronological order.
+
+### [V49] — 2026-08-08 — Designed entanglements, verified by primitive-path analysis
+
+**What changed.** Two new modules under `topon/conformation/`:
+
+- `entanglement/waypoints.py` — draws a chain through points the caller
+  chooses. `Site(at, turns)` says where along the chain an entanglement goes
+  and how many times it winds; `entangled_pair` and `entangled_group` return
+  the paths. Both chains are Catmull-Rom splines through waypoints that
+  spiral about the line between the two chords in antiphase, so the winding
+  count is prescribed rather than emergent. Each path is drawn at exactly the
+  length its beads need, by waving the free stretches where it is short and
+  shrinking the sites where it is long, so bonds land on target whatever the
+  chord is and density becomes a free choice.
+- `junction_shell.py` — seats the beads next to a crosslink on a spread
+  shell, with the radius growing with functionality. A junction of
+  functionality 12 cannot seat twelve first beads a sigma apart at the radius
+  four chains need.
+
+Supporting work in `tests/workflows/`: `entangle_steps.py` builds the thing
+step by step and measures each stage, `entangle_validate.py` reports a hit
+rate rather than an example, `run_z1.sh` drives Z1+, and `lammps_hardcore/`
+holds an alternative three-stage script set. The generated LAMMPS scripts are
+unchanged and remain the default.
+
+**What it delivers.** Measured with Z1+ (Kröger, CPC 283 (2023) 108567) on
+the written data file with the network stripped, so counts are between the
+named chains only, after the full three-stage protocol:
+
+| case | asked | delivered |
+|---|---|---|
+| one pair, one entanglement | 1 | 1/1 |
+| one chain, two partners | 1 each | 2 of 2 |
+| one chain, three partners | 1 each | 2 of 3 |
+| composite over five chains | 1 each on 4 pairs | 3 of 4 |
+| every pair never asked for | 0 | 0/0, all of them, every stage |
+
+**Three findings that drive the design.**
+
+*The stage-1 soft push destroys prescribed topology.* `pair_style soft` has
+finite energy at zero separation, which is how it resolves a tangled start:
+by letting chains pass through one another. Z1+ on the same build reads 1/1
+as built and 0/0 after stage 1 under the stock protocol, and 1/1 throughout
+under WCA. The hard-core set is opt-in and experimental until it has been run
+against the atomistic side-chain cases.
+
+*Contour over chord decides whether any of this is controllable.* Every chain
+carries `(DP+1)*bond` of path whatever its chord is. Swept from 1.7x to 7.8x,
+asking for one, two and three sites: below about 2.5 asked is delivered,
+above it nothing tracks, because the coil makes more crossings than the
+design does.
+
+*Several sites on one pair are not available on this lattice.* Every position
+along one chain maps to the same position on its partner for the close pairs,
+because those pairs are perpendicular — 336 of 822 close pairs cross, and the
+33 that are parallel sit 30.2 sigma apart and staggered. Two perpendicular
+chains meet in one place, so one entanglement apiece is what they support.
+That is also the physically natural target: a chain in a melt carries many
+entanglements with different partners, not several with the same one.
+
+**Corrections to results reported during the work.** A "three sites reading
+3/3" was built below the minimum reach for a winding — the chains were lying
+against each other, and Z1+ counted three because they were on top of one
+another; both builders now refuse there. And `apply_noise` perturbs every
+atom with `np.random` with nothing seeding it once the network came from
+cache, so the same configuration gave 3/3 one run and 2/4 the next; it is
+seeded now.
+
+**Still open.** SC lattices do not work: every chord is one lattice unit, so
+the nearest strands are as far apart as the chains are long. Neighbour-shell
+weighting in the assignment stage is not started.
 
 ### [V48] — 2026-08-06 — Open axes are not wrapped; molecules stay whole
 

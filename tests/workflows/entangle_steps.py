@@ -1332,6 +1332,22 @@ def step5(args):
                             for p in paths.values()])
     print(f"  bonds {built.min():.3f} to {built.max():.3f}")
 
+    # Two ways a site can be built and still not be an entanglement, both
+    # worth saying out loud rather than leaving to be discovered in the Z1+
+    # table: it can land off the partner's chain, or the two chains can end
+    # up lying against each other instead of winding.
+    for d in info:
+        a, b = d["pair"]
+        if d.get("off_end"):
+            print(f"  warning: the {a}-{b} site at {d['at_a']:.2f} along {a} "
+                  f"falls at {d['at_b_raw']:+.2f} along {b}, past its end; "
+                  f"clamped to {d['at_b']:.2f}")
+    for a, b, _ in plan:
+        sep = min_separation(paths[a], paths[b])
+        if sep < 0.5:
+            print(f"  warning: {a} and {b} are built {sep:.2f} sigma apart, "
+                  f"which is lying against each other rather than winding")
+
     root = OUT / f"step5_{args.plan}{args.partners}"
     n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
     chains = sorted(wanted)
