@@ -171,9 +171,96 @@ def chain_through(start, end, waypoints, n_beads: int) -> np.ndarray:
     return catmull_rom(np.array(pts), n_beads)
 
 
+def _frames(path):
+    """A unit normal at every point, varying smoothly along the path."""
+    d = np.gradient(path, axis=0)
+    n = np.linalg.norm(d, axis=1, keepdims=True)
+    tan = d / np.where(n < 1e-12, 1.0, n)
+
+    ref = np.array([0.0, 0.0, 1.0])
+    if abs(float(tan[0] @ ref)) > 0.9:
+        ref = np.array([1.0, 0.0, 0.0])
+
+    # Parallel transport, so the normal does not spin where the path turns.
+    out = np.empty_like(path)
+    v = ref - float(ref @ tan[0]) * tan[0]
+    v /= np.linalg.norm(v) + 1e-12
+    out[0] = v
+    for i in range(1, len(path)):
+        v = v - float(v @ tan[i]) * tan[i]
+        m = np.linalg.norm(v)
+        v = v / m if m > 1e-9 else out[i - 1]
+        out[i] = v
+    return tan, out
+
+
+def meander_to_length(path, target: float, protect=(), waves: float = 6.0,
+                      tol: float = 1e-3, iters: int = 60) -> np.ndarray:
+    """Wave the path sideways until it is ``target`` long.
+
+    A chain has a fixed number of beads and wants a fixed spacing, so its
+    path has a length it must be. Drawing it straight and hoping the chord
+    obliges is what fails on a uniform lattice, where every chord is
+    identical and there is no slack anywhere: bonds came out at 4.039 sigma
+    against a limit of 1.5, or the whole box had to be shrunk until the
+    network was crushed. Neither is necessary. The path is ours to draw, so
+    it is drawn at the length the beads need.
+
+    The wave vanishes at both junctions and across every protected stretch,
+    so the entanglements keep the geometry they were given and only the free
+    run between them takes up the slack.
+
+    ``protect`` is a list of (lo, hi) fractions of the path to leave alone.
+    """
+    p = np.asarray(path, float)
+    have = float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
+    if target <= have or have <= 0.0:
+        return p
+
+    t = np.linspace(0.0, 1.0, len(p))
+    # Zero at the ends, zero across anything protected, smooth in between.
+    w = np.sin(np.pi * t) ** 2
+    for lo, hi in protect:
+        mid, half = 0.5 * (lo + hi), 0.5 * (hi - lo)
+        if half <= 0:
+            continue
+        d = np.clip(np.abs(t - mid) / (1.6 * half), 0.0, 1.0)
+        w = w * (0.5 - 0.5 * np.cos(np.pi * d))
+
+    _, normal = _frames(p)
+    phase = np.sin(2.0 * np.pi * waves * t)[:, None]
+    shape = (w[:, None] * phase) * normal
+
+    def length(a):
+        q = p + a * shape
+        return float(np.linalg.norm(np.diff(q, axis=0), axis=1).sum())
+
+    lo_a, hi_a = 0.0, max(1e-6, 0.05 * have / max(waves, 1.0))
+    for _ in range(40):
+        if length(hi_a) >= target:
+            break
+        hi_a *= 1.8
+    for _ in range(iters):
+        mid = 0.5 * (lo_a + hi_a)
+        if length(mid) < target:
+            lo_a = mid
+        else:
+            hi_a = mid
+        if abs(length(mid) - target) <= tol * target:
+            break
+    return p + 0.5 * (lo_a + hi_a) * shape
+
+
 def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
-                   per_turn: int = 8, reach: float = 0.45):
+                   per_turn: int = 8, reach: float = 0.45,
+                   bond: float | None = None):
     """Both chains, wound at every site asked for.
+
+    With ``bond`` given, each path is drawn at exactly the length its beads
+    need -- ``(n_beads - 1) * bond`` -- by waving the free stretches between
+    the entanglements. Every bond then comes out at ``bond`` whatever the
+    chord happens to be, so a lattice whose chords are all identical is no
+    harder than one with a spread of them.
 
     Returns ``(path_a, path_b, info)`` where ``info`` carries each site's
     midpoint, axis and half span, for drawing and for measurement.
@@ -188,12 +275,83 @@ def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
         info.append(dict(at=s.at, turns=s.turns, mid=mid, axis=axis,
                          half=half))
 
-    pa = chain_through(a0, a1, wa_all, n_beads)
+    # Draw dense first: a wave has to be resolved before the beads are placed
+    # on it, or the resampling cuts corners and loses the length it added.
+    dense = max(n_beads * 6, 600)
+    pa = chain_through(a0, a1, wa_all, dense)
+
     # Chain B's waypoints are ordered along A, which is the order B meets
     # them only when the two run the same way. Reverse if they do not, or
     # B doubles back between sites.
     same_way = float((np.asarray(a1, float) - np.asarray(a0, float))
                      @ (np.asarray(b1, float) - np.asarray(b0, float))) >= 0.0
     wb_ordered = wb_all if same_way else [w[::-1] for w in wb_all[::-1]]
-    pb = chain_through(b0, b1, wb_ordered, n_beads)
-    return pa, pb, info
+    pb = chain_through(b0, b1, wb_ordered, dense)
+
+    if bond is None:
+        return resample_path(pa, n_beads), resample_path(pb, n_beads), info
+
+    # Solve the site size so the path is the length the beads need, then wave
+    # the free stretches to make up whatever is still missing.
+    #
+    # Both directions have to be handled and only one of them is meandering.
+    # A short chord leaves the path shorter than the beads need, and the wave
+    # takes up the slack. A long chord leaves it *longer*, since three
+    # detours on a nearly-extended chain overshoot, and no amount of waving
+    # shortens anything -- measured on an 76 sigma chord with 80 beads at
+    # 0.95, bonds came out at 1.20. Shrinking the sites is what fixes that,
+    # so reach is solved for rather than given.
+    target = (n_beads - 1) * float(bond)
+    a0v, a1v = np.asarray(a0, float), np.asarray(a1, float)
+    chord_a = float(np.linalg.norm(a1v - a0v))
+
+    def draw(r):
+        wa, wb, nfo = [], [], []
+        for s in sites:
+            xa, xb, mid, axis, half = winding_waypoints(
+                a0, a1, b0, b1, s, per_turn, r)
+            wa.append(xa)
+            wb.append(xb)
+            nfo.append(dict(at=s.at, turns=s.turns, mid=mid, axis=axis,
+                            half=half))
+        ordered = wb if same_way else [w[::-1] for w in wb[::-1]]
+        return (chain_through(a0, a1, wa, dense),
+                chain_through(b0, b1, ordered, dense), nfo)
+
+    def plen(p):
+        return float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
+
+    if plen(pa) > target:
+        lo_r, hi_r = 0.0, reach
+        for _ in range(40):
+            mid_r = 0.5 * (lo_r + hi_r)
+            if plen(draw(mid_r)[0]) > target:
+                hi_r = mid_r
+            else:
+                lo_r = mid_r
+            if hi_r - lo_r < 1e-4:
+                break
+        reach = 0.5 * (lo_r + hi_r)
+        pa, pb, info = draw(reach)
+
+    protect = []
+    for s, d in zip(sites, info):
+        half_frac = min(0.45, d["half"] / max(chord_a, 1e-9))
+        protect.append((s.at - half_frac, s.at + half_frac))
+    pa = meander_to_length(pa, target, protect)
+    pb = meander_to_length(pb, target, protect)
+
+    for d in info:
+        d["reach"] = reach
+    return resample_path(pa, n_beads), resample_path(pb, n_beads), info
+
+
+def resample_path(p, n: int) -> np.ndarray:
+    """Place ``n`` points at equal arc length along ``p``."""
+    seg = np.linalg.norm(np.diff(p, axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(seg)])
+    if s[-1] < 1e-12:
+        return np.repeat(np.asarray(p, float)[:1], n, axis=0)
+    want = np.linspace(0.0, s[-1], n)
+    return np.column_stack([np.interp(want, s, np.asarray(p, float)[:, d])
+                            for d in range(3)])

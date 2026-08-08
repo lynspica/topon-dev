@@ -43,6 +43,8 @@ from topon.conformation.junction_shell import (  # noqa: E402
 from topon.conformation.entanglement.waypoints import (  # noqa: E402
     Site,
     entangled_pair,
+    meander_to_length,
+    resample_path,
 )
 from topon.conformation.entanglement import (  # noqa: E402
     BraidShape,
@@ -944,7 +946,7 @@ def step3(args):
 # ---------------------------------------------------------------------------
 
 def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45,
-                         fene=1.5):
+                         fene=1.5, density=0.30):
     """Every chain's path, with one pair wound at the sites given.
 
     The sites are positions along the chain, chosen by the caller. Nothing
@@ -967,36 +969,44 @@ def build_with_waypoints(graph, pair, sites, bond=BOND, dp=DP, reach=0.45,
     """
     ka, kb = pair
 
-    def straights(g):
-        out = {k: resample(np.stack([c0, c1]), dp + 2)
-               for k, (c0, c1) in g["chords"].items()}
-        return apply_junction_shells(out, g["ends"], spacing=SHELL_SPACING)
+    # Every chain is drawn at the length its beads need, entangled or not.
+    #
+    # Drawing the plain chains straight and sizing the box so the longest of
+    # them lands at `bond` is what forced everything else: it fully extends
+    # the longest chord, so on a lattice whose chords are all identical --
+    # SC -- every chain is extended, no chain has slack, and an entanglement
+    # has nothing to detour with. Measured there: clearance 0.00, longest
+    # bond 2.843, and the pair reading 1/1 as built and 0/0 after stage 1.
+    #
+    # Once each path carries its own length the scale stops being determined
+    # by bond length at all, and density becomes a free choice again.
+    geo = geometry(graph, dp=dp, density=density)
 
-    geo, _ = pin_scale(graph, straights, bond, dp)
+    target = (dp + 1) * bond
+
+    def plain(c0, c1):
+        """A chain with no entanglement, still drawn at the right length."""
+        dense = resample(np.stack([c0, c1]), max(6 * dp, 600))
+        return resample_path(meander_to_length(dense, target), dp + 2)
 
     def build(r):
-        out = {k: resample(np.stack([c0, c1]), dp + 2)
+        out = {k: plain(c0, c1)
                for k, (c0, c1) in geo["chords"].items() if k not in (ka, kb)}
         a0, a1 = geo["chords"][ka]
         b0, b1 = geo["chords"][kb]
+        # bond= draws each path at the length its beads need, so the
+        # entangled chain comes out at the same spacing as every other one
+        # whatever its detours cost.
         pa, pb, nfo = entangled_pair(a0, a1, b0, b1, sites,
-                                     n_beads=dp + 2, reach=r)
+                                     n_beads=dp + 2, reach=r, bond=bond)
         out[ka], out[kb] = pa, pb
         out = apply_junction_shells(out, geo["ends"], spacing=SHELL_SPACING)
         worst = max(float(np.linalg.norm(np.diff(out[c], axis=0), axis=1).max())
                     for c in (ka, kb))
         return out, nfo, worst
 
-    reach_used = reach
-    for _ in range(8):
-        paths, info, worst = build(reach_used)
-        if worst <= fene * 0.85 or reach_used < 0.05:
-            break
-        reach_used *= 0.75
-    if reach_used < reach:
-        print(f"  reach reduced {reach:.2f} -> {reach_used:.2f} to keep the "
-              f"entangled chain under the FENE limit")
-    return geo, paths, info, reach_used
+    paths, info, worst = build(reach)
+    return geo, paths, info, info[0].get("reach", reach)
 
 
 def parse_sites(at, count, turns, span):
@@ -1035,7 +1045,8 @@ def step4(args):
           + f"  ({asked} in total)")
 
     geo, paths, info, reach_used = build_with_waypoints(
-        graph, (ka, kb), sites, args.bond, DP, args.reach)
+        graph, (ka, kb), sites, args.bond, DP, args.reach,
+        density=args.density if args.density is not None else 0.30)
     straight_a = resample(np.stack(geo["chords"][ka]), DP + 2)
     straight_b = resample(np.stack(geo["chords"][kb]), DP + 2)
     base = far_closed_linking(straight_a, straight_b)
