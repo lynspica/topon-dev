@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import defaultdict
 import random
 import shutil
 import sys
@@ -1176,8 +1177,10 @@ def build_group(graph, plan, bond=BOND, dp=DP, reach=0.45, coil=COIL):
     geo = geometry(graph, dp=dp, bond=bond, coil=coil)
     named = {k for a, b, _ in plan for k in (a, b)}
     sub = {k: geo["chords"][k] for k in named}
+    dropped = []
     ent, info = entangled_group(sub, plan, n_beads=dp + 2, reach=reach,
-                                bond=bond)
+                                bond=bond, dropped=dropped)
+    build_group.dropped = dropped
 
     target = (dp + 1) * bond
     paths = dict(ent)
@@ -1432,7 +1435,174 @@ def step5(args):
     return 0
 
 
-STEPS = {1: step1, 2: step2, 3: step3, 4: step4, 5: step5}
+# ---------------------------------------------------------------------------
+# Step 6: shell-weighted selection across the whole network
+# ---------------------------------------------------------------------------
+
+def shell_plan(geo, weights, total, max_partners=1, seed=42):
+    """Pairs drawn from named separation bands in prescribed proportions.
+
+    ``weights`` maps band number to its share, e.g. ``{1: 0.4, 2: 0.4,
+    3: 0.2}``. This is the thing the whole construction was for: a network
+    where first, second and third neighbours are entangled at rates you
+    choose rather than at whatever rate the geometry happens to produce.
+
+    Bands are read off the lattice rather than assumed -- on this mix the
+    closest-approach distance between two strands takes discrete values, and
+    those bands are what "first neighbour" means here.
+
+    A band can run out. Band 1 holds 8 pairs against band 5's 609, so a
+    share that asks for more than a band has is served short and the
+    shortfall reported rather than quietly made up from elsewhere.
+    """
+    rng = random.Random(seed)
+    bands = separation_bands(geo)
+    want = {b: int(round(total * w / sum(weights.values())))
+            for b, w in weights.items()}
+
+    used = defaultdict(int)
+    plan, got, short = [], defaultdict(int), {}
+    for b in sorted(want):
+        if b > len(bands):
+            short[b] = want[b]
+            continue
+        pool = list(bands[b - 1])
+        rng.shuffle(pool)
+        for _, ka, kb in pool:
+            if got[b] >= want[b]:
+                break
+            if used[ka] >= max_partners or used[kb] >= max_partners:
+                continue
+            plan.append((ka, kb, [Site(0.5, 1)]))
+            used[ka] += 1
+            used[kb] += 1
+            got[b] += 1
+        if got[b] < want[b]:
+            short[b] = want[b] - got[b]
+    return plan, want, dict(got), short
+
+
+def step6(args):
+    """Shell-weighted entanglement across the whole network."""
+    graph = build_network()
+    geo0 = geometry(graph, dp=DP, bond=args.bond, coil=args.coil)
+    weights = {}
+    for item in (args.weights or ["1:0.4", "2:0.4", "3:0.2"]):
+        b, w = item.split(":")
+        weights[int(b)] = float(w)
+
+    plan, want, got, short = shell_plan(geo0, weights, args.total,
+                                        args.max_partners)
+    print(f"  weights {weights}, asked {args.total} entanglements")
+    for b in sorted(want):
+        note = f"  ({short[b]} short, the band ran out)" if b in short else ""
+        print(f"    band {b} (gap {separation_bands(geo0)[b-1][0][0]:.2f} "
+              f"lattice units): asked {want[b]}, placed {got.get(b, 0)}{note}")
+    if not plan:
+        print("  nothing to build")
+        return 1
+    print(f"  {len(plan)} pairs over "
+          f"{len({k for a, b, _ in plan for k in (a, b)})} chains")
+
+    try:
+        geo, paths, info = build_group(graph, plan, args.bond, DP,
+                                       args.reach, args.coil)
+    except ValueError as exc:
+        print(f"\n  {exc}")
+        return 1
+
+    built = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
+                            for p in paths.values()])
+    print(f"\n  box {geo['L'][0]:.1f} sigma, density {geo['density']:.4f}, "
+          f"reach solved to {info[0]['reach']:.2f}")
+    print(f"  bonds {built.min():.3f} to {built.max():.3f}")
+    tight = [(a, b) for a, b, _ in plan
+             if min_separation(paths[a], paths[b]) < 0.5]
+    if tight:
+        print(f"  {len(tight)} of {len(plan)} pairs are built closer than "
+              f"0.5 sigma, which is lying together rather than winding")
+
+    root = OUT / f"step6_{args.total}"
+    n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+    sim_dir = conform_and_script(root, graph, geo,
+                                 pair_style=args.pair_style,
+                                 protocol=args.protocol)
+
+    z1_dir = OUT / f"step6_{args.total}_z1"
+    if z1_dir.exists():
+        for f in z1_dir.glob("*.Z1"):
+            f.unlink()
+    z1_dir.mkdir(parents=True, exist_ok=True)
+
+    # Each pair on its own. At this scale that is the only honest measure:
+    # one file holding every entangled chain reports a total that cannot be
+    # attributed, and the question is whether each prescribed pair got what
+    # it was asked for.
+    seq = {k: chain_ids(k, node_atom, chain_atoms, geo["ends"])
+           for k in {c for a, b, _ in plan for c in (a, b)}}
+
+    stage_files = [("built", "03_Conformation/system_conformed.data")]
+    if args.run_md:
+        print(f"\n--- LAMMPS, {args.stages} stage(s) ---")
+        run_md(sim_dir, args.stages)
+        stage_files = [("final", {1: "04_Simulation/system_after_soft.data",
+                                  2: "04_Simulation/system_ramped.data",
+                                  3: "04_Simulation/system_equilibrated.data"
+                                  }[args.stages])]
+        print()
+        report_bonds(root)
+
+    for tag, rel in stage_files:
+        out_file = root / rel
+        if not out_file.exists():
+            continue
+        for i, (a, b, _) in enumerate(plan):
+            z1_export(out_file, [seq[a], seq[b]], z1_dir / f"{tag}_{i:03d}.Z1")
+
+    print(f"\n  measuring {len(plan)} pairs with Z1+ ...")
+    z = run_z1(z1_dir)
+    if z is None:
+        print(f"  Z1+ unavailable; files in {z1_dir.name}")
+        return 0
+
+    tag = stage_files[0][0]
+    hit = over = under = 0
+    by_band = defaultdict(lambda: [0, 0])
+    bands = separation_bands(geo0)
+    band_of = {}
+    for bi, band in enumerate(bands, 1):
+        for _, ka, kb in band:
+            band_of[(min(ka, kb), max(ka, kb))] = bi
+    for i, (a, b, _) in enumerate(plan):
+        v = z.get(f"{tag}_{i:03d}")
+        if not v:
+            continue
+        bi = band_of.get((min(a, b), max(a, b)), 0)
+        by_band[bi][1] += 1
+        if all(x == 1 for x in v):
+            hit += 1
+            by_band[bi][0] += 1
+        elif any(x > 1 for x in v):
+            over += 1
+        else:
+            under += 1
+
+    print()
+    print("  " + "-" * 52)
+    print(f"  {len(plan)} prescribed entanglements, each pair measured alone")
+    print("  " + "-" * 52)
+    print(f"  exactly one, as asked   {hit:5d}   {100.0*hit/max(len(plan),1):5.1f}%")
+    print(f"  more than one           {over:5d}")
+    print(f"  none                    {under:5d}")
+    print("  " + "-" * 52)
+    for bi in sorted(by_band):
+        ok, tot = by_band[bi]
+        print(f"  band {bi}: {ok} of {tot} exact")
+    print("  " + "-" * 52)
+    return 0
+
+
+STEPS = {1: step1, 2: step2, 3: step3, 4: step4, 5: step5, 6: step6}
 
 
 def main():
@@ -1454,6 +1624,14 @@ def main():
                     help="step 4: place sites explicitly along the chain, "
                          "e.g. --at 0.15 0.5:2 0.85. Positions are fractions "
                          "of the chain and need not be evenly spread")
+    ap.add_argument("--total", type=int, default=40,
+                    help="step 6: how many entanglements to place")
+    ap.add_argument("--weights", nargs="*", default=None,
+                    metavar="BAND:SHARE",
+                    help="step 6: how to split them across separation "
+                         "bands, e.g. --weights 1:0.4 2:0.4 3:0.2")
+    ap.add_argument("--max-partners", type=int, default=1,
+                    help="step 6: how many entanglements one chain may carry")
     ap.add_argument("--partners", type=int, default=2,
                     help="step 5: how many partners the hub carries. Each "
                          "costs contour, so more needs a larger coil")

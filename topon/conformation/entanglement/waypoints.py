@@ -169,6 +169,12 @@ def winding_waypoints(a0, a1, b0, b1, site: Site, per_turn: int = 8,
     if site.span is not None:
         half = 0.5 * site.span * chord
     else:
+        # A turn of radius r needs about 2.2r of axial length to be a turn
+        # rather than a flat loop, with a floor in the chain's own length so
+        # a site on a very close pair does not vanish. Widening this to cover
+        # the sideways travel as well was tried and is worse: the span costs
+        # contour of its own, and 39 pairs went from wanting 91.9 sigma to
+        # 120.8.
         half = 0.5 * max(2.2 * radius * site.turns, 0.06 * chord)
     half = min(half, 0.45 * chord)
 
@@ -431,7 +437,8 @@ def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
 
 
 def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
-                    reach: float = 0.45, bond: float | None = None):
+                    reach: float = 0.45, bond: float | None = None,
+                    dropped: list | None = None):
     """Many chains at once, any of them carrying several partners.
 
     ``plan`` is a list of ``(chain_a, chain_b, sites)``. A chain appearing in
@@ -448,6 +455,9 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
     """
     dense = max(n_beads * 6, 600)
     target = None if bond is None else (n_beads - 1) * float(bond)
+    plan = list(plan)
+    if dropped is None:
+        dropped = []
 
     load = {}
     for ka, kb, sites in plan:
@@ -456,6 +466,7 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
         load[kb] = load.get(kb, 0) + n
 
     def lay(r):
+        # r is either one number for every pair, or a dict keyed by pair.
         marks = {k: [] for k in chords}
         nfo = []
         for ka, kb, sites in plan:
@@ -468,9 +479,10 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
             # partners, so the busy one stays near its own chord.
             na, nb = load.get(ka, 1), load.get(kb, 1)
             bias = float(np.clip(nb / float(na + nb), 0.15, 0.85))
+            rp = r[(ka, kb)] if isinstance(r, dict) else r
             for s in sorted(sites, key=lambda x: x.at):
                 wa, wb, mid, axis, half = winding_waypoints(
-                    a0, a1, b0, b1, s, per_turn, r, bias)
+                    a0, a1, b0, b1, s, per_turn, rp, bias)
                 # Where this site falls along B, so B meets its waypoints in
                 # the order B travels rather than the order A does.
                 at_b = (float((mid - b0v) @ db) / Lb2) if Lb2 > 1e-12 else 0.5
@@ -489,7 +501,7 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
                                 at_b_raw=at_b_raw,
                                 off_end=abs(at_b_raw - at_b) > 1e-9,
                                 turns=s.turns, mid=mid, axis=axis, half=half,
-                                reach=r))
+                                reach=rp))
 
         out = {}
         for k, (c0, c1) in chords.items():
@@ -506,6 +518,9 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
         return max(float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
                    for p in paths.values())
 
+    def plen_of(paths, k):
+        return float(np.linalg.norm(np.diff(paths[k], axis=0), axis=1).sum())
+
     paths, info, marks = lay(reach)
 
     if target is not None:
@@ -516,16 +531,48 @@ def entangled_group(chords, plan, n_beads: int = 200, per_turn: int = 8,
         # partners came out at 2.30 to 2.50 sigma bonds against a limit of
         # 1.5.
         if longest(paths) > target:
-            lo_r, hi_r = 0.0, reach
-            for _ in range(40):
-                mid_r = 0.5 * (lo_r + hi_r)
-                if longest(lay(mid_r)[0]) > target:
-                    hi_r = mid_r
-                else:
-                    lo_r = mid_r
-                if hi_r - lo_r < 1e-4:
-                    break
-            solved = 0.5 * (lo_r + hi_r)
+            # Solve each pair's reach on its own rather than one number for
+            # all of them. A plan drawn from several separation bands mixes
+            # gaps that differ several-fold, and a single reach is set by the
+            # widest pair, so the close ones are shrunk to nothing for a
+            # problem they do not have: 39 pairs across three bands wanted
+            # 119.3 sigma against the 77 available, on a plan where every
+            # chain carried exactly one site.
+            keys = [(ka, kb) for ka, kb, _ in plan]
+            solved_per = {}
+            for key in keys:
+                lo_r, hi_r = 0.0, reach
+                for _ in range(30):
+                    mid_r = 0.5 * (lo_r + hi_r)
+                    trial = dict(solved_per)
+                    trial[key] = mid_r
+                    for other in keys:
+                        trial.setdefault(other, reach)
+                    drawn = lay(trial)[0]
+                    a_len = plen_of(drawn, key[0])
+                    b_len = plen_of(drawn, key[1])
+                    if max(a_len, b_len) > target:
+                        hi_r = mid_r
+                    else:
+                        lo_r = mid_r
+                    if hi_r - lo_r < 1e-4:
+                        break
+                solved_per[key] = 0.5 * (lo_r + hi_r)
+            # Drop what cannot be afforded rather than refusing the plan.
+            # At scale a plan mixes bands whose gaps differ several-fold, and
+            # one pair too far apart for its chains' contour should cost that
+            # pair, not the other thirty-eight.
+            dropped[:] = [k for k, v in solved_per.items() if v < MIN_REACH]
+            if dropped and len(dropped) < len(keys):
+                keep = [(a, b, st) for a, b, st in plan
+                        if (a, b) not in set(dropped)]
+                plan[:] = keep
+                keys = [(a, b) for a, b, _ in plan]
+                solved_per = {k: v for k, v in solved_per.items()
+                              if k not in set(dropped)}
+            solved = min(solved_per.values()) if solved_per else 0.0
+            if solved >= MIN_REACH:
+                paths, info, marks = lay(solved_per)
             if solved < MIN_REACH:
                 # Even a site of no size overshoots, so there is not enough
                 # contour for what was asked. Building it anyway produces a
