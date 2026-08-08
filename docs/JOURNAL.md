@@ -14,6 +14,55 @@ Newest first.
 
 ---
 
+## 2026-08-08 — The meander helps, which is the opposite of what the last entry guessed
+
+**Change:** No code. Two measurements, the second of which corrects the
+first.
+
+**Why:** the previous entry read asymmetric Z1+ counts (a pair reading 1/3)
+and reasoned that since linking between two curves is symmetric, the extra
+kinks must come from the chain's own slack-absorbing wave. That was a guess
+and it was wrong.
+
+**Issue / solution:** built the same three first-shell pairs at a fixed reach
+of 0.25, once with the meander and once without, Z1+ on the paths with no MD
+so nothing else varies:
+
+| pair | no meander | with meander |
+|---|---|---|
+| 91-94 | 1/3 | 1/1 |
+| 191-195 | 1/3 | 1/1 |
+| 334-341 | 1/1 | 1/1 |
+
+The asymmetry belongs to the *unmeandered* case. Without the wave a chain is
+a straight line with one bump on it, and the straight stretches run alongside
+the partner's straight stretches for most of their length, which is where the
+extra contacts come from. The wave perturbs them apart. All three pairs are
+exact with it.
+
+That also makes sense of an earlier change that was made for a different
+reason: steering the wave away from partners helped, and the wave existing at
+all helps more.
+
+At scale, first shell, eight prescribed entanglements through the full
+protocol:
+
+| reach | exact | over | none |
+|---|---|---|---|
+| 0.45 (the default cap) | 6 of 7 | 1 | 0 |
+| 0.25 | 6 of 7 | 0 | 1 |
+
+The same rate with a different failure. At 0.25 nothing over-winds, and one
+pair simply does not form; at the default one pair picks up an entanglement
+nobody asked for. For a construction whose whole claim is that it delivers
+what was asked and nothing else, a miss is a better failure than a spurious
+hit, so 0.25 is the more honest setting even though the headline number does
+not move.
+
+**Follow-up:** not changed in code, because the choice between "misses" and
+"invents" is the user's to make and both are 6 of 7. It is a one-flag change
+either way (`--reach`).
+
 ## 2026-08-08 — Reach is not the governing variable; the pair is
 
 **Change:** No code. A one-variable sweep, which is what the previous entry
