@@ -147,7 +147,12 @@ This stage also writes the first set of LAMMPS-relevant outputs to `<output_dir>
 ### Stage 5 — Conformation
 **Module:** `topon/conformation/` &nbsp;**Code:** `pipeline.py:251-271`
 
-`ConformationManager` (`conformation/manager.py`) is the entire stage-5 implementation: it reads the chemistry-stage data file, applies the displacement files, adds a small Gaussian noise to break degeneracy, and resolves overlaps iteratively. The sub-namespaces `conformation/{entanglement,packing,placement}/` are 1-line stubs reserved for a future refactor of `manager.py` into smaller pieces.
+`ConformationManager` (`conformation/manager.py`) is the pipeline's stage-5 implementation: it reads the chemistry-stage data file, applies the displacement files, adds a small Gaussian noise to break degeneracy, and resolves overlaps iteratively. `conformation/{packing,placement}/` remain 1-line stubs reserved for a future refactor of `manager.py`.
+
+Two further modules sit beside it and are **not** on the default pipeline path; they are used by the entanglement workflows and are opt-in:
+
+- `conformation/entanglement/` — building chain paths that wind around each other a prescribed number of times. `waypoints.py` draws a chain through points the caller chooses (`Site(at, turns)`) and is the current approach; `braid.py` and `allocation.py` are an earlier search-based construction that picks its own positions, kept because its budgeting and obstruction checks have no equivalent yet in the waypoint path.
+- `conformation/junction_shell.py` — spreads the chains leaving a crosslink so their first beads do not overlap, with the shell radius growing with functionality.
 
 Conformation defaults (`pipeline.py:47`):
 
@@ -191,7 +196,7 @@ Concise tour of every directory under `topon/`. Every module above the dashed li
 | `analysis/` | 2 files | Read-only graph statistics for the `topon analyze` CLI. **Not used by `Pipeline` stage 2** — that calls `AssignmentManager.analyze()`. |
 | `assignment/` | 8 files | Graph annotation: node/edge types, DP, defects, entanglements, copolymers. Stage 3. |
 | `chemistry/` | 4 files (`builder.py` is most of stage 4); `dreiding/`/`kg/`/`charmm/` are stubs | RDKit Mol construction with 3D coords. Stage 4. |
-| `conformation/` | 2 files (`manager.py` is most of stage 5); `entanglement/`/`packing/`/`placement/` are stubs | Overlap resolution and conformation. Stage 5. |
+| `conformation/` | `manager.py` is stage 5; `entanglement/` (waypoint and braid path construction) and `junction_shell.py` are opt-in and off the default path; `packing/`/`placement/` are stubs | Overlap resolution, conformation, and designed entanglement geometry. Stage 5. |
 | `writers/` | 6 files | LAMMPS data and input-script writers. Stage 4 + Stage 6. |
 | `forcefield/` | 4 files | DREIDING parameter parser; Kremer-Grest parameters. Read by chemistry/writers. |
 | `config/` | 4 files | Pydantic `ToponConfig` schema; `ConfigLoader.load()`. |
