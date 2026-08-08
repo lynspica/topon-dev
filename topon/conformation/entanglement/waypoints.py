@@ -386,11 +386,19 @@ def entangled_pair(a0, a1, b0, b1, sites, n_beads: int = 200,
     def plen(p):
         return float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum())
 
-    if plen(pa) > target:
+    def worst(drawn):
+        # Both chains, not just A. A site is placed by its position along A,
+        # but B has to reach it too, and where it lands on B is whatever the
+        # geometry says. Two sites spread evenly along A were measured
+        # landing on the same point of B, so B doubled back and its path ran
+        # to 163 sigma against A's 138 -- and checking only A never saw it.
+        return max(plen(drawn[0]), plen(drawn[1]))
+
+    if worst((pa, pb)) > target:
         lo_r, hi_r = 0.0, reach
         for _ in range(40):
             mid_r = 0.5 * (lo_r + hi_r)
-            if plen(draw(mid_r)[0]) > target:
+            if worst(draw(mid_r)) > target:
                 hi_r = mid_r
             else:
                 lo_r = mid_r
