@@ -14,6 +14,55 @@ Newest first.
 
 ---
 
+## 2026-08-08 — The "lattice limit" was an artifact of the construction, not a property of the lattice
+
+**Change:** No code. Retracting a conclusion that three earlier entries and
+`STATUS.md` all repeat.
+
+**Why:** challenged on it. The Gaussian kink in
+`assignment/entanglements.py` has always worked on SC -- the shipped sample
+graph `network_N5x5x5_trial3` is SC and is what the CG demos and the
+entanglement examples run on -- so "SC cannot support a designed
+entanglement" could not be right.
+
+**Issue / solution:** the error is in what was measured. Every claim about
+gap over chord was computed between *chords*: straight lines from crosslink
+to crosslink. Chains do not follow those lines. Each one carries
+`(DP+1)*bond` of contour on a much shorter chord and wanders well off it.
+Measured on the paths the pipeline actually draws rather than on the chords:
+
+| lattice | chord | closest chord-to-chord | closest path-to-path |
+|---|---|---|---|
+| MIX | 42.8 | 12.3 | 0.00 |
+| SC | 42.8 | no pair within cutoff | 0.00 |
+
+So the ratio that was called "fixed by the lattice, unchanged by the mix
+fractions or the box size" is a property of idealised segments that nothing
+in the system follows. The conclusions drawn from it -- that SC is
+impossible, that shells past the first are impossible, that a different
+lattice would be needed -- do not follow.
+
+What the corrected measurement does say is narrower. Excluding pairs that
+share a crosslink and trimming the ends, MIX has 24 disjoint pairs whose
+interiors come within 4 sigma and SC has none. That is a fact about the
+meander used here, a six-wave sinusoid carrying only enough amplitude to
+absorb the difference between chord and contour, not about SC.
+
+The design difference that matters: the legacy kink *drives* a bulge from
+one chain toward its partner, so it needs the partner's position and nothing
+else. The waypoint construction puts a meeting point between the two chords
+and sends both chains to it, so it costs contour in proportion to how far
+apart the chords are, and refuses when that exceeds the chain's slack. Chord
+separation became a hard constraint because of that choice, not because of
+the physics. Every "not enough contour" refusal in this work traces to it.
+
+**Follow-up:** whether SC and the outer shells work is open again, and the
+concrete route is to site entanglements where the built paths approach, or
+to drive one chain toward its partner as the legacy kink does, rather than
+requiring both to meet in the middle. The delivered numbers elsewhere in
+this log stand -- they are what this implementation produces -- but the
+explanations offered for its limits do not.
+
 ## 2026-08-08 — As-built robustness does not predict survival, so the cheap screen is not worth building
 
 **Change:** No code. A negative result, recorded so it is not attempted
