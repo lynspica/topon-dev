@@ -14,6 +14,55 @@ Newest first.
 
 ---
 
+## 2026-08-08 — The coil was chosen wrong, and that choice manufactured every limit
+
+**Change:** No code. The third and largest retraction in this series.
+
+**Why:** asked whether, if the path prevents entanglement, the path might be
+wrong. It is not the path's *shape*: a random walk and the six-wave sinusoid
+at the same contour both give zero disjoint SC pairs within 4 sigma. It is
+the amount of slack, which is `COIL`, and which was chosen here.
+
+**Issue / solution:** swept it on SC with random-walk chains, counting
+disjoint pairs whose interiors come within 4 sigma:
+
+| coil | chord | density | pairs within 4 sigma | closest |
+|---|---|---|---|---|
+| 1.8 | 42.8 | 0.0017 | 0 | — |
+| 2.5 | 30.8 | 0.0046 | 0 | — |
+| 4.0 | 19.2 | 0.019 | 0 | — |
+| 6.0 | 12.8 | 0.063 | 34 | 0.26 |
+| 8.0 | 9.6 | 0.150 | 155 | 0.14 |
+
+SC chains interpenetrate perfectly well from a coil of about 6. The default
+used throughout this work is 1.8.
+
+The reasoning that set it was circular. `COIL = 1.8` was chosen because
+above roughly 2.5 the construction lost control of the winding count -- but
+that was measured with a construction whose designed site must compete with
+the coil's own crossings, so it says the site is fragile, not that the coil
+is wrong. Chains at 1.8 are nearly extended, which is precisely the regime
+where they do not interpenetrate. Then the fact that they never come near
+each other was measured and attributed to the lattice.
+
+Every limit reported in this work descends from that. Chord separation only
+mattered because the construction makes both chains travel to a midpoint;
+that only mattered because they were not already close; they were not close
+because the coil was set low; the coil was set low because the construction
+could not hold its count otherwise.
+
+The legacy Gaussian kink runs at melt density, 0.85, where the coil is far
+above anything tested here and chains are fully interpenetrating. That is
+why it works on SC and this does not.
+
+**Follow-up:** this establishes a necessary condition, not a sufficient one.
+Chains meeting at coil 6 does not by itself show that a prescribed
+entanglement can be built and survive there, and the winding-count control
+that motivated the low coil still has to be solved rather than avoided. The
+right next measurement is whether a site built where two *paths* already
+approach, at coil 6 on SC, realises and survives -- which is a different
+construction from the one measured throughout this log.
+
 ## 2026-08-08 — The "lattice limit" was an artifact of the construction, not a property of the lattice
 
 **Change:** No code. Retracting a conclusion that three earlier entries and
