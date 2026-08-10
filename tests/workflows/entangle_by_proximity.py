@@ -42,7 +42,7 @@ from topon.assignment.entanglements import (  # noqa: E402
     select_entanglements,
 )
 from topon.config.schema import EntanglementsConfig  # noqa: E402
-from tests.workflows.entangle_all import random_walk  # noqa: E402
+from topon.conformation.paths import bridging_walk  # noqa: E402
 from tests.workflows.entangle_spatial import BIAS, kinked_paths  # noqa: E402
 from tests.workflows.entangle_steps import (  # noqa: E402
     BOND,
@@ -65,7 +65,7 @@ def provisional(geo, dp, bond, seed):
     the whole reason for doing this after conformation rather than before.
     """
     rng = np.random.default_rng(seed)
-    return {k: random_walk(c0, c1, dp + 1, bond, rng)
+    return {k: bridging_walk(c0, c1, dp + 1, bond, rng)
             for k, (c0, c1) in geo["chords"].items()}
 
 
@@ -104,9 +104,12 @@ def main():
                               placement_bias_kind=args.bias,
                               placement_bias_params=BIAS[args.bias])
 
-    by_pair = {frozenset(v): paths0[k] for k, v in geo["ends"].items()}
-    allw = compute_proximity_weights(cands, by_pair, box=geo["L"],
-                                     cutoff=args.cutoff)
+    # Assignment works in lattice units, the same as the node positions, so
+    # the conformation is handed over in those units and the cutoff with it.
+    scale = geo["scale"]
+    by_pair = {frozenset(v): paths0[k] / scale for k, v in geo["ends"].items()}
+    cut = args.cutoff / scale
+    allw = compute_proximity_weights(cands, by_pair, box=dims, cutoff=cut)
 
     # Pass 2 ---------------------------------------------------------------
     if not args.no_rank:
@@ -116,18 +119,19 @@ def main():
         if live:
             print(f"    score range {min(live):.0f} to {max(live):.0f}, "
                   f"median {np.median(live):.0f}")
-        object.__setattr__(cfg, "_proximity_weights", allw)
+
 
     # Pass 3 ---------------------------------------------------------------
     random.seed(args.seed)
     sel = select_entanglements(G, cfg, dims, candidates=list(cands),
-                               num_chains=G.number_of_edges())
+                               num_chains=G.number_of_edges(),
+                               chain_paths=None if args.no_rank else by_pair,
+                               proximity_cutoff=cut)
     print(f"  selected {len(sel)} entanglements")
 
     if sel:
         chosen = compute_proximity_weights(
-            [(a, b) for a, b, _ in sel], by_pair, box=geo["L"],
-            cutoff=args.cutoff)
+            [(a, b) for a, b, _ in sel], by_pair, box=dims, cutoff=cut)
         pool = [x for x in allw if x > 0]
         print(f"  chosen pairs score {np.median(chosen):.0f} median, "
               f"against {np.median(pool):.0f} for the candidate pool "

@@ -1142,6 +1142,36 @@ Or distribution mode (average per chain):
 | `z_amp` | `0.5` | Out-of-plane amplitude of the Gaussian kink |
 | `sigma` | `0.15` | Width of the Gaussian kink |
 
+##### Choosing pairs on a conformation instead of on crosslink distance
+
+By default candidates are ranked by the distance between their crosslinks,
+which is a property of the network rather than of the chains. Two chains can
+be nearest neighbours by crosslink and never come near each other, and a kink
+placed there aims one chain at a partner that is not present.
+
+`select_entanglements` accepts a `chain_paths` argument — a mapping of
+`frozenset((u, v))` to that chain's bead path — and ranks candidates by how
+much of the two chains actually lies alongside. The assignment stage does not
+draw the conformation itself; the caller supplies one, in the same units as
+the node positions. `tests/workflows/entangle_by_proximity.py` shows the
+sequence: draw a provisional conformation with no entanglements, rank on it,
+select, then draw the final one with the kinks.
+
+`topon/conformation/paths.py` provides `bridging_walk` for that first pass —
+a random walk of fixed bond length that closes exactly on its far junction.
+A straight chain will not do, since it lies on its chord and so cannot say
+anything about which chains meet.
+
+Measured on a 354-chain network, 281 candidates, 0.20 entanglements per chain:
+
+| ranking | median proximity of chosen pairs | chosen pairs whose chains never touch |
+|---|---|---|
+| crosslink distance (the default) | 39 | 8 of 33 |
+| on a conformation | **156** | **0 of 35** |
+
+The pool median is 50, so the default ranking is slightly worse than choosing
+at random.
+
 ##### Choosing which neighbour shell to entangle
 
 `shell_weights` biases the draw toward particular neighbour shells. Shells are
