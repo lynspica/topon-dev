@@ -14,6 +14,54 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Capacity is a property of the pair, and shared proximity predicts it
+
+**Change:** No code. Correlating the measured partner network against the
+geometry of each pair.
+
+**Why:** put to me that positioning and neighbouring should mean some pairs
+can carry more entanglements than others. Testable against the DP 80 melt,
+where Z1+ with its ``+`` option already names the partner for every
+entanglement point.
+
+**Issue / solution:** 223 entangled pairs. For each, counted the bead pairs
+lying within 2 sigma of each other -- how much of the two chains runs
+alongside, which is a proximity *contour* rather than a single distance:
+
+| e on the pair | pairs | median bead pairs within 2 sigma |
+|---|---|---|
+| 1 | 46 | 164 |
+| 2 | 116 | 228 |
+| 3 | 26 | 300 |
+| 4 | 20 | 406 |
+| 5 | 6 | 380 |
+| 6 | 6 | 353 |
+| 8 | 2 | 456 |
+| 14 | 1 | 888 |
+
+Monotonic to e = 4 and correlated at r = +0.40 overall. The single pair
+carrying 14 shares more than five times the proximity contour of a typical
+pair carrying one.
+
+So the claim holds: capacity belongs to the pair, and it is set by how much
+of the two chains runs together rather than by whether their crosslinks are
+neighbours. Chord separation, which this work leaned on for days, is not the
+quantity -- two chains can be first neighbours by their crosslinks and barely
+touch, or distant by their crosslinks and wander alongside for hundreds of
+beads.
+
+The correlation is moderate, so proximity is necessary and not sufficient:
+about a sixth of the variance. Two chains can run together at length without
+threading, because closeness is not topology. The tail beyond e = 4 rests on
+six pairs or fewer and should not be read as a trend.
+
+**Follow-up:** this is the selection criterion the design problem needs.
+Proximity contour is computable from a conformation in seconds with no MD
+and no Z1+, so a plan that wants particular pairs to carry several
+entanglements can rank candidates on it before anything is run. That is the
+opposite of what was attempted here, which was to impose a count on pairs
+chosen by crosslink distance.
+
 ## 2026-08-08 — Everything the task asked for is already in a plain melt
 
 **Change:** No code. Z1+ run with its ``+`` option, which reports the chain
