@@ -14,6 +14,48 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Entanglement selection moved after conformation
+
+**Change:** `compute_proximity_weights` in `topon/assignment/entanglements.py`
+scores each candidate pair by how many of its two chains' beads lie within a
+cutoff of each other, given a conformation. It multiplies into the existing
+spatial and shell biases rather than replacing them, so all three compose.
+`tests/workflows/entangle_by_proximity.py` runs the selection in passes:
+draw a provisional conformation with no entanglements, score the candidates
+on it, select, then redraw the chosen chains with their kinks.
+
+**Why:** the pipeline places entanglements during assignment, before any
+coordinates exist, so the only thing available to choose pairs by is the
+distance between their crosslinks. That is a property of the network and not
+of the chains.
+
+**Issue / solution:** it matters more than expected. Same network, same
+draw parameters, 281 candidates, 0.20 entanglements per chain:
+
+| | median score of chosen pairs | pool median | chosen pairs whose chains never touch |
+|---|---|---|---|
+| ranked after conformation | 156 | 50 | 0 of 35 |
+| unranked, as the pipeline does it | 39 | 50 | 8 of 33 |
+
+The current selection picks pairs slightly *worse* than random on this
+measure, and a quarter of what it picks are chains that never come within 2
+sigma of each other anywhere along their length. A kink placed on such a pair
+aims one chain at a partner that is not there. Ranking on the conformation
+triples the median and removes them entirely.
+
+196 of the 281 candidates have chains that come within range at all; the
+scores span 1 to 1524 with a median of 50, so there is a great deal of
+structure for the ranking to use that crosslink distance cannot see.
+
+Runs clean through stages 1 and 2: bonds 0.086 as built, 0.911 after the
+soft stage, 0.931 after the ramp, one bond past the FENE limit.
+
+**Follow-up:** this lives in a workflow because the pipeline's stage order
+puts assignment before conformation. Making it the default needs that order
+changed, or a provisional conformation drawn inside the assignment stage --
+a structural decision rather than a geometric one. The scoring function
+itself is in `assignment/` and is ready either way.
+
 ## 2026-08-10 — Selection after conformation: the ranking half works, the winding half still does not
 
 **Change:** Nothing kept in the geometry code. `find_contacts` now takes the
