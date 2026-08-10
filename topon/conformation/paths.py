@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import numpy as np
 
-__all__ = ["bridging_walk", "straight", "walk_via"]
+__all__ = ["bridging_walk", "straight", "walk_via", "walk_through",
+           "loop_around"]
 
 
 def straight(start, end, n_beads: int) -> np.ndarray:
@@ -113,3 +114,71 @@ def walk_via(start, end, via, n_bonds: int, bond: float = 0.97,
     first = bridging_walk(start, via, n1, bond, rng)
     second = bridging_walk(via, end, n2, bond, rng)
     return np.vstack([first, second[1:]])
+
+
+def walk_through(start, end, waypoints, n_bonds: int, bond: float = 0.97,
+                 rng=None) -> np.ndarray:
+    """A bridging walk visiting each of ``waypoints`` in order.
+
+    Bonds are shared between the legs in proportion to how far each has to
+    travel, so no leg is left short of what it needs. Raises when the whole
+    route is longer than the chain.
+    """
+    rng = np.random.default_rng() if rng is None else rng
+    pts = [np.asarray(start, float)]
+    pts += [np.asarray(w, float) for w in waypoints]
+    pts.append(np.asarray(end, float))
+
+    legs = [float(np.linalg.norm(pts[i + 1] - pts[i]))
+            for i in range(len(pts) - 1)]
+    total = sum(legs)
+    if total > n_bonds * bond:
+        raise ValueError(
+            f"route is {total:.1f} sigma but the chain carries "
+            f"{n_bonds * bond:.1f}")
+
+    # One bond minimum per leg, the rest shared by distance.
+    share = [max(1, int(round(n_bonds * L / total))) for L in legs]
+    while sum(share) > n_bonds:
+        share[int(np.argmax(share))] -= 1
+    while sum(share) < n_bonds:
+        share[int(np.argmin([s / max(L, 1e-9) for s, L in zip(share, legs)]))] += 1
+
+    out = [bridging_walk(pts[0], pts[1], share[0], bond, rng)]
+    for i in range(1, len(legs)):
+        out.append(bridging_walk(pts[i], pts[i + 1], share[i], bond, rng)[1:])
+    return np.vstack(out)
+
+
+def loop_around(target, i: int, radius: float, n_pts: int = 6,
+                phase: float = 0.0) -> np.ndarray:
+    """Waypoints that encircle ``target``'s strand at bead ``i``.
+
+    Returns ``n_pts`` points on a circle of ``radius`` about the target's
+    local tangent, so a chain routed through them in order passes once around
+    that strand.
+
+    Going *around* is the thing. Routing a chain to a point *on* its intended
+    partner puts the two side by side and creates no link between them:
+    measured, twelve such attempts raised the routed chain's own entanglement
+    count from 3 to 8 while leaving the count with the named partner at zero,
+    because at melt density the arriving chain is caught by whichever
+    neighbour is topologically in the way. Encircling is what cannot be
+    undone by pulling the two taut.
+    """
+    target = np.asarray(target, float)
+    i = int(np.clip(i, 1, len(target) - 2))
+    tan = target[i + 1] - target[i - 1]
+    n = float(np.linalg.norm(tan))
+    tan = tan / n if n > 1e-12 else np.array([0.0, 0.0, 1.0])
+
+    ref = np.array([0.0, 0.0, 1.0])
+    if abs(float(tan @ ref)) > 0.9:
+        ref = np.array([1.0, 0.0, 0.0])
+    u = np.cross(tan, ref)
+    u /= np.linalg.norm(u)
+    v = np.cross(tan, u)
+
+    th = np.linspace(0.0, 2.0 * np.pi, n_pts, endpoint=False) + phase
+    return target[i] + radius * (np.cos(th)[:, None] * u
+                                 + np.sin(th)[:, None] * v)

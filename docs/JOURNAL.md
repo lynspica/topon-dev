@@ -14,6 +14,57 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Encircling the target works; the collateral is the open problem
+
+**Change:** `walk_through` and `loop_around` in
+`topon/conformation/paths.py`. The first is a bridging walk visiting several
+waypoints in order, sharing its bonds between the legs by distance. The
+second returns waypoints on a circle about a target strand's local tangent,
+so a chain routed through them passes once around it.
+
+**Why:** the previous entry concluded that a chain cannot choose its partner
+in a melt. That was too strong, and the reason was in the previous entry
+itself: it routed the chain to a point *on* the partner, which puts the two
+side by side and creates nothing. Going *around* is a different move, and it
+is a path-finding problem rather than a physical impossibility.
+
+**Issue / solution:** encircling works. Same target as before, a partner 1.73
+chord-lengths away that twelve routed attempts had failed to entangle:
+
+| path | Z of A | partners | A-B |
+|---|---|---|---|
+| base | 3 | 3 | 0 |
+| loop0 | 8 | 4 | 0 |
+| loop1 | 13 | 7 | **1** |
+| loop2 | 11 | 9 | 0 |
+| loop3 | 10 | 5 | 0 |
+| loop4 | 11 | 8 | **2** |
+| loop5 | 9 | 7 | **2** |
+
+Three of six encircling paths entangled the named partner, where zero of
+twelve "route to a point on it" attempts had. Every bond stayed at 0.95, so
+the chain had the contour for this all along.
+
+The collateral is the problem. A went from 3 partners to between 4 and 9: the
+loop threads whatever lies along the way as well as the target. Scoring 24
+candidate loops by how much of the path runs within 1.5 sigma of a
+non-target chain, and keeping the least cluttered, does not fix it -- scores
+ranged 1435 to 1985 and hits appeared in both halves, while unwanted
+entanglements tracked the total count rather than the proximity score.
+
+That is the correct lesson and it is the same one as everywhere else in this
+work: *proximity is not entanglement*. Ranking a path by how close it comes
+to other chains cannot separate "passed alongside" from "threaded through",
+and only the second creates an entanglement. The objective has to be
+topological, not geometric.
+
+**Follow-up:** the tractable version measures rather than predicts. Build a
+few candidate loops, run Z1+ on each, keep the one whose partner list is
+closest to what was asked. Each evaluation costs one Z1+ call over the
+system, seconds, so a few dozen candidates is minutes -- and unlike a
+geometric score it is measuring the thing being optimised. That is a search
+loop, which is what the question proposed in the first place.
+
 ## 2026-08-10 — Entanglement is a search, a chain can reach anywhere, and you still cannot pick your partner
 
 **Change:** `walk_via` in `topon/conformation/paths.py` -- a bridging walk
