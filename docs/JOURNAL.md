@@ -14,6 +14,48 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Spatial heterogeneity already works, and needs headroom to show
+
+**Change:** No code. Exercising `placement_bias_kind`, which predates this
+work, and recording what it does.
+
+**Why:** asked whether spatially heterogeneous entanglement distributions
+are possible, and separately what this work actually added over the existing
+Gaussian kink. The first answer turns out to be "yes, already", which bears
+on the second.
+
+**Issue / solution:** all four bias kinds run. Measured on the 4x4x4 MIX
+network, 281 candidates, counting kinks landing in the central quarter of
+the box:
+
+| entanglements per chain | draws | uniform | region bias |
+|---|---|---|---|
+| 0.1 | 17 | 1 | 8 |
+| 0.3 | 53 | 7 | 14 |
+| 0.6 | 106 | 14 | 16 |
+| 1.2 | 212 | 21 | 20 |
+
+Eightfold enrichment at 0.1 per chain, nothing at 1.2. That is not a fault:
+212 draws from 281 candidates takes nearly everything, so there is no
+selection left to bias with. Spatial control needs headroom below
+saturation, and how much is a property of the candidate pool rather than of
+the bias.
+
+`anti_region` and `gradient` show the same way round -- depleting a region
+or tilting along an axis both work at any density, because they can be
+satisfied by *declining* candidates rather than by finding scarce ones.
+
+**On what this work added.** Setting the constructions aside, the honest
+ledger against the existing kink is short. Already there: candidate
+selection, spatial bias, density by `avg_crosslinks_per_chain`, several
+entanglements on one pair, and a path builder that works at melt density.
+Added here: `shell_weights` for neighbour-shell selection, the Z1+ harness
+that turns any written data file into a verified count per chain or per
+pair, and the hard-core protocol that stops stage 1 destroying prescribed
+topology. The three path constructions are not improvements on the kink --
+the last several entries establish that the kink is the right primitive and
+they were not.
+
 ## 2026-08-10 — Capacity is a property of the pair, and shared proximity predicts it
 
 **Change:** No code. Correlating the measured partner network against the
