@@ -14,6 +14,65 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Everything the task asked for is already in a plain melt
+
+**Change:** No code. Z1+ run with its ``+`` option, which reports the chain
+responsible for each entanglement point, so the whole partner network can be
+read out rather than just a count.
+
+**Why:** asked whether DP 80 gives 5 for sure, whether DP 100 gives 6, and
+whether the multi-partner picture is available rather than only pairs.
+
+**Issue / solution:** measured on SC at melt density with random-walk chains
+and no designed entanglement anywhere.
+
+Density targets, mean Z per chain:
+
+| DP | lattice | chains | mean Z | range |
+|---|---|---|---|---|
+| 80 | 4x4x4 | 106 | 5.02 | 0-12 |
+| 100 | 4x4x4 | 106 | 6.28 | 1-13 |
+| 100 | 5x5x5 | 217 | 5.86 | 0-17 |
+
+So both targets land on the mean and neither is "for sure": the distribution
+is broad, and a given chain may carry none or a dozen.
+
+The partner structure at DP 80 is the answer to the third question, and it
+is emphatic. Mean **3.76 distinct partners** per chain, range 0 to 9:
+
+```
+ 0 partners:   1 chain
+ 1 partners:   6
+ 2 partners:  22
+ 3 partners:  18
+ 4 partners:  24
+ 5 partners:  20
+ 6 partners:  10
+ 7 partners:   2
+ 8 partners:   2
+ 9 partners:   1
+```
+
+And pairs entangled with each other more than once: 72 cases of twice, 16 of
+three times, 3 of four, 2 of five, 2 of seven.
+
+That is the arrangement this task set out to construct, described in the
+original request as "chain A entangled with B and C, chain D entangled with B
+twice and E once". A melt produces it without being asked. Multiple partners
+per chain, multiple entanglements per pair, across whatever neighbours happen
+to be nearby -- all of it, for free, from chains that coil.
+
+What is not available is control. You get a distribution, not a
+specification: 3.76 partners on average rather than a named three, and a
+count that varies chain to chain. Narrowing that distribution, or naming
+which chain entangles which, is the real open problem and it is what the
+construction work should have been aimed at from the start.
+
+**Follow-up:** the route to control on top of this is selection rather than
+construction -- draw a conformation, measure it, redraw the chains that are
+off target, repeat. Each round costs one Z1+ call over the whole system,
+which is seconds. Nothing needs to be built into the path geometry.
+
 ## 2026-08-08 — A realistic melt is already entangled; the density is set by DP
 
 **Change:** No code. The measurement that should have opened this work
