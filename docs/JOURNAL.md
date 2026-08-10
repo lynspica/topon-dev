@@ -14,6 +14,54 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Selection after conformation: the ranking half works, the winding half still does not
+
+**Change:** Nothing kept in the geometry code. `find_contacts` now takes the
+closest approach *within the usable separation band* rather than the global
+minimum, which is a real fix; everything else attempted here was reverted.
+
+**Why:** asked to move entanglement selection after conformation and rank on
+proximity.
+
+**Issue / solution:** the two halves came apart.
+
+*Ranking works, and well.* Scoring every chain pair in a melt by how many
+bead pairs lie within 2 sigma, then checking against Z1+: the top 20 average
+3.70 entanglements and include the pair carrying 14; the bottom 50 carry
+zero, every one. One pass over the conformation, no MD, no Z1+. As a way of
+finding which pairs can hold several entanglements, this is settled.
+
+*Applying a winding to those pairs still fails.* Three things were tried
+here and only the first is kept:
+
+The global-minimum contact was being rejected by a `min_sep` guard, because
+at melt density chains routinely touch and a separation of hundredths is
+noise to build a frame from. Taking the closest approach inside the usable
+band instead recovered 13 of the 15 best pairs -- workable windows went from
+2 of 15 to 3 of 15. Kept.
+
+Replacing the lockstep bead correspondence with nearest-neighbour pairing,
+on the reasoning that coiled chains do not advance in step through a
+contact. Took it from 3 of 15 to 0 of 15, because the monotonic filter that
+came with it strips most of the correspondence. Reverted.
+
+A diagnostic to explain that regression, which compared the wrong pair --
+chain keys read as array positions. Discarded.
+
+**The honest position.** This construction has now failed six separate
+times across this work, each time for a different reason, and each fix has
+been sound in isolation. That pattern says the object is wrong rather than
+the implementation, which is what the entry of 2026-08-08 already concluded:
+a winding needs two chains to travel together, and melt chains meet and part
+instead. The proximity ranking is worth keeping and wiring in. The winding
+is not worth a seventh attempt.
+
+**Follow-up:** the ordering question the request was really about --
+entanglement selection currently happens during assignment, before any
+conformation exists -- is worth answering regardless, because the ranking
+needs a conformation to rank on. That is a pipeline change and it does not
+depend on any of the geometry above.
+
 ## 2026-08-10 — Pairs can be chosen for capacity, and the ranking is free
 
 **Change:** No code beyond making the linear chains legible in the plots.
