@@ -43,7 +43,11 @@ from tests.workflows.entangle_steps import (  # noqa: E402
     LATTICE,
     OUT,
     build_network,
+    conform_and_script,
     geometry,
+    report_bonds,
+    run_md,
+    write_system,
     write_z1,
 )
 
@@ -123,6 +127,12 @@ def main():
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--per-round", type=int, default=20)
     ap.add_argument("--dp", type=int, default=DP)
+    ap.add_argument("--n-routed", type=int, default=2,
+                    help="how many chains carry a designed pair; above 2 a "
+                         "wider plan is generated")
+    ap.add_argument("--run-md", action="store_true",
+                    help="write the system and run minimize 1 and 2")
+    ap.add_argument("--stages", type=int, default=2)
     ap.add_argument("--passes", type=int, default=3,
                     help="sweeps over the plan; a chain routed later can "
                          "knock an earlier pair off target")
@@ -153,14 +163,28 @@ def main():
             for b in keys if b != a and not set(ends[a]) & set(ends[b]))
         return order[rank][1]
 
-    A = keys[0]
-    B, C = far_from(A, len(keys) // 3), far_from(A, len(keys) // 5)
-    D = keys[20]
-    E = far_from(D, len(keys) // 4)
-    plan = [(A, {B: 1, C: 1}), (D, {B: 2, E: 1})]
-
-    print(f"  plan: chain {A} with {B} and {C}; "
-          f"chain {D} with {B} twice and {E} once")
+    if args.n_routed <= 2:
+        A = keys[0]
+        B, C = far_from(A, len(keys) // 3), far_from(A, len(keys) // 5)
+        D = keys[20]
+        E = far_from(D, len(keys) // 4)
+        plan = [(A, {B: 1, C: 1}), (D, {B: 2, E: 1})]
+        print(f"  plan: chain {A} with {B} and {C}; "
+              f"chain {D} with {B} twice and {E} once")
+    else:
+        # A wider plan, for finding where the collateral from one routed
+        # chain starts undoing another. Routed chains are spread through the
+        # network and each is given one partner a third of the way down its
+        # own distance list.
+        step = max(1, len(keys) // args.n_routed)
+        plan = []
+        for i in range(args.n_routed):
+            a = keys[(i * step) % len(keys)]
+            if any(a == r for r, _ in plan):
+                continue
+            plan.append((a, {far_from(a, len(keys) // 3): 1}))
+        print(f"  plan: {len(plan)} chains, one partner each, "
+              f"{sum(len(w) for _, w in plan)} requested pairs")
     print(f"  {len(keys)} chains, DP {args.dp}, melt density")
     print(f"  {args.rounds} rounds x {args.per_round} candidates per chain\n")
 
@@ -232,6 +256,43 @@ def main():
     bonds = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1)
                             for p in paths.values()])
     print(f"  bonds {bonds.min():.3f} to {bonds.max():.3f}")
+
+    if args.run_md:
+        root = OUT / "design_md"
+        n_atoms, node_atom, chain_atoms = write_system(graph, geo, paths, root)
+        sim = conform_and_script(root, graph, geo, pair_style="repulsive",
+                                 protocol="hardcore")
+        print(f"\n  wrote {n_atoms} beads to {root.name}/")
+        print(f"  --- LAMMPS, stages 1 to {args.stages} ---")
+        run_md(sim, args.stages)
+        print()
+        report_bonds(root)
+
+        # Does the designed topology survive the protocol? Measure the same
+        # pairs on the minimised coordinates, not on what was built.
+        from tests.workflows.entangle_steps import chain_ids, read_data, unwrap_chain
+        after = {1: "system_after_soft.data", 2: "system_ramped.data",
+                 3: "system_equilibrated.data"}[args.stages]
+        f = root / "04_Simulation" / after
+        if f.exists():
+            box, xyz, _ = read_data(f)
+            md = {}
+            for k in keys:
+                seq = chain_ids(k, node_atom, chain_atoms, geo["ends"])
+                md[k] = unwrap_chain(seq, xyz, box)
+            geo_md = dict(geo)
+            geo_md["L"] = box
+            post = measure_one(md, keys, geo_md, work, "post")
+            print("\n  after minimisation:")
+            ok = 0
+            for routed, want in plan:
+                for t, n in want.items():
+                    got = _both(post, idx[routed], idx[t])
+                    ok += (got == n)
+                    print(f"    {routed}-{t}: asked {n}, got {got}"
+                          + ("   ok" if got == n else ""))
+            print(f"    {ok} of {total} still exact after stages 1-"
+                  f"{args.stages}")
     return 0
 
 

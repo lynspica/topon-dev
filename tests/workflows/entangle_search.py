@@ -84,6 +84,17 @@ def measure_batch(directory):
     out = {}
     for f in sorted(Path(directory).glob("SP_*.dat")):
         out[f.stem[3:]] = _partners(f)
+
+    # A configuration Z1+ could not handle must not come back as a
+    # configuration with no entanglements. It crashed on a post-minimisation
+    # system here and every pair read zero, which looks exactly like a
+    # designed topology that did not survive.
+    inputs = {f.stem for f in Path(directory).glob("*.Z1")}
+    missing = sorted(inputs - set(out))
+    if missing:
+        print(f"    Z1+ produced no output for {len(missing)} of "
+              f"{len(inputs)} configurations: {', '.join(missing[:4])}"
+              + (" ..." if len(missing) > 4 else ""))
     return out
 
 
