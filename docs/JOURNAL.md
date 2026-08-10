@@ -14,6 +14,59 @@ Newest first.
 
 ---
 
+## 2026-08-08 — Not DP: a helix is the wrong primitive for a melt
+
+**Change:** No code. The diagnosis the previous entry asked for.
+
+**Why:** asked whether the contact construction's failure on real chains was
+about DP.
+
+**Issue / solution:** it is not, and the measurement rules it out cleanly.
+The construction needs a stretch where the two chains run alongside each
+other -- a full turn of a 1 sigma offset spread over fewer than about 26
+beads stretches the bonds it rides on. Measuring the stretch actually
+available at every contact, on SC at coil 6:
+
+| DP | chord | contacts found | median window | longest window |
+|---|---|---|---|---|
+| 20 | 3.3 | 691 | 0 | 0 |
+| 40 | 6.5 | 194 | 0 | 0 |
+| 80 | 12.8 | 28 | 0 | 0 |
+| 160 | 25.5 | 0 | 0 | 0 |
+| 320 | 50.8 | 0 | 0 | 0 |
+
+Zero at every chain length. Not one contact in any of these systems gives
+two chains that stay adjacent even briefly. That also explains the silence:
+`_pair_window` returns None, `wind_at` hands the paths back untouched, and
+nothing reported it -- the 0 of 14 was code doing nothing rather than doing
+something wrong.
+
+The governing quantity is persistence. A freely-jointed walk decorrelates in
+about one bond, so two chains that touch at one bead are past the window cap
+by the next. Chain length cannot change that; only stiffness could.
+
+The deeper error is the choice of object. A helical winding is two chains
+spiralling about a shared axis, which requires them to travel together for
+tens of beads. Melt chains never do. The only way to get that geometry was
+to extend the chains until they stopped coiling -- which is exactly the low
+coil this log spent days rationalising, and which removes the
+interpenetration that entanglement is made of. The circle is: helix needs
+parallel strands, parallel strands need low coil, low coil means no
+interpenetration, no interpenetration means nothing to entangle.
+
+The legacy Gaussian kink is a single excursion: one chain bulges past
+another and makes one crossing. It needs no shared stretch, so it is
+indifferent to persistence and works at melt density on any lattice. That is
+not a cruder approximation of what this work was building -- it is the right
+primitive, and the helix was the wrong one.
+
+**Follow-up:** if this is picked up again, the object to prescribe is a
+crossing, not a winding: drive one chain past another at a chosen point and
+verify the crossing with Z1+, which is what the legacy code does
+geometrically without ever measuring it. Both constructions in
+`conformation/entanglement/` are built on the helix and neither is the right
+starting point.
+
 ## 2026-08-08 — The coil was chosen wrong, and that choice manufactured every limit
 
 **Change:** No code. The third and largest retraction in this series.
