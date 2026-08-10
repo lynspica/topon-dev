@@ -14,6 +14,51 @@ Newest first.
 
 ---
 
+## 2026-08-08 — A realistic melt is already entangled; the density is set by DP
+
+**Change:** No code. The measurement that should have opened this work
+rather than closed it.
+
+**Why:** asked whether a realistic system with an entanglement density of 1,
+2 or 3 is available at all. It is, and nothing needs to be constructed to
+get it.
+
+**Issue / solution:** built SC networks at melt density 0.85 with
+random-walk chains, no designed entanglement anywhere, and measured Z1+ on
+every chain. Lattice size chosen to keep the box near 25 sigma so Z1+ is
+comparable across the row:
+
+| DP | lattice | chains | mean Z per chain |
+|---|---|---|---|
+| 16 | 8x8x8 | 888 | 0.67 |
+| 24 | 7x7x7 | 595 | 1.08 |
+| 48 | 5x5x5 | 217 | 2.95 |
+| 80 | 4x4x4 | 106 | 5.02 |
+
+Z is linear in DP with Ne about 16 beads, which is the textbook
+Kremer-Grest result. An entanglement density of 1 is DP 24, of 3 is DP 48.
+The distribution at DP 80 runs from 0 to 12 across the 106 chains.
+
+So the target this work set out to hit was available from the start by
+choosing a chain length, and every difficulty recorded in this log came from
+trying to *impose* entanglements on a system built at a coil where they
+could not occur naturally. The coil was low because the helix needed
+parallel strands; the helix was chosen because the goal was read as
+"construct an entanglement" rather than "have the right number of them".
+
+What construction would add is not entanglement density. It is control over
+*which* chains are entangled with which, and where along them -- a
+designable topology rather than a statistical one. That is a real and much
+harder goal, it is what the shell weighting was reaching for, and it remains
+unsolved. But it should be pursued on top of a melt that is already
+entangled, not on a stretched system that is not.
+
+**Follow-up:** the useful piece to keep from all of this is the measurement
+harness -- `write_z1`, `z1_export` and `run_z1` turn any written data file
+into a verified entanglement count in seconds, per chain or per pair. That
+is what made this measurement possible and it is independent of any
+construction.
+
 ## 2026-08-08 — Not DP: a helix is the wrong primitive for a melt
 
 **Change:** No code. The diagnosis the previous entry asked for.
