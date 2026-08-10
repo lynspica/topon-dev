@@ -14,6 +14,46 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Pairs can be chosen for capacity, and the ranking is free
+
+**Change:** No code beyond making the linear chains legible in the plots.
+The finding is a measurement.
+
+**Why:** asked whether pairs can be found smartly, such that the chosen ones
+support higher entanglement counts. They can, and the criterion is the
+proximity contour from the previous entry used the other way round: instead
+of explaining why some pairs carry more, rank on it and pick them.
+
+**Issue / solution:** scored every chain pair in the DP 80 melt by how many
+bead pairs lie within 2 sigma -- 1373 pairs have any proximity at all, 223
+turn out entangled -- then compared what Z1+ found for the top of that
+ranking against the bottom:
+
+| selection | median proximity | mean e | max e | pairs with none |
+|---|---|---|---|---|
+| top 20 by proximity | 604 | 3.70 | 14 | 1 of 20 |
+| rank 20 to 60 | 449 | 2.25 | 6 | 8 of 40 |
+| bottom 50 | 1 | 0.00 | 0 | 50 of 50 |
+
+The bottom fifty carry nothing at all, every one. The top twenty average
+3.70 and include the pair carrying 14. So capacity is not only explained by
+proximity after the fact, it is *predicted* by it beforehand, and the
+ranking costs one pass over the conformation with no MD and no Z1+.
+
+That is the selection criterion this work needed from the start. The
+candidate list the pipeline builds today comes from `find_crossing_candidates`,
+which ranks on the distance between chord midpoints -- a property of the
+crosslinks, not of the chains. Ranking the same candidates on proximity
+contour instead would put the pairs that can hold several entanglements at
+the top of the draw, which is what a request for a high count on a named
+pair needs.
+
+**Follow-up:** worth wiring into `find_crossing_candidates` as an
+alternative ranking, since the conformation is available by the time
+entanglements are placed in some workflows but not in the pipeline's own
+order, where assignment precedes conformation. That ordering is the real
+obstacle and it is a pipeline question rather than a geometry one.
+
 ## 2026-08-10 — Spatial heterogeneity already works, and needs headroom to show
 
 **Change:** No code. Exercising `placement_bias_kind`, which predates this

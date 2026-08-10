@@ -144,7 +144,7 @@ def plot(name, geo, paths, partner, sites, path, dims):
     if xs:
         fig.add_trace(go.Scatter3d(
             x=xs, y=ys, z=zs, mode="lines", name="linear chains",
-            line=dict(color="rgba(150,150,150,0.28)", width=1),
+            line=dict(color="rgba(120,120,120,0.55)", width=2),
             hoverinfo="skip"))
 
     ex, ey, ez = [], [], []
