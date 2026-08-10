@@ -14,6 +14,55 @@ Newest first.
 
 ---
 
+## 2026-08-10 — Entanglement is a search, a chain can reach anywhere, and you still cannot pick your partner
+
+**Change:** `walk_via` in `topon/conformation/paths.py` -- a bridging walk
+routed through a chosen waypoint, built from two bridging walks joined there.
+Every bond stays at its length and both junctions are still met exactly.
+
+**Why:** three questions. Is the selection path-dependent; if so is it a
+search problem; and can chains that are somewhat far apart be entangled by
+finding the right path.
+
+**Issue / solution:** the first two are yes, the third is subtler.
+
+*Path-dependent, strongly.* Three conformations of the same network, contacts
+within 2 sigma: 1355, 1419 and 1362 pairs, of which only 404 are common to
+all three against 2720 appearing in at least one. So 85% of which chains
+touch is decided by the conformation and 15% by the network. It is a search.
+
+*A chain can reach far past its own crosslinks.* It carries 77 sigma of
+contour on a 5.4 sigma chord at melt density, and that slack is enough to
+visit a neighbour one or two chord-lengths away and come back. Blind draws
+reached partners at 1.0 to 1.9 chord-lengths in 2 to 16 of 50 attempts;
+routing through a point on the partner reached them 10 times out of 10 at
+every distance tried, with the longest bond still 0.95.
+
+*Reaching a partner is not entangling it.* Routing chain A through a point on
+chain B raised A's own entanglement count from 3 to 8 and its partner count
+from 3 to 6 -- and left the A-B count at zero. Twelve routed attempts,
+varying which bead of B was targeted and how the contour was split: 0 of 12
+entangled the named partner, though every one changed how much A was
+entangled overall.
+
+The mechanism is screening. At melt density the target chain is surrounded,
+and a chain arriving in its neighbourhood is caught by whichever chain is
+topologically in the way, which is almost never the one that was named. Two
+isolated chains show this from the other side: routed together and measured
+alone, Z1+ reports 0 for both, because two chains that merely touch have
+nothing holding them.
+
+**What this settles.** Control over *how many* entanglements (by DP) and
+over *where in the box* they sit (by placement bias) is available and
+measured. Control over *which specific pair* is not, and the obstacle is
+physical rather than a limitation of any construction here: in a dense melt
+a chain does not get to choose its partner. That is worth stating plainly,
+because most of this work was aimed at exactly that target.
+
+**Follow-up:** if pair-level control is wanted, the regimes where screening
+is weak are the place to look -- low density, or a chain much longer than its
+neighbours so it dominates its own environment. Neither is a melt.
+
 ## 2026-08-10 — Entanglement selection moved after conformation
 
 **Change:** `compute_proximity_weights` in `topon/assignment/entanglements.py`
