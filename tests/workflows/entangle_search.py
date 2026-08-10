@@ -168,36 +168,62 @@ def _both(partners, a, b):
 # Proposals
 # ---------------------------------------------------------------------------
 
-def propose(a0, a1, target_path, box, n, rng, around=None, spread=1.0,
+def propose(a0, a1, target_paths, box, n, rng, around=None, spread=1.0,
             dp=DP, bond=BOND):
-    """``n`` candidate paths, each encircling the target strand somewhere.
+    """``n`` candidate paths, each encircling every strand in ``target_paths``.
 
-    ``around`` is a previous winner's ``(bead, radius, points, phase)``; when
-    given, proposals cluster near it instead of covering the whole range.
-    That is the difference between the first round and the ones after it.
+    A single strand may be passed on its own; several means one path that
+    loops around each in turn. That is not optional for a chain with more
+    than one requested partner: encircling them one at a time and taking the
+    best gets whichever was aimed at and never both. Measured on a plan where
+    chain 0 wanted two partners, alternating the target across rounds
+    delivered one of them every time and the other never.
+
+    Loops are visited in the order the strands lie along the routed chain's
+    own chord, so the path does not double back across the box between them.
+
+    ``around`` is a previous winner's knobs; when given, proposals cluster
+    near it rather than covering the whole range.
     """
+    targets = ([target_paths] if isinstance(target_paths, np.ndarray)
+               else list(target_paths))
+    a0 = np.asarray(a0, float)
+    chord = np.asarray(a1, float) - a0
+    order = sorted(range(len(targets)),
+                   key=lambda i: float((targets[i].mean(0) - a0) @ chord))
+
     out = []
     for _ in range(n):
-        if around is None:
-            bead = int(rng.integers(4, len(target_path) - 4))
-            radius = float(rng.uniform(1.2, 3.2))
-            pts = int(rng.choice([4, 5, 6, 8]))
-            phase = float(rng.uniform(0.0, 2.0 * np.pi))
-        else:
-            b0, r0, p0, ph0 = around
-            bead = int(np.clip(b0 + rng.integers(-6, 7) * spread,
-                               4, len(target_path) - 5))
-            radius = float(np.clip(r0 + rng.normal(0.0, 0.35 * spread),
-                                   1.0, 3.5))
-            pts = int(np.clip(p0 + rng.integers(-1, 2), 4, 8))
-            phase = ph0 + float(rng.normal(0.0, 0.8 * spread))
+        knobs, rings = [], []
+        for j in order:
+            t = targets[j]
+            if around is None or len(around) != len(targets):
+                bead = int(rng.integers(4, len(t) - 4))
+                radius = float(rng.uniform(1.2, 3.2))
+                pts = int(rng.choice([4, 5, 6, 8]))
+                phase = float(rng.uniform(0.0, 2.0 * np.pi))
+            else:
+                b0, r0, p0, ph0 = around[j]
+                bead = int(np.clip(b0 + rng.integers(-6, 7) * spread,
+                                   4, len(t) - 5))
+                radius = float(np.clip(r0 + rng.normal(0.0, 0.35 * spread),
+                                       1.0, 3.5))
+                pts = int(np.clip(p0 + rng.integers(-1, 2), 4, 8))
+                phase = ph0 + float(rng.normal(0.0, 0.8 * spread))
+            knobs.append((bead, radius, pts, phase))
+            rings.append(loop_around(t, bead, radius, pts, phase))
 
-        ring = loop_around(target_path, bead, radius, pts, phase)
+        way = [w for ring in rings for w in ring]
         try:
-            path = walk_through(a0, a1, list(ring), dp + 1, bond, rng)
+            path = walk_through(a0, a1, way, dp + 1, bond, rng)
         except ValueError:
             continue
-        out.append(((bead, radius, pts, phase), path))
+        # Knobs come back in target order, not visiting order, so a later
+        # round can perturb each loop against the strand it belongs to.
+        by_target = [None] * len(targets)
+        for slot, j in enumerate(order):
+            by_target[j] = knobs[slot]
+        out.append((tuple(by_target), path))
     return out
 
 
@@ -217,7 +243,7 @@ def search(base, keys, routed, wish, geo, rounds, per_round, rng, work):
         # The target in the image nearest the chain being routed.
         tgt = base[target_key]
         tgt = tgt + L * np.round((base[routed].mean(0) - tgt.mean(0)) / L)
-        cands = propose(a0, a1, tgt, L, per_round, rng, around, spread)
+        cands = propose(a0, a1, [tgt], L, per_round, rng, around, spread)
         if not cands:
             print(f"  round {rnd + 1}: no candidate path could be built")
             continue
@@ -331,7 +357,7 @@ def main():
         print("\n  nothing built")
         return 1
     c, miss, unw, hits, knobs, path = best
-    bead, radius, pts, phase = knobs
+    bead, radius, pts, phase = knobs[0]
     bonds = np.linalg.norm(np.diff(path, axis=0), axis=1)
     verdict = "exactly as asked" if miss == 0 else f"{miss} off target"
     print(f"\n  best: {hits} entanglement(s) with chain {B} "

@@ -14,6 +14,71 @@ Newest first.
 
 ---
 
+## 2026-08-10 — A named entanglement topology, delivered and verified
+
+**Change:** `tests/workflows/entangle_search.py` and `entangle_design.py`,
+with `run_z1_batch.sh` driving the measurement. The search proposes encircling
+paths, measures each with Z1+, and keeps what worked; the design script takes
+a whole plan and routes the chains it names.
+
+**Why:** everything before this tried to *predict* whether a path would
+entangle a particular partner, and every attempt failed the same way --
+proximity is not entanglement, and no distance measure separates passing
+alongside from threading through. So this measures instead.
+
+**Issue / solution:** the original request was "chain A entangled with B and
+C, chain D entangled with B twice and E once". On a 106-chain SC melt at DP
+80, with the partners one to two chord-lengths away:
+
+    pass 1: 2 chains to route
+      chain 0  -- 15:1/1, 8:1/1, 7 added elsewhere
+      chain 20 -- 15:2/2, 95:1/1, 2 added elsewhere
+    pass 2: 1 chain to route
+      chain 0  -- 15:1/1, 8:1/1, 0 added elsewhere
+    pass 3: everything already on target
+
+    0-15: asked 1, got 1
+    0-8:  asked 1, got 1
+    20-15: asked 2, got 2
+    20-95: asked 1, got 1
+    4 of 4 requested pairs delivered exactly
+
+Bonds 0.436 to 0.950 throughout, so nothing is stretched.
+
+Four things had to be right, and each was found by a measurement that
+contradicted an assumption.
+
+*Collateral is counted above a baseline, not from zero.* A melt chain already
+carries three entanglements before anything is routed, so charging for all of
+them makes doing nothing the cheapest move, and the search converged on
+exactly that.
+
+*The objective is lexicographic.* No single weighted sum expresses "deliver
+what I asked for": any weight small enough to tolerate collateral also makes
+missing the target the cheapest option. Hit the target, then minimise what
+else changed.
+
+*A chain with two requested partners needs one path around both.* Encircling
+them one at a time and taking the best delivered whichever was aimed at and
+never the pair, every time.
+
+*Passes, not one sweep.* Routing a chain changes what its neighbours are
+threaded by. Chain 0 was routed with both targets exact, and routing chain
+20, which shares one of those targets, took the 0-15 count from 1 to 2.
+Re-routing what has drifted against the conformation as it now stands is what
+converges.
+
+**The cost.** Entanglements on the routed chains that nobody asked for went
+from 7 to 16. The plan is delivered exactly and the two routed chains are
+more entangled overall than they were. Reducing that is the open problem, and
+the search already has the lever -- the collateral term is the second half of
+the objective and simply loses to the first.
+
+**Follow-up:** this is two chains in a hundred-chain system, so it says the
+mechanism works rather than that it scales. Worth knowing next: how many
+chains can carry a designed plan at once before the collateral from each
+starts breaking the others.
+
 ## 2026-08-10 — Encircling the target works; the collateral is the open problem
 
 **Change:** `walk_through` and `loop_around` in
