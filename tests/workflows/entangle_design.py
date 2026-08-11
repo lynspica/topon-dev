@@ -269,44 +269,48 @@ def main():
         print()
         report_bonds(root)
 
-        # Does the designed topology survive the protocol? Measure the same
-        # pairs on the minimised coordinates, not on what was built.
-        from tests.workflows.entangle_steps import chain_ids, read_data, unwrap_chain
+        # Does the designed topology survive the protocol? Measure each
+        # requested pair on its own, from the minimised coordinates.
+        #
+        # Per pair rather than whole-system, because Z1+ crashes on some
+        # whole-system configurations read back from LAMMPS output and does
+        # not say why -- 31652 nodes died where 15984 had been fine, so it is
+        # not a simple size limit, and the core module ships as a binary so
+        # the cause is not reachable from here. Two chains in a file works
+        # reliably, and it answers exactly the question being asked: are
+        # these two still entangled, and how many times.
+        from tests.workflows.entangle_steps import chain_ids, z1_export
         after = {1: "system_after_soft.data", 2: "system_ramped.data",
                  3: "system_equilibrated.data"}[args.stages]
         f = root / "04_Simulation" / after
         if f.exists():
-            box, xyz, _ = read_data(f)
-            md = {}
-            for k in keys:
-                seq = chain_ids(k, node_atom, chain_atoms, geo["ends"])
-                md[k] = unwrap_chain(seq, xyz, box)
-            geo_md = dict(geo)
-            geo_md["L"] = box
-            post = measure_one(md, keys, geo_md, work, "post")
+            seq = {k: chain_ids(k, node_atom, chain_atoms, geo["ends"])
+                   for k in keys}
+            pairs = sorted({(min(r, t), max(r, t))
+                            for r, w in plan for t in w})
+            for old in list(work.glob("*.Z1")) + list(work.glob("SP_*.dat")):
+                old.unlink()
+            for a, b in pairs:
+                z1_export(f, [seq[a], seq[b]], work / f"p{a}_{b}.Z1")
+            res = measure_batch(work) or {}
 
-            # A failed measurement and a destroyed topology print the same
-            # thing: every pair reads zero. Z1+ currently rejects a whole
-            # system read back from LAMMPS output -- the blocker recorded in
-            # entangle_legacy_check.py -- so this path yields no survival
-            # number at all, and a table of zeros claims one.
-            measured = sum(sum(v.values()) for v in post.values())
-            if not measured:
-                print("\n  after minimisation: NOT MEASURED. Z1+ returned "
-                      "nothing for the post-run system, so this run says "
-                      "nothing about whether the topology survived.")
-                return 0
-
-            print(f"\n  after minimisation ({measured} points system-wide):")
-            ok = 0
+            print(f"\n  after stages 1-{args.stages}, each pair measured "
+                  f"on its own:")
+            ok = shown = 0
             for routed, want in plan:
                 for t, n in want.items():
-                    got = _both(post, idx[routed], idx[t])
+                    a, b = min(routed, t), max(routed, t)
+                    r = res.get(f"p{a}_{b}")
+                    if r is None:
+                        print(f"    {routed}-{t}: NOT MEASURED")
+                        continue
+                    shown += 1
+                    got = _both(r, 1, 2)
                     ok += (got == n)
                     print(f"    {routed}-{t}: asked {n}, got {got}"
                           + ("   ok" if got == n else ""))
-            print(f"    {ok} of {total} still exact after stages 1-"
-                  f"{args.stages}")
+            if shown:
+                print(f"    {ok} of {shown} still exact after minimisation")
     return 0
 
 

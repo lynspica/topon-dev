@@ -753,6 +753,28 @@ def z1_export(data_file, sequences, out_path):
     # are wound together get reported as far apart and unentangled.
     ref = chains[0].mean(axis=0)
     chains = [c + box * np.round((ref - c.mean(axis=0)) / box) for c in chains]
+
+    # Z1+ cannot take a chain longer than the periodic cell -- it has no way
+    # to say which image a bead belongs to, and dies with "CRASHED. contact
+    # mk" rather than an error naming the cause. Worth catching here, because
+    # the caller sees an empty result, which is indistinguishable from a
+    # system that lost all its entanglements.
+    #
+    # It bites after minimisation and not before. Measured on a 4x4x4 SC melt
+    # at DP 80, box 21.6 sigma: the conformed state has no chain over the box
+    # and measures fine, while after stages 1 and 2 nineteen chains reach up
+    # to 30.9 sigma and Z1+ refuses the lot. The cure is a box bigger than the
+    # chains -- a larger lattice at the same density -- not a change here.
+    extent = max(float(np.linalg.norm(c.max(axis=0) - c.min(axis=0)))
+                 for c in chains)
+    if extent > float(np.min(box)):
+        over = sum(1 for c in chains
+                   if np.linalg.norm(c.max(axis=0) - c.min(axis=0))
+                   > float(np.min(box)))
+        print(f"    warning: {over} of {len(chains)} chains are longer than "
+              f"the box ({extent:.1f} vs {float(np.min(box)):.1f} sigma). "
+              f"Z1+ will reject this; use a larger lattice at the same "
+              f"density.")
     return write_z1(out_path, chains, box)
 
 
