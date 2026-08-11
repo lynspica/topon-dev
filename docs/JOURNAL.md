@@ -74,9 +74,12 @@ slack so no partner is reachable -- and neither knew anything about the design
 it was meant to hold. Sized this way a 4x4x4 SC network lands at density 0.033.
 
 **Result:** designed counts now survive exactly, through minimisations that
-move beads a median of 12.4 sigma and up to 45. Over four consecutive runs
-every designed count came back unchanged (2 to 2, 1 to 1, 2 to 2, 0 to 0),
-where before the same plan lost one pair and grew another from 1 to 4.
+move beads a median of 12.4 sigma and up to 45. Six of the seven non-zero
+counts built across five runs came back unchanged. The one loss, a pair built
+at 2 that came back 0, was in the run before windings were confined to
+mid-strand; the three runs since have held every count. For comparison, the
+same plan before any of this lost one pair outright and grew another from 1
+to 4.
 
 **Still open:** the search does not reliably build the count it is asked for.
 It hit 1 of 1 once and otherwise settles on 2. One full turn puts two crossings
