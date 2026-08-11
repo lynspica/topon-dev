@@ -177,3 +177,87 @@ def test_full_span_is_unchanged_by_the_span_knob():
     t = _target()
     assert loop_around(t, 40, 2.0, 6, 0.3) == pytest.approx(
         loop_around(t, 40, 2.0, 6, 0.3, span=1.0))
+
+
+# ---------------------------------------------------------------------------
+# Deterministic routing
+# ---------------------------------------------------------------------------
+
+def test_zigzag_keeps_exact_bonds_and_lands_on_its_end():
+    from topon.conformation.paths import zigzag
+    a, b = np.zeros(3), np.array([5.0, 0.0, 0.0])
+    for n in (6, 20, 60):
+        p = zigzag(a, b, n, 0.95, np.array([0.0, 1.0, 0.0]))
+        assert len(p) == n + 1
+        assert np.linalg.norm(np.diff(p, axis=0), axis=1) == pytest.approx(
+            0.95, abs=1e-9)
+        assert p[-1] == pytest.approx(b)
+
+
+def test_zigzag_refuses_a_leg_it_cannot_span():
+    from topon.conformation.paths import zigzag
+    with pytest.raises(ValueError, match="carries"):
+        zigzag(np.zeros(3), np.array([50.0, 0.0, 0.0]), 5, 0.95)
+
+
+def test_taut_leg_does_not_lie_on_itself(melt):
+    """The reason a planar fold could not be used.
+
+    Given far more bonds than the leg needs, a fold's axial step goes to zero
+    and every second bead lands exactly on the one two before it. LAMMPS
+    reports an infinite pair energy and stops.
+    """
+    from topon.conformation.paths import taut_leg
+
+    def closest(p):
+        d = np.linalg.norm(p[:, None, :] - p[None, :, :], axis=2)
+        return d[np.triu_indices(len(p), 2)].min()
+
+    # Ordinary slack: the leg has room and keeps well clear of itself.
+    assert closest(taut_leg(np.zeros(3), np.array([20.0, 0.0, 0.0]),
+                            40, 0.95)) > 0.7
+    # Extreme slack, seventy bonds folded into four sigma. Nothing can hold
+    # 0.9 there, but it stays far from the zero separation a planar fold gives.
+    assert closest(taut_leg(np.zeros(3), np.array([4.0, 0.0, 0.0]),
+                            70, 0.95)) > 0.3
+
+
+def test_taut_leg_lands_on_its_end_with_bonds_intact():
+    from topon.conformation.paths import taut_leg
+    a, b = np.zeros(3), np.array([9.0, 2.0, 1.0])
+    p = taut_leg(a, b, 40, 0.95)
+    assert p[0] == pytest.approx(a)
+    assert p[-1] == pytest.approx(b)
+    assert np.linalg.norm(np.diff(p, axis=0), axis=1) == pytest.approx(
+        0.95, abs=0.02)
+
+
+def test_route_through_is_reproducible():
+    """The whole point: the same design gives the same system.
+
+    With random legs the same design, same site and same winding came back 4,
+    7 and 0 on three seeds, so a requested count could not be delivered twice.
+    """
+    from topon.conformation.paths import route_through
+    a, b = np.zeros(3), np.array([5.0, 0.0, 0.0])
+    w = [np.array([3.0, 2.0, 0.0]), np.array([3.0, -2.0, 1.0])]
+    p1 = route_through(a, b, w, 81, 0.95, away_from=np.array([3.0, 0.0, 0.0]))
+    p2 = route_through(a, b, w, 81, 0.95, away_from=np.array([3.0, 0.0, 0.0]))
+    assert np.array_equal(p1, p2)
+    assert len(p1) == 82
+
+
+def test_route_through_visits_every_waypoint():
+    from topon.conformation.paths import route_through
+    a, b = np.zeros(3), np.array([5.0, 0.0, 0.0])
+    w = [np.array([3.0, 2.0, 0.0]), np.array([3.0, -2.0, 1.0])]
+    p = route_through(a, b, w, 81, 0.95)
+    for pt in w:
+        assert np.linalg.norm(p - pt, axis=1).min() == pytest.approx(0, abs=1e-6)
+
+
+def test_route_through_refuses_a_route_longer_than_the_chain():
+    from topon.conformation.paths import route_through
+    with pytest.raises(ValueError, match="route is"):
+        route_through(np.zeros(3), np.array([5.0, 0.0, 0.0]),
+                      [np.array([80.0, 0.0, 0.0])], 20, 0.95)

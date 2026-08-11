@@ -11,7 +11,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 __all__ = ["Clearance", "bridging_walk", "straight", "walk_via",
-           "walk_through", "loop_around"]
+           "walk_through", "loop_around", "zigzag", "taut_leg",
+           "route_through"]
 
 
 class Clearance:
@@ -317,3 +318,253 @@ def loop_around(target, i: int, radius: float, n_pts: int = 6,
         clear = np.flatnonzero(gap >= avoid.radius)
         out.append(cand[clear[0]] if len(clear) else cand[int(gap.argmax())])
     return np.array(out)
+
+
+def _lateral(direction, hint):
+    """A unit vector perpendicular to ``direction``, as near ``hint`` as it
+    can be."""
+    d = np.asarray(direction, float)
+    n = float(np.linalg.norm(d))
+    d = d / n if n > 1e-12 else np.array([0.0, 0.0, 1.0])
+    h = np.asarray(hint, float)
+    h = h - d * float(h @ d)
+    n = float(np.linalg.norm(h))
+    if n < 1e-9:
+        ref = np.array([0.0, 0.0, 1.0])
+        if abs(float(d @ ref)) > 0.9:
+            ref = np.array([1.0, 0.0, 0.0])
+        h = np.cross(d, ref)
+        n = float(np.linalg.norm(h))
+    return h / n
+
+
+def zigzag(start, end, n_bonds: int, bond: float = 0.97, hint=None):
+    """Exact bonds from ``start`` to ``end``, using up every one of them.
+
+    A chain carries far more contour than its route needs. Measured on one
+    designed pair: 77 sigma of contour for a route of about 21. A random walk
+    disposes of that slack by wandering, and the wandering crosses the target
+    again on its own account, so the count stops being a property of the design
+    -- the same design, same site, same winding, drawn with three different
+    seeds, came back 4, 7 and 0.
+
+    A zigzag spends the same slack in a fixed local shape. It folds against one
+    lateral direction and stays near the straight line between its ends, so the
+    contour goes somewhere known instead of somewhere random, and the count
+    becomes reproducible. Nothing here draws from a generator.
+
+    ``hint`` is the lateral direction to fold against, and only its component
+    perpendicular to the leg is used. Point it away from whatever the path is
+    meant not to touch.
+    """
+    start = np.asarray(start, float)
+    end = np.asarray(end, float)
+    d = end - start
+    dist = float(np.linalg.norm(d))
+    if n_bonds < 1:
+        raise ValueError("a leg needs at least one bond")
+    if dist > n_bonds * bond + 1e-9:
+        raise ValueError(
+            f"leg is {dist:.1f} sigma but carries {n_bonds * bond:.1f}")
+    if n_bonds == 1:
+        return np.vstack([start, end])
+
+    axis = d / dist if dist > 1e-12 else _lateral([0, 0, 1], [1, 0, 0])
+    lat = _lateral(axis, hint if hint is not None else axis + 1.0)
+
+    # Offsets alternate about the straight line and vanish at both ends, so
+    # the leg starts and finishes exactly where it was told to.
+    sign = np.array([0.0] + [1.0 if i % 2 else -1.0
+                             for i in range(1, n_bonds)] + [0.0])
+
+    def reach(h):
+        off = sign * h
+        step = np.sqrt(np.maximum(bond ** 2 - np.diff(off) ** 2, 0.0))
+        return float(step.sum())
+
+    # One bisection on the fold height: taller folds eat more contour, so
+    # there is exactly one height that lands the leg on its far end.
+    if reach(0.0) < dist:
+        h = 0.0
+    else:
+        lo, hi = 0.0, bond
+        while reach(hi) > dist and hi < 50.0 * bond:
+            hi *= 2.0
+        for _ in range(80):
+            mid = 0.5 * (lo + hi)
+            if reach(mid) > dist:
+                lo = mid
+            else:
+                hi = mid
+        h = 0.5 * (lo + hi)
+
+    off = sign * h
+    step = np.sqrt(np.maximum(bond ** 2 - np.diff(off) ** 2, 0.0))
+    total = step.sum()
+    step = step * (dist / total) if total > 1e-12 else step
+    along = np.concatenate([[0.0], np.cumsum(step)])
+    return start + along[:, None] * axis + off[:, None] * lat
+
+
+def route_through(start, end, waypoints, n_bonds: int, bond: float = 0.97,
+                  away_from=None, avoid: "Clearance | None" = None):
+    """Visit every waypoint in order, spending all the contour deterministically.
+
+    The same job as ``walk_through`` and the same guarantees -- exact bonds,
+    lands on both junctions, hits each waypoint -- but the legs are zigzags
+    rather than random walks, so the same design gives the same path every
+    time. That is what makes a requested entanglement count reproducible: with
+    random legs the leftover contour wanders back across the target and adds
+    crossings of its own.
+
+    ``away_from`` is a point the slack should fold away from, normally the
+    target being wound. With ``avoid``, the fold direction is chosen from a
+    fixed set of candidates by which one clears best, which keeps the result
+    deterministic while still keeping the path off the beads already there.
+    """
+    pts = [np.asarray(start, float)]
+    pts += [np.asarray(w, float) for w in waypoints]
+    pts.append(np.asarray(end, float))
+
+    legs = [float(np.linalg.norm(pts[i + 1] - pts[i]))
+            for i in range(len(pts) - 1)]
+    total = sum(legs)
+    if total > n_bonds * bond:
+        raise ValueError(
+            f"route is {total:.1f} sigma but the chain carries "
+            f"{n_bonds * bond:.1f}")
+
+    # Each leg needs enough bonds to span itself; the rest is shared by
+    # length. Reserving a spare bond per leg looks harmless and is not: a ring
+    # of seventeen waypoints is eighteen legs, so it quietly costs eighteen
+    # bonds of contour and turns routes that fit into routes that do not.
+    need = [max(1, int(np.ceil(L / bond - 1e-9))) for L in legs]
+    share = list(need)
+    spare = n_bonds - sum(share)
+    if spare < 0:
+        raise ValueError(
+            f"route needs {sum(need)} bonds but the chain has {n_bonds}")
+    for i in np.argsort([-L for L in legs]):
+        take = int(round(spare * legs[i] / total)) if total > 1e-12 else 0
+        share[i] += take
+    share[int(np.argmax(legs))] += n_bonds - sum(share)
+
+    out, placed = [], []
+    for i in range(len(legs)):
+        leg = taut_leg(pts[i], pts[i + 1], share[i], bond, avoid, placed)
+        placed.extend(leg[:-1])
+        out.append(leg if not out else leg[1:])
+    return np.vstack(out)
+
+
+def _sphere(n=72):
+    """A fixed, evenly spread set of unit directions.
+
+    Deterministic by construction, which is the point: it stands in for the
+    random draw so the same design gives the same path every time.
+    """
+    i = np.arange(n) + 0.5
+    phi = np.arccos(1.0 - 2.0 * i / n)
+    theta = np.pi * (1.0 + 5.0 ** 0.5) * i
+    return np.column_stack([np.cos(theta) * np.sin(phi),
+                            np.sin(theta) * np.sin(phi),
+                            np.cos(phi)])
+
+
+_DIRS = _sphere()
+
+
+def taut_leg(start, end, n_bonds: int, bond: float = 0.97,
+             avoid: "Clearance | None" = None, placed=None):
+    """A deterministic leg of exact bonds that avoids itself and its
+    surroundings.
+
+    Same guarantees as ``bridging_walk`` -- every step from the cone that keeps
+    the far end reachable, so it lands there exactly with no bond rescaled --
+    but the direction is chosen from a fixed set rather than drawn, so the path
+    is reproducible.
+
+    It also avoids the beads it has already laid down. A planar fold cannot:
+    given far more bonds than the leg needs, its axial step goes to zero and
+    every second bead lands exactly on the one two before it. That is not a
+    near miss, it is a zero separation, and LAMMPS reports an infinite pair
+    energy and stops. Chains carry three or four times the contour their route
+    needs, so this is the normal case rather than the corner one.
+    """
+    start = np.asarray(start, float)
+    end = np.asarray(end, float)
+    if n_bonds < 1:
+        raise ValueError("a leg needs at least one bond")
+    dist = float(np.linalg.norm(end - start))
+    if dist > n_bonds * bond + 1e-9:
+        raise ValueError(
+            f"leg is {dist:.1f} sigma but carries {n_bonds * bond:.1f}")
+
+    mine = [] if placed is None else [np.asarray(p, float) for p in placed]
+    pts = [start]
+    mine.append(start)
+    for k in range(n_bonds - 1):
+        d = end - pts[-1]
+        r = float(np.linalg.norm(d))
+        remaining = n_bonds - k - 1
+        cos_min = ((r * r + bond * bond - (remaining * bond) ** 2)
+                   / (2.0 * r * bond) if r > 1e-12 else -1.0)
+        cos_min = min(1.0, max(-1.0, cos_min))
+        head = d / r if r > 1e-12 else np.array([0.0, 0.0, 1.0])
+
+        ok = _DIRS[(_DIRS @ head) >= cos_min - 1e-12]
+        if not len(ok):
+            ok = head[None, :]
+        cand = pts[-1] + bond * ok
+
+        gap = (avoid.near(cand) if avoid is not None
+               else np.full(len(cand), np.inf))
+        if len(mine) > 1:
+            # Its own beads, minus the one it is stepping off.
+            prev = np.array(mine[:-1])
+            own = np.linalg.norm(cand[:, None, :] - prev[None, :, :], axis=2)
+            gap = np.minimum(gap, own.min(axis=1))
+
+        # Spend the slack evenly, and prefer a step that clears.
+        #
+        # The two obvious rules both fail. Roomiest walks the chain down the
+        # middle of whatever void it can find, and a chain carrying three
+        # times the contour its route needs wanders far enough to cross the
+        # target again on its own account: a pair built for 2 came back 3, and
+        # 0 after minimisation. Straightest is worse in a quieter way -- it
+        # arrives early and has to burn every leftover bond in the small space
+        # left, folding on itself to 0.13 sigma, which is the overlap that
+        # makes minimisation push chains through each other.
+        #
+        # Closing the gap at a constant rate spreads the slack along the whole
+        # leg instead, which is what an unbiased walk does by accident and
+        # this does on purpose.
+        want = float(np.clip(r / (bond * max(remaining, 1)), cos_min, 1.0))
+        room = np.flatnonzero(gap >= (avoid.radius if avoid is not None
+                                      else 0.9))
+        pool = room if len(room) else np.arange(len(cand))
+        pick = int(pool[np.abs((ok[pool] @ head) - want).argmin()])
+        nxt = cand[pick]
+
+        if remaining == 1:
+            # The last free bead has to sit exactly one bond from the junction
+            # as well as one bond from here, and a fixed set of directions
+            # cannot land on that by chance: it closed at 0.841 sigma instead
+            # of 0.95. The two conditions describe a circle, so put the bead on
+            # the point of it nearest the direction already chosen.
+            ax = end - pts[-1]
+            dd = float(np.linalg.norm(ax))
+            if 1e-9 < dd <= 2.0 * bond:
+                ax = ax / dd
+                mid = pts[-1] + 0.5 * dd * ax
+                rho = np.sqrt(max(bond ** 2 - 0.25 * dd * dd, 0.0))
+                v = nxt - mid
+                v = v - ax * float(v @ ax)
+                n = float(np.linalg.norm(v))
+                v = v / n if n > 1e-9 else _lateral(ax, ax + 1.0)
+                nxt = mid + rho * v
+
+        pts.append(nxt)
+        mine.append(pts[-1])
+    pts.append(end)
+    return np.array(pts)

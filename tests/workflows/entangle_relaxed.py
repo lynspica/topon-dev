@@ -40,6 +40,8 @@ sys.path.insert(0, str(ROOT))
 from topon.conformation.paths import (  # noqa: E402
     Clearance,
     bridging_walk,
+    loop_around,
+    route_through,
 )
 from tests.workflows.entangle_all import CASES  # noqa: E402
 from tests.workflows.entangle_design import route_one  # noqa: E402
@@ -192,11 +194,123 @@ def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
     return best
 
 
+def construct(paths, routed, target, want, box, avoid, at=None, radius=2.0,
+              phase=0.0, dp=DP, bond=BOND, span=(0.3, 0.7), rank=0):
+    """Build the requested count instead of searching for it.
+
+    One full turn around a strand is two entanglement points, not one: pulled
+    taut, a loop presses on the strand from both sides. Measured over four
+    phases, one turn gave 2 as built and 2 after minimisation every time, so
+    the count follows from the winding and does not have to be hunted for.
+
+    Two things had to be true before that worked. The leftover contour is spent
+    as a zigzag rather than a random walk -- a chain carrying 77 sigma for a
+    21 sigma route will otherwise wander back over the target and add crossings
+    of its own, which is what made the same design come back 4, 7 and 0 on
+    three seeds. And the path is drawn around the beads already there, so the
+    minimisation that follows has no overlap to resolve by pushing chains
+    through one another.
+
+    ``at`` names the site along the target, as a fraction of its length. Left
+    unset it is chosen as the place inside ``span`` where the two chains
+    actually come closest, which matters more than it sounds: a ring put at
+    mid-strand regardless built with a clean 0.92 sigma of clearance and still
+    measured zero, because the routed chain only reaches it by a long
+    excursion and the primitive path retracts straight back out. A winding has
+    to sit where the chain already passes. ``rank`` takes the second-closest
+    such place, and so on, so two chains sent to one target do not stack.
+
+    Odd counts are not available this way. Raises rather than quietly building
+    the nearest even number, since a count you did not ask for is worse than a
+    refusal.
+    """
+    if want <= 0 or want % 2:
+        raise ValueError(
+            f"{want} is not buildable: one turn is two entanglement points, "
+            f"so this construction makes even counts only")
+    turns = want // 2
+    tgt = paths[target]
+    tgt = tgt + box * np.round((paths[routed].mean(0) - tgt.mean(0)) / box)
+    if at is not None:
+        i = int(np.clip(round(at * len(tgt)), 1, len(tgt) - 2))
+    else:
+        lo = max(1, int(span[0] * len(tgt)))
+        hi = min(len(tgt) - 2, int(span[1] * len(tgt)))
+        d = tgt[lo:hi + 1, None, :] - paths[routed][None, :, :]
+        d -= box * np.round(d / box)
+        near = np.linalg.norm(d, axis=2).min(axis=1)
+        order = np.argsort(near)
+        i = int(lo + order[min(rank, len(order) - 1)])
+    n_pts = int(np.clip(round(2.0 * np.pi * radius * turns / (1.6 * bond)),
+                        4, 24))
+    ring = loop_around(tgt, i, radius, n_pts, phase, avoid, float(turns))
+    return route_through(paths[routed][0], paths[routed][-1], list(ring),
+                         dp + 1, bond, tgt[i], avoid)
+
+
+def construct_exact(paths, routed, target, want, box, avoid, seq, template,
+                    work, span, radius, dp, ranks=8, phases=6):
+    """Build the exact count, by enumerating placements rather than drawing.
+
+    One turn is two entanglement points where the routed chain passes its
+    target once, and four where it passes twice, so the winding alone does not
+    fix the count -- what else the route does with that target counts as well.
+    Measured on two pairs built identically: one came back 2 and the other 4.
+
+    So build, measure, and move the winding if the number is wrong. The
+    placements are tried in a fixed order and the first exact match wins, so
+    this is an enumeration and not a search: the same request gives the same
+    system every time.
+
+    It deliberately does *not* prefer the roomiest exact placement, which is
+    counter-intuitive and was measured the hard way. Selecting for clearance
+    gave two windings sitting at 0.88 and 0.90 sigma and lost both of them
+    during minimisation; the placements this rule picks sat at 0.65 and 0.14
+    and both survived. A loop with room around it can slide off the strand it
+    is on, while one that hugs it is committed. Clearance still matters -- it
+    is what stops minimisation pushing chains through each other -- so the two
+    pull against each other and where the balance lies is not yet known. What
+    is known is that ordering by clearance is the wrong way round.
+
+    Returns ``(path, count)``, with the closest miss if no placement is exact,
+    so the caller can say what it got rather than imply it got what was asked.
+    """
+    best = None
+    for rank in range(ranks):
+        for k in range(phases):
+            phase = 2.0 * np.pi * k / phases
+            try:
+                p = construct(paths, routed, target, want, box, avoid,
+                              radius=radius, phase=phase, dp=dp, span=span,
+                              rank=rank)
+            except ValueError:
+                continue
+            trial = dict(zip(seq[routed], p))
+            rewrite_coords(template, work / "try.data", trial)
+            got = measure_pairs(work / "try.data", seq,
+                                [(min(routed, target), max(routed, target))],
+                                work)[(min(routed, target),
+                                       max(routed, target))]
+            if got is None:
+                continue
+            if got == want:
+                return p, got
+            if best is None or abs(got - want) < abs(best[1] - want):
+                best = (p, got)
+    return best if best is not None else (None, None)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--per-round", type=int, default=20)
     ap.add_argument("--dp", type=int, default=DP)
+    ap.add_argument("--construct", action="store_true",
+                    help="build the requested count from the winding instead "
+                         "of searching for it. Deterministic: the same "
+                         "request gives the same system.")
+    ap.add_argument("--want", type=int, default=2,
+                    help="entanglements per designed pair")
     ap.add_argument("--site-lo", type=float, default=0.30)
     ap.add_argument("--site-hi", type=float, default=0.70,
                     help="the stretch of the target a loop may sit on. Near a "
@@ -204,7 +318,7 @@ def main():
                          "chain crossing anything, and the count drops.")
     ap.add_argument("--ring", type=float, default=2.0,
                     help="ring radius the box is sized to hold")
-    ap.add_argument("--margin", type=float, default=1.35,
+    ap.add_argument("--margin", type=float, default=2.0,
                     help="how much chain contour to leave spare")
     ap.add_argument("--coil", type=float, default=None,
                     help="contour over chord. Sets the lattice scale, and so "
@@ -246,15 +360,20 @@ def main():
         mic = (raw[v] - a) - box_g * np.round((raw[v] - a) / box_g)
         return a + np.linspace(span[0], span[1], 24)[:, None] * mic
 
-    def nearest_chord(a):
+    def nearest_chord(a, taken=()):
         # Judged against the stretch of the partner a loop may actually sit
         # on, not its nearest approach, for the same reason the box is sized
         # that way.
+        #
+        # `taken` keeps two routed chains off the same partner. Sending both
+        # to the nearest one puts the second ring against the first: measured,
+        # the second pair built at a tightest contact of 0.34 sigma and read
+        # zero, while the first built and survived cleanly.
         span = (args.site_lo, args.site_hi)
         best, out = np.inf, None
         A = chord_pts(a)
         for b in range(len(edges)):
-            if b == a or set(edges[a]) & set(edges[b]):
+            if b == a or b in taken or set(edges[a]) & set(edges[b]):
                 continue
             d = A[:, None, :] - chord_pts(b, span)[None, :, :]
             d -= box_g * np.round(d / box_g)
@@ -263,7 +382,13 @@ def main():
                 best, out = gap, b
         return out
 
-    plan = [(a, {nearest_chord(a): 1}) for a in (0, 20)]
+    plan, taken = [], set()
+    for a in (0, 20):
+        t = nearest_chord(a, taken)
+        if t is None:
+            continue
+        taken.add(t)
+        plan.append((a, {t: args.want}))
     pairs_g = [(r, t) for r, w in plan for t in w]
 
     if args.density:
@@ -344,6 +469,11 @@ def main():
         return out if out.exists() else None
 
     xyz_now = dict(xyz0)
+    # Two chains may be sent to the same partner, and winding both at the same
+    # place puts the second ring inside the first. Measured: the second pair
+    # built nothing at all. Spread the sites across the permitted stretch so
+    # each has its own piece of the target.
+    used = collections.Counter()
     for routed, want in plan:
         target, n = list(want.items())[0]
         # Everything except the chain being redrawn, by atom id rather than
@@ -357,6 +487,30 @@ def main():
                            if i not in mine])
         avoid = Clearance(others, box, args.clearance)
         before = avoid.worst(paths[routed])
+        if args.construct:
+            k = used[target]
+            used[target] += 1
+            try:
+                p, got = construct_exact(
+                    paths, routed, target, n, box, avoid, seq, relaxed, work,
+                    (args.site_lo, args.site_hi), args.ring, args.dp)
+            except ValueError as e:
+                print(f"    chain {routed} -> {target}: {e}")
+                continue
+            if p is None:
+                print(f"    chain {routed} -> {target}: nothing built")
+                continue
+            if got != n:
+                print(f"    chain {routed} -> {target}: asked {n}, "
+                      f"closest placement gives {got}")
+            paths[routed] = p
+            for aid, xyzp in zip(seq[routed], p):
+                xyz_now[aid] = xyzp
+            print(f"    chain {routed} -> {target}: built {got} by "
+                  f"construction"
+                  f"   (tightest contact {before:.2f} -> "
+                  f"{avoid.worst(p[1:-1]):.2f} sigma)")
+            continue
         best = route_pairwise(paths, keys, seq, geo_r, routed, target, n,
                               relaxed, args.rounds, args.per_round, rng, work,
                               relax=relax_candidate, avoid=avoid,

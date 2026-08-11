@@ -14,6 +14,73 @@ Newest first.
 
 ---
 
+## 2026-08-11 — Determinism: ask for a count, get that count, twice
+
+**Change:** `taut_leg`, `route_through` and `zigzag` in
+`topon/conformation/paths.py`; `construct` and `construct_exact` in
+`tests/workflows/entangle_relaxed.py` behind `--construct`;
+`tests/workflows/entangle_calibrate.py`.
+
+**Why:** the same request did not give the same system. Asked for one
+entanglement the search returned two, or none, depending on the seed.
+
+**Issue / solution:** the search was not the problem, the slack was. A chain
+carries far more contour than its route needs -- 77 sigma for a route of about
+21 -- and `walk_through` disposed of the rest as a random walk. That walk
+crosses the target again on its own account, so the count stopped being a
+property of the design: the same pair, same site, same winding, drawn on three
+seeds, measured 4, 7 and 0. Sweeping the winding span changed almost nothing
+by comparison, which is what made it look like a search problem.
+
+Spending the slack deterministically fixes it. `taut_leg` picks each step from
+a fixed set of directions instead of drawing one, keeps the same reachable-cone
+rule so bonds stay exact and it still lands on its junction, and avoids the
+beads it has already laid down as well as the ones already in the box.
+
+Three attempts were needed to get the step rule right, and the failures are
+worth keeping:
+
+- Roomiest step: walks down the middle of whatever void it finds, wanders far
+  enough to cross the target again, and built 3 where 2 was asked.
+- Straightest step: arrives early and has to burn every leftover bond in the
+  space that is left, folding on itself to 0.13 sigma. That is the overlap
+  that makes minimisation push chains through each other.
+- Closing the gap at a constant rate: spreads the slack along the whole leg,
+  which is what an unbiased walk does by accident. Self-clearance 0.89 to 0.93
+  sigma at every slack ratio from 1.9x to 16.6x, bonds exact, lands exactly.
+
+A planar fold was tried first and cannot work: given more bonds than the leg
+needs its axial step goes to zero and every second bead lands exactly on the
+one two before it, which LAMMPS reports as an infinite pair energy.
+
+**One turn is two entanglement points, not one.** Pulled taut a loop presses on
+the strand from both sides. Calibrated over four phases, one turn gave 2 as
+built and 2 after minimisation every time. Odd counts are not available from
+this construction and `construct` raises rather than quietly building the
+nearest even number.
+
+The winding also has to sit where the chain already passes. Fixed at
+mid-strand it built with a clean 0.92 sigma of clearance and still measured
+zero, because the routed chain only reached it by a long excursion and the
+primitive path retracts back out. The site is now the closest approach of the
+two chains within the permitted stretch.
+
+Finally the count is verified rather than assumed. One turn gives 2 where the
+route passes the target once and 4 where it passes twice, so `construct_exact`
+enumerates placements in a fixed order and takes the first that measures the
+number asked for, reporting the closest miss when none does.
+
+**Result:** two pairs, both asked for 2, both built 2, both survived 2 through
+a minimisation moving beads a median of 7.1 sigma and up to 30.3. Run twice,
+byte-identical, including the bead motion.
+
+**Open, and counter-intuitive:** ordering exact placements by clearance makes
+things worse. Selecting the roomiest gave windings at 0.88 and 0.90 sigma and
+lost both; the rule kept here picked 0.65 and 0.14 and held both. A loop with
+room can slide off the strand, while one that hugs it is committed, so
+clearance and retention pull against each other. Where the balance lies is not
+known, and the code says so rather than guessing.
+
 ## 2026-08-11 — Designed entanglements now survive minimisation
 
 **Change:** `Clearance` in `topon/conformation/paths.py`, threaded through
