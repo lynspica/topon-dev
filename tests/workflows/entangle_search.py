@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -340,7 +341,7 @@ def main():
 
     # What chain A carries before anything is routed, so collateral is
     # measured as what the routing added.
-    probe = OUT / "search_probe"
+    probe = OUT / f"search_probe_{os.getpid()}"
     probe.mkdir(parents=True, exist_ok=True)
     for old in list(probe.glob("*.Z1")) + list(probe.glob("SP_*.dat")):
         old.unlink()
@@ -361,7 +362,7 @@ def main():
           f"{len(keys)} chains total")
     print(f"  {args.rounds} rounds x {args.per_round} candidates\n")
 
-    work = OUT / "search_work"
+    work = OUT / f"search_work_{os.getpid()}"
     best = search(base, keys, A, wish, geo, args.rounds, args.per_round,
                   rng, work)
     if best is None:

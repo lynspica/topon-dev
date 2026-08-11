@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import os
 import sys
 from pathlib import Path
 
@@ -184,7 +185,7 @@ def run_case(name, lattice, rounds, per_round, dp, seed, out_dir):
              for k, (c0, c1) in ch.items()}
     plan, note = plan_for(name, keys, ch, ends, L)
 
-    work = OUT / "gallery_work"
+    work = OUT / f"gallery_work_{os.getpid()}"
     base = measure_one(paths, keys, geo, work, "base")
     for _ in range(2):
         todo = [(r, w) for r, w in plan

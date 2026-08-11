@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import os
 import sys
 from pathlib import Path
 
@@ -188,7 +189,7 @@ def main():
     print(f"  {len(keys)} chains, DP {args.dp}, melt density")
     print(f"  {args.rounds} rounds x {args.per_round} candidates per chain\n")
 
-    work = OUT / "design_work"
+    work = OUT / f"design_work_{os.getpid()}"
     base = measure_one(paths, keys, geo, work, "base")
 
     # Passes, not one sweep. Routing a chain changes what its neighbours are

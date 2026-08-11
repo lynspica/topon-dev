@@ -14,6 +14,51 @@ Newest first.
 
 ---
 
+## 2026-08-10 — The nondeterminism was stale files in a shared staging directory
+
+**Change:** `run_z1_batch.sh` takes a private working directory per
+invocation instead of a fixed `$HOME/z1batch` that it wiped on entry, and the
+search, design and gallery scripts stage their candidates in a per-process
+directory instead of one shared name.
+
+**Why:** the gallery reported the same case with the same seed giving 0 of 1
+on one run and 1 of 1 on the next.
+
+**Issue / solution:** bisected the pipeline, checking each stage twice with
+identical input. All of it is deterministic: the sculpted network, the
+conformation, `propose` under a seeded generator, Z1+ itself on an identical
+`.Z1` file (three runs, 532 entanglement points, byte-identical partner
+lists), and `route_one` end to end (three runs in one process, identical
+cost and result).
+
+The state was outside all of it. Both the WSL working directory and the
+Windows staging directory were fixed names shared by every invocation.
+`measure_batch` globs `SP_*.dat` from the staging directory *after* running
+the batch, so any file left behind by an earlier run was read as if it were
+a result for the current one. Which stale files survived depended on what had
+run before, and on whether anything was running at the same time -- one batch
+wiping the other's working directory mid-run.
+
+Both are now private per invocation, and the same command repeats exactly:
+three runs of one case, same answer each time.
+
+**The uncomfortable part.** The fix changes results. A case that read 1 of 1
+before now reads 0 of 1 at the same settings, and repeats. So some of what
+was reported as a success earlier in this work was scored against files a
+previous run had left behind, not against the configuration that had just
+been written. The gallery numbers in
+`tests/output/entangle_steps/gallery/GALLERY.md` were all produced under the
+old behaviour and none of them should be trusted; they need regenerating.
+
+That also revises what the previous entry called a reproducibility caveat.
+It was not a stochastic search converging differently -- the search is
+deterministic. It was a measurement reading the wrong files.
+
+**Follow-up:** regenerate the gallery, and re-check the four-of-four result
+from `entangle_design.py`, which was measured the same way. The search budget
+is a separate matter: 3 rounds of 10 fails where 4 of 14 succeeds, and that
+is a real setting rather than noise.
+
 ## 2026-08-10 — A named entanglement topology, delivered and verified
 
 **Change:** `tests/workflows/entangle_search.py` and `entangle_design.py`,
