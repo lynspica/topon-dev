@@ -186,6 +186,78 @@ def build_network(spec=LATTICE, cache=True):
     return graphs[0]
 
 
+def scale_for_design(graph, pairs, dp=DP, bond=BOND, radius=2.0,
+                     margin=1.35, samples=24, site_span=(0.05, 0.95)):
+    """The largest lattice scale on which every designed route still fits.
+
+    Density should follow from what is being built rather than be picked ahead
+    of it. A chain carries ``(dp+1)*bond`` of contour and a designed route
+    spends it on three things: the chord it has to span anyway, the detour out
+    to its partner and back, and the ring it makes around it. Everything but
+    the ring scales with the lattice, so the longest route in the design is the
+    binding one and it sets the scale.
+
+    Largest is what is wanted, and that is the whole point. More box at the
+    same bead count is lower density and more free volume to route through, and
+    free volume is what keeps a routed path off the beads already there. That
+    matters more than it sounds: a routed path that lands on existing beads
+    starts inside the WCA hard core, which is the one condition under which
+    minimisation can push two chains through each other, and a chain crossing
+    is the only thing that can change the topology once it is built. Relaxation
+    on its own cannot -- beads may move as far as they like, and a hard core
+    they never enter is a hard core they never pass.
+
+    Fixing the density up front gets this backwards. At 0.85 a point lies
+    within 0.9 sigma of 2.6 beads on average, so there is no free volume to
+    route into and a designed path overlaps whatever it does; at coil 1.8 the
+    chains are 35 sigma apart with 34 sigma of slack and no partner is
+    reachable at all. Both are the same mistake made in opposite directions,
+    and neither knows anything about the design it is meant to hold.
+
+    ``margin`` is how much of the contour is left spare. ``site_span`` is the
+    stretch of the target a loop is allowed to sit on, and it has to be the
+    same one the search is given: a loop confined to mid-strand is reaching a
+    farther part of the target than the nearest approach of the two chords, and
+    sizing the box to the nearest approach leaves the route it actually has to
+    build too long to fit. Every candidate then fails to build and the pair
+    reports nothing, which reads like an entanglement that could not be made
+    rather than a box that was mis-sized. ``pairs`` are ``(routed_key,
+    target_key)`` in the ordering ``geometry`` uses.
+    """
+    box = np.asarray(graph.graph["box"], float)
+    raw = {n: np.asarray(d["pos"], float) for n, d in graph.nodes(data=True)}
+    edges = sorted(graph.edges())
+
+    def chord_pts(k, span=(0.0, 1.0)):
+        u, v = edges[k]
+        a = raw[u]
+        mic = (raw[v] - a) - box * np.round((raw[v] - a) / box)
+        t = np.linspace(span[0], span[1], samples)[:, None]
+        return a + t * mic
+
+    # The ring does not scale with the lattice, so it comes off the budget
+    # before the rest is divided by anything.
+    budget = (dp + 1) * bond - 2.0 * np.pi * radius
+    if budget <= 0:
+        raise ValueError(
+            f"a ring of radius {radius} needs {2 * np.pi * radius:.1f} sigma "
+            f"but the chain carries only {(dp + 1) * bond:.1f}")
+
+    worst = np.inf
+    for routed, target in pairs:
+        A, B = chord_pts(routed), chord_pts(target, site_span)
+        d = A[:, None, :] - B[None, :, :]
+        d -= box * np.round(d / box)
+        gap = float(np.linalg.norm(d, axis=2).min())
+        span = float(np.linalg.norm(A[-1] - A[0]))
+        need = span + 2.0 * gap          # out to the partner and back
+        if need > 1e-12:
+            worst = min(worst, budget / (margin * need))
+    if not np.isfinite(worst):
+        raise ValueError("no pairs given, so nothing sets the scale")
+    return float(worst)
+
+
 def geometry(graph, dp=DP, density=None, bond=BOND, scale=None,
              coil=None):
     """Junction positions and chain chords in sigma, plus the lattice scale.

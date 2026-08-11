@@ -37,7 +37,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from topon.conformation.paths import bridging_walk  # noqa: E402
+from topon.conformation.paths import (  # noqa: E402
+    Clearance,
+    bridging_walk,
+)
 from tests.workflows.entangle_all import CASES  # noqa: E402
 from tests.workflows.entangle_design import route_one  # noqa: E402
 from tests.workflows.entangle_search import (  # noqa: E402
@@ -47,6 +50,7 @@ from tests.workflows.entangle_search import (  # noqa: E402
 )
 from tests.workflows.entangle_steps import (  # noqa: E402
     BOND,
+    COIL,
     DP,
     LATTICE,
     OUT,
@@ -54,6 +58,7 @@ from tests.workflows.entangle_steps import (  # noqa: E402
     chain_ids,
     conform_and_script,
     geometry,
+    scale_for_design,
     read_data,
     report_bonds,
     run_md,
@@ -110,7 +115,8 @@ def measure_pairs(data_file, seq, pairs, work):
 
 
 def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
-                   rounds, per_round, rng, work, relax=None):
+                   rounds, per_round, rng, work, relax=None, avoid=None,
+                   site_span=(0.05, 0.95)):
     """Search for a path, scoring each candidate on the pair alone.
 
     The whole-system score used elsewhere is unavailable here: Z1+ crashes on
@@ -121,6 +127,9 @@ def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
     The cost is collateral blindness -- what else the routed chain picks up is
     not seen, so it cannot be traded against. The primary objective is served;
     the secondary one is not.
+
+    ``avoid`` holds every bead except the routed chain's own, so candidates
+    are drawn around what is already there rather than through it.
     """
     from tests.workflows.entangle_search import propose
 
@@ -132,7 +141,8 @@ def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
     for _ in range(rounds):
         tgt = paths[target]
         tgt = tgt + L * np.round((paths[routed].mean(0) - tgt.mean(0)) / L)
-        cands = propose(a0, a1, [tgt], L, per_round, rng, around, spread)
+        cands = propose(a0, a1, [tgt], L, per_round, rng, around, spread,
+                        avoid=avoid, site_span=site_span)
         if not cands:
             continue
 
@@ -187,15 +197,89 @@ def main():
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--per-round", type=int, default=20)
     ap.add_argument("--dp", type=int, default=DP)
+    ap.add_argument("--site-lo", type=float, default=0.30)
+    ap.add_argument("--site-hi", type=float, default=0.70,
+                    help="the stretch of the target a loop may sit on. Near a "
+                         "tip it slides off during relaxation without any "
+                         "chain crossing anything, and the count drops.")
+    ap.add_argument("--ring", type=float, default=2.0,
+                    help="ring radius the box is sized to hold")
+    ap.add_argument("--margin", type=float, default=1.35,
+                    help="how much chain contour to leave spare")
+    ap.add_argument("--coil", type=float, default=None,
+                    help="contour over chord. Sets the lattice scale, and so "
+                         "the box: density is reported, not chosen.")
+    ap.add_argument("--density", type=float, default=None,
+                    help="use the melt route instead and pack to this "
+                         "density. Leaves no free volume to route through: "
+                         "at 0.85 a point is within 0.9 sigma of 2.6 beads on "
+                         "average, so a routed path lands on beads whatever "
+                         "it does, and the overlap relief that follows is "
+                         "what destroys the design.")
     ap.add_argument("--stages", type=int, default=2)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--dims", type=int, default=6,
+                    help="lattice cells per side. 4 puts the box at 21.6 "
+                         "sigma, which is shorter than a routed chain's own "
+                         "unwrapped extent, and Z1+ rejects those outright -- "
+                         "so the search scores on refusals and is blind. The "
+                         "spacing is set by density, so more cells is a bigger "
+                         "box at the same physics.")
+    ap.add_argument("--clearance", type=float, default=0.9,
+                    help="how close a routed bead may come to an existing one")
     args = ap.parse_args()
 
     spec = dict(LATTICE)
     spec.update(CASES["SC"])
-    spec["dims"] = (4, 4, 4)
+    spec["dims"] = (args.dims,) * 3
     graph = build_network(spec)
-    geo = geometry(graph, dp=args.dp, density=0.85)
+    # The design comes first and the box is sized to it. Which chains are
+    # partnered has to be decided in graph units, before there is a scale at
+    # all, because the scale is what the decision determines.
+    box_g = np.asarray(graph.graph["box"], float)
+    raw = {n: np.asarray(d["pos"], float) for n, d in graph.nodes(data=True)}
+    edges = sorted(graph.edges())
+
+    def chord_pts(k, span=(0.0, 1.0)):
+        u, v = edges[k]
+        a = raw[u]
+        mic = (raw[v] - a) - box_g * np.round((raw[v] - a) / box_g)
+        return a + np.linspace(span[0], span[1], 24)[:, None] * mic
+
+    def nearest_chord(a):
+        # Judged against the stretch of the partner a loop may actually sit
+        # on, not its nearest approach, for the same reason the box is sized
+        # that way.
+        span = (args.site_lo, args.site_hi)
+        best, out = np.inf, None
+        A = chord_pts(a)
+        for b in range(len(edges)):
+            if b == a or set(edges[a]) & set(edges[b]):
+                continue
+            d = A[:, None, :] - chord_pts(b, span)[None, :, :]
+            d -= box_g * np.round(d / box_g)
+            gap = float(np.linalg.norm(d, axis=2).min())
+            if gap < best:
+                best, out = gap, b
+        return out
+
+    plan = [(a, {nearest_chord(a): 1}) for a in (0, 20)]
+    pairs_g = [(r, t) for r, w in plan for t in w]
+
+    if args.density:
+        geo = geometry(graph, dp=args.dp, density=args.density)
+    elif args.coil:
+        geo = geometry(graph, dp=args.dp, bond=BOND, coil=args.coil)
+    else:
+        sc = scale_for_design(graph, pairs_g, dp=args.dp, bond=BOND,
+                              radius=args.ring, margin=args.margin,
+                              site_span=(args.site_lo, args.site_hi))
+        geo = geometry(graph, dp=args.dp, scale=sc)
+    n_beads = graph.number_of_edges() * args.dp + graph.number_of_nodes()
+    rho = n_beads / float(np.prod(geo["L"]))
+    print(f"  box {geo['L'][0]:.1f} sigma, density {rho:.3f}, "
+          f"{n_beads} beads, crowding "
+          f"{rho * 4 / 3 * np.pi * 0.9 ** 3:.2f} beads within 0.9 sigma")
     ch, ends = geo["chords"], geo["ends"]
     keys = sorted(ch)
     idx = {k: i + 1 for i, k in enumerate(keys)}
@@ -226,18 +310,6 @@ def main():
     print(f"  relaxed: box {box[0]:.1f} sigma")
 
     # ---- 3: route into the relaxed coordinates --------------------------
-    def far_from(a, rank):
-        m = 0.5 * (ch[a][0] + ch[a][1])
-        order = sorted(
-            (float(np.linalg.norm(
-                (lambda v: v - geo["L"] * np.round(v / geo["L"]))(
-                    0.5 * (ch[b][0] + ch[b][1]) - m))), b)
-            for b in keys if b != a and not set(ends[a]) & set(ends[b]))
-        return order[rank][1]
-
-    A, D = keys[0], keys[20]
-    plan = [(A, {far_from(A, len(keys) // 3): 1}),
-            (D, {far_from(D, len(keys) // 4): 1})]
     pairs = sorted({(min(r, t), max(r, t)) for r, w in plan for t in w})
     print(f"  plan: " + "; ".join(f"{r} with {list(w)[0]}" for r, w in plan))
 
@@ -271,16 +343,33 @@ def main():
         out = cand_root / "04_Simulation" / "system_after_soft.data"
         return out if out.exists() else None
 
+    xyz_now = dict(xyz0)
     for routed, want in plan:
         target, n = list(want.items())[0]
+        # Everything except the chain being redrawn, by atom id rather than
+        # by chain: a crosslink junction belongs to every chain meeting there,
+        # so dropping whole chains still leaves the routed chain's own two
+        # endpoints in the obstacle set. It then spends its accept test trying
+        # to get away from the junctions it is pinned to, and the tightest
+        # contact reads 0.00 no matter what the path does.
+        mine = set(seq[routed])
+        others = np.array([xyz_now[i] for i in sorted(xyz_now)
+                           if i not in mine])
+        avoid = Clearance(others, box, args.clearance)
+        before = avoid.worst(paths[routed])
         best = route_pairwise(paths, keys, seq, geo_r, routed, target, n,
                               relaxed, args.rounds, args.per_round, rng, work,
-                              relax=relax_candidate)
+                              relax=relax_candidate, avoid=avoid,
+                              site_span=(args.site_lo, args.site_hi))
         if best is None:
             print(f"    chain {routed}: nothing built")
             continue
         paths[routed] = best[3]
-        print(f"    chain {routed} -> {target}: got {best[1]}, wanted {n}")
+        for aid, xyzp in zip(seq[routed], best[3]):
+            xyz_now[aid] = xyzp
+        print(f"    chain {routed} -> {target}: got {best[1]}, wanted {n}"
+              f"   (tightest contact {before:.2f} -> "
+              f"{avoid.worst(best[3]):.2f} sigma)")
 
     # ---- 4: write it back and minimise again ----------------------------
     new_xyz = {}

@@ -14,6 +14,76 @@ Newest first.
 
 ---
 
+## 2026-08-11 — Designed entanglements now survive minimisation
+
+**Change:** `Clearance` in `topon/conformation/paths.py`, threaded through
+`bridging_walk`, `walk_via`, `walk_through` and `loop_around`;
+`scale_for_design` in `tests/workflows/entangle_steps.py`; a `span` knob on
+`loop_around` and a `site_span` on `propose`; `tests/workflows/entangle_relaxed.py`
+and `tests/workflows/entangle_fixedpoint.py`.
+
+**Why:** designed pairs read correctly as built and came back wrong after
+minimisation, losing count or gaining it.
+
+**Issue / solution:** the earlier diagnosis was wrong. It attributed the loss
+to bead motion, on the grounds that beads move 3.34 sigma while the designed
+loop is 1.2 to 3.4 sigma across, and set out to reduce the motion. Motion is
+not the mechanism. WCA has a hard core, so no amount of relaxation can change
+a topology on its own -- a hard core the chains never enter is one they never
+pass through, and beads may move as far as they like. The system relaxing is
+expected and harmless.
+
+What actually loses topology is starting *inside* the hard core. Routing a
+path into an occupied box without regard to what is there put 153 beads inside
+0.5 sigma and took the closest pair from 0.502 to 0.195 sigma. At 0.195 the
+WCA energy is of order 1e5 kT, so minimisation does not relax that contact, it
+shoves, and the shove pushes chains through each other. `Clearance` draws the
+path around what is already there instead: each step is still drawn from the
+same reachable cone and simply kept only if it clears, so bonds stay exact and
+the walk still lands on its junction. Measured through a real relaxed melt,
+the tightest contact a routed path makes went from 0.081 to 0.822 sigma, and
+0.822 is the melt's own nearest-neighbour spacing at the junction the walk is
+pinned to, so it is the best any path between those two junctions could do.
+
+Three things had to be fixed before that worked end to end:
+
+- The ring could not be cleared by rotating it. At melt density a point lies
+  within 0.9 sigma of 2.6 beads on average, and one shared angle for all the
+  waypoints left the tightest contact at 0.10 sigma. Each waypoint is now
+  placed inside its own angular sector, which keeps the winding -- a path goes
+  once around as long as the points keep their order -- and roughly doubles the
+  clearance.
+- Junctions are shared between chains, so excluding the routed chain by chain
+  still left its own two endpoints in the obstacle set. It then spent its
+  accept test trying to get away from the junctions it is pinned to.
+- A winding near the tip of a target strand slides off it during relaxation
+  with nothing crossing anything, and the count drops. Sites are now confined
+  to mid-strand, and the box is sized against the same span, since a loop
+  confined to the middle reaches a farther part of the target than the nearest
+  approach of the two chords.
+
+**Density is no longer chosen up front.** `scale_for_design` sizes the lattice
+from the design itself: a chain spends its contour on the chord it must span,
+the detour out to its partner and back, and the ring, so the longest route in
+the design sets the largest scale on which the design is buildable, and largest
+is what is wanted because more box at the same bead count is more free volume
+to route through. The two constants it replaces were the same mistake in
+opposite directions -- density 0.85 leaves no free volume at all (2.6 beads
+within 0.9 sigma), and coil 1.8 puts chains 35 sigma apart with 34 sigma of
+slack so no partner is reachable -- and neither knew anything about the design
+it was meant to hold. Sized this way a 4x4x4 SC network lands at density 0.033.
+
+**Result:** designed counts now survive exactly, through minimisations that
+move beads a median of 12.4 sigma and up to 45. Over four consecutive runs
+every designed count came back unchanged (2 to 2, 1 to 1, 2 to 2, 0 to 0),
+where before the same plan lost one pair and grew another from 1 to 4.
+
+**Still open:** the search does not reliably build the count it is asked for.
+It hit 1 of 1 once and otherwise settles on 2. One full turn puts two crossings
+into the primitive path rather than one, and a `span` knob for partial turns
+did not move it off 2. That is a search problem, not a survival problem: what
+it does build is now what comes out.
+
 ## 2026-08-11 — Why designed entanglements are lost, and a partial fix
 
 **Change:** `tests/workflows/entangle_relaxed.py`. Survival measurement is

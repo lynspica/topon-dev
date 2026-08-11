@@ -181,7 +181,7 @@ def _both(partners, a, b):
 # ---------------------------------------------------------------------------
 
 def propose(a0, a1, target_paths, box, n, rng, around=None, spread=1.0,
-            dp=DP, bond=BOND):
+            dp=DP, bond=BOND, avoid=None, site_span=(0.05, 0.95)):
     """``n`` candidate paths, each encircling every strand in ``target_paths``.
 
     A single strand may be passed on its own; several means one path that
@@ -196,6 +196,19 @@ def propose(a0, a1, target_paths, box, n, rng, around=None, spread=1.0,
 
     ``around`` is a previous winner's knobs; when given, proposals cluster
     near it rather than covering the whole range.
+
+    ``site_span`` is the stretch of the target a loop may be put on, as a
+    fraction of its length. It matters because a loop can leave without
+    anything crossing anything: slide it along the strand it is on and off the
+    far tip, and the count drops by one with the hard core never touched.
+    Relaxation does exactly that, so a winding placed near a tip is not
+    designed, it is on loan. Narrowing the span to the middle costs a little
+    freedom and buys a winding that has nowhere to go.
+
+    ``avoid`` is the beads already in the box. Without it a candidate lands
+    on top of whatever is in the way, and the minimisation that follows
+    resolves those overlaps by pushing chains through each other, which
+    destroys the winding the candidate was chosen for.
     """
     targets = ([target_paths] if isinstance(target_paths, np.ndarray)
                else list(target_paths))
@@ -210,24 +223,31 @@ def propose(a0, a1, target_paths, box, n, rng, around=None, spread=1.0,
         for j in order:
             t = targets[j]
             if around is None or len(around) != len(targets):
-                bead = int(rng.integers(4, len(t) - 4))
+                lo = max(4, int(site_span[0] * len(t)))
+                hi = min(len(t) - 4, int(site_span[1] * len(t)))
+                bead = int(rng.integers(lo, max(lo + 1, hi)))
                 radius = float(rng.uniform(1.2, 3.2))
                 pts = int(rng.choice([4, 5, 6, 8]))
                 phase = float(rng.uniform(0.0, 2.0 * np.pi))
+                span = float(rng.choice([0.6, 0.75, 0.9, 1.0, 1.25, 1.5]))
             else:
-                b0, r0, p0, ph0 = around[j]
+                b0, r0, p0, ph0, span0 = around[j]
                 bead = int(np.clip(b0 + rng.integers(-6, 7) * spread,
-                                   4, len(t) - 5))
+                                   max(4, int(site_span[0] * len(t))),
+                                   min(len(t) - 5,
+                                       int(site_span[1] * len(t)))))
                 radius = float(np.clip(r0 + rng.normal(0.0, 0.35 * spread),
                                        1.0, 3.5))
                 pts = int(np.clip(p0 + rng.integers(-1, 2), 4, 8))
                 phase = ph0 + float(rng.normal(0.0, 0.8 * spread))
-            knobs.append((bead, radius, pts, phase))
-            rings.append(loop_around(t, bead, radius, pts, phase))
+                span = float(np.clip(span0 + rng.normal(0.0, 0.2 * spread),
+                                     0.5, 1.75))
+            knobs.append((bead, radius, pts, phase, span))
+            rings.append(loop_around(t, bead, radius, pts, phase, avoid, span))
 
         way = [w for ring in rings for w in ring]
         try:
-            path = walk_through(a0, a1, way, dp + 1, bond, rng)
+            path = walk_through(a0, a1, way, dp + 1, bond, rng, avoid)
         except ValueError:
             continue
         # Knobs come back in target order, not visiting order, so a later
