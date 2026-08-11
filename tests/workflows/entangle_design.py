@@ -284,7 +284,20 @@ def main():
             geo_md = dict(geo)
             geo_md["L"] = box
             post = measure_one(md, keys, geo_md, work, "post")
-            print("\n  after minimisation:")
+
+            # A failed measurement and a destroyed topology print the same
+            # thing: every pair reads zero. Z1+ currently rejects a whole
+            # system read back from LAMMPS output -- the blocker recorded in
+            # entangle_legacy_check.py -- so this path yields no survival
+            # number at all, and a table of zeros claims one.
+            measured = sum(sum(v.values()) for v in post.values())
+            if not measured:
+                print("\n  after minimisation: NOT MEASURED. Z1+ returned "
+                      "nothing for the post-run system, so this run says "
+                      "nothing about whether the topology survived.")
+                return 0
+
+            print(f"\n  after minimisation ({measured} points system-wide):")
             ok = 0
             for routed, want in plan:
                 for t, n in want.items():
