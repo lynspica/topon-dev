@@ -14,6 +14,48 @@ Newest first.
 
 ---
 
+## 2026-08-11 — Why designed entanglements are lost, and a partial fix
+
+**Change:** `tests/workflows/entangle_relaxed.py`. Survival measurement is
+now per pair, which is the only export Z1+ accepts reliably, and
+`z1_export` warns when a chain is longer than the periodic cell.
+
+**Why:** the design plan read 4 of 4 as built and 2 of 4 after minimisation --
+one pair lost, one overshooting from 1 to 4.
+
+**Issue / solution:** the cause is a size comparison, and it is not close.
+Beads move a median of 3.34 sigma during minimisation, up to 12.45, while the
+designed loop is 1.2 to 3.4 sigma across. The feature is the same size as the
+motion. Nothing about how carefully it is built can survive that.
+
+That motion is not the entanglement's fault. A random walk drawn without
+excluded volume overlaps itself and its neighbours everywhere, and the first
+minimisation stage is mostly relieving that. Relaxing a plain melt first and
+designing into the relaxed coordinates cuts the motion tenfold: median 3.34
+to 0.35 sigma, maximum 12.45 to 2.52.
+
+**It is still not enough.** With motion down tenfold the designed pairs still
+do not hold. A pair placed at 1 came back 0; a pair placed at 2 came back 5.
+Scoring each candidate after a short relaxation rather than as built -- which
+in an already-relaxed system costs a fraction of a second per candidate --
+finds candidates that survive *that* relaxation, and they still do not
+survive the longer one. The topology is marginal: whether a loop holds
+depends on how much relaxation it sees, not on a property of the loop.
+
+Two enabling fixes did land. Z1+ crashes on whole-system configurations read
+back from LAMMPS output, so survival is measured per pair, which works
+reliably. And chains longer than the periodic cell are one identifiable
+cause of that crash -- after minimisation a 4x4x4 melt at DP 80 has nineteen
+chains reaching 30.9 sigma in a 21.6 sigma box -- now warned about, since an
+empty result is indistinguishable from a destroyed topology.
+
+**Follow-up:** the honest next step is not another placement scheme. It is to
+ask what makes an entanglement stable rather than marginal, which is a
+question about the depth of the threading, not its existence. A loop that
+merely encircles is at the edge of the definition; one that encircles with
+several beads either side of the crossing may not be. That is measurable with
+what is already here.
+
 ## 2026-08-10 — The nondeterminism was stale files in a shared staging directory
 
 **Change:** `run_z1_batch.sh` takes a private working directory per
