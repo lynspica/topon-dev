@@ -48,7 +48,6 @@ from tests.workflows.entangle_all import CASES  # noqa: E402
 from tests.workflows.entangle_relaxed import measure_pairs  # noqa: E402
 from tests.workflows.entangle_spatial import kinked_paths  # noqa: E402
 from tests.workflows.entangle_steps import (  # noqa: E402
-    BOND,
     DP,
     LATTICE,
     OUT,
@@ -59,7 +58,6 @@ from tests.workflows.entangle_steps import (  # noqa: E402
     report_bonds,
     run_md,
     write_system,
-    z1_export,
 )
 
 
@@ -99,21 +97,35 @@ def main():
     print(f"  {len(cands)} candidates, {len(sel)} pairs selected, "
           f"{asked} entanglements requested")
 
-    root = OUT / f"legacy_check_{args.protocol}"
-    _n, node_atom, chain_atoms = write_system(graph, geo, paths, root)
-    sim = conform_and_script(root, graph, geo, pair_style="repulsive",
-                             protocol=args.protocol)
-    print(f"\n  --- LAMMPS, stages 1 to {args.stages} ---")
-    run_md(sim, args.stages)
+    def build_and_relax(these_paths, tag):
+        r = OUT / f"legacy_check_{args.protocol}{tag}"
+        _n, node_atom, chain_atoms = write_system(graph, geo, these_paths, r)
+        sim = conform_and_script(r, graph, geo, pair_style="repulsive",
+                                 protocol=args.protocol)
+        print(f"\n  --- LAMMPS, stages 1 to {args.stages} "
+              f"({tag.strip('_') or 'kinked'}) ---")
+        run_md(sim, args.stages)
+        out = r / "04_Simulation" / {
+            1: "system_after_soft.data", 2: "system_ramped.data",
+            3: "system_equilibrated.data"}[args.stages]
+        return r, (out if out.exists() else None), node_atom, chain_atoms
+
+    root, final, node_atom, chain_atoms = build_and_relax(paths, "")
     print()
     report_bonds(root)
-
-    final = root / "04_Simulation" / {
-        1: "system_after_soft.data", 2: "system_ramped.data",
-        3: "system_equilibrated.data"}[args.stages]
-    if not final.exists():
+    if final is None:
         print("\n  minimisation produced no output")
         return 1
+
+    # The same network with no kinks at all.
+    #
+    # A melt is entangled whether or not anybody designed it, so a raw count on
+    # the kinked system says nothing on its own. What the kink can be credited
+    # with is the difference between the two.
+    plain, _p, _s = kinked_paths(graph, geo, [], dims, args.dp,
+                                 {"overshoot": 0.2, "z_amp": 0.5,
+                                  "sigma": 0.15})
+    _r, base_final, _na, _ca = build_and_relax(plain, "_plain")
 
     keys = sorted(geo["chords"])
     seq = {k: chain_ids(k, node_atom, chain_atoms, geo["ends"]) for k in keys}
