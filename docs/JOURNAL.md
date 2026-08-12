@@ -14,6 +14,59 @@ Newest first.
 
 ---
 
+## 2026-08-12 — Requirement 1: a requested entanglement density is delivered
+
+**Change:** `tests/workflows/entangle_density.py`, `close_pairs` /
+`watch_set` / `measure_system`, and `tests/unit/workflows/test_close_pairs.py`.
+
+**Why:** the first of the five things asked for -- set a system-averaged
+entanglements per chain and get it.
+
+**Result**, SC 4x4x4, DP 80, density 0.85, target 2.00 per chain, half first
+shell and half second:
+
+```
+ round  routed   added  per pair  target
+     1      15    2.21     0.147    2.00
+       backing off to 13 pairs, since a pair is worth 0.147
+     2      13    1.55     0.119    2.00
+     3      17    1.74     0.102    2.00
+     4      20    1.89     0.095    2.00
+ delivered 1.89 per chain against a target of 2.00, within 0.15
+```
+
+**Why this is robust where a named pair is not.** A density does not care
+which pairs carry the entanglements, so a pair that fails to survive is simply
+replaced, and the collateral a routed chain picks up counts toward the total
+rather than against it. The loop closes on the measured, post-relaxation value,
+so what is reported is what survived.
+
+Three things had to be built.
+
+*The measurement.* The whole-system Z1+ export cannot do this job: it refuses a
+configuration once a chain is longer than the periodic cell, which at routing
+densities is routine, and it has a size ceiling besides -- 8544 beads measured,
+52056 did not. So `close_pairs` finds the chain pairs actually in contact with a
+KD-tree, which is exact rather than a sample since chains that never come close
+cannot be entangled, and `measure_system` sums the per-pair export over them.
+
+*The cost.* Measuring every contact pair is unaffordable at melt density,
+14754 of them, and the first run stalled after the baseline. The watch set is
+fixed once and reused, so before and after are paired: every designed pair in
+full, since that is where the signal is, plus a weighted random sample of the
+rest for the background.
+
+*The calibration.* Routing every selected pair at once overshot 5.48 against
+2.00. A designed pair is worth more than its nominal count, 0.095 to 0.147
+entanglements per chain here, so the loop routes a small batch, measures what a
+pair is worth, and sizes the rest from that. An overshoot is treated as a
+calibration rather than a failure: it restarts from the plain melt with the
+number of pairs the yield implies.
+
+**Recorded for context:** that melt already carries 9.6 entanglement points per
+chain over 3.4 partners before anything is designed, so a request of "2 per
+chain" can only mean 2 on top of the background, which is what is targeted.
+
 ## 2026-08-12 — Neighbour shells, and the outer-shell limit is gone
 
 **Change:** `chain_distances`, `neighbour_shells` and `select_by_shells` in
