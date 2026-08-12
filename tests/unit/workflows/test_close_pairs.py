@@ -75,3 +75,50 @@ def test_scales_to_a_realistic_chain_count():
         d = paths[a][:, None, :] - paths[b][None, :, :]
         d -= BOX * np.round(d / BOX)
         assert np.linalg.norm(d, axis=2).min() <= 1.5 + 1e-9
+
+
+# ---------------------------------------------------------------------------
+# The watch set
+# ---------------------------------------------------------------------------
+
+def test_every_designed_pair_is_watched_and_counts_for_itself():
+    """The designed pairs are where the increment is meant to appear.
+
+    Sampling them would put noise exactly where the signal is.
+    """
+    from tests.workflows.entangle_density import watch_set
+    paths = {k: line([2 + k, 5, 2], [0, 0, 1]) for k in range(8)}
+    designed = [(0, 1), (2, 3)]
+    pairs, scale = watch_set(paths, BOX, designed, cutoff=3.0, sample=2,
+                             rng=np.random.default_rng(0))
+    for q in designed:
+        assert q in pairs
+        assert scale[q] == 1.0
+
+
+def test_the_sample_stands_for_the_pairs_left_out():
+    from tests.workflows.entangle_density import watch_set
+    paths = {k: line([1 + 0.7 * k, 5, 2], [0, 0, 1]) for k in range(20)}
+    pairs, scale = watch_set(paths, BOX, [], cutoff=3.0, sample=5,
+                             rng=np.random.default_rng(1))
+    assert len(pairs) == 5
+    rest = len(close_pairs(paths, BOX, 3.0))
+    assert sum(scale.values()) == pytest.approx(rest)
+
+
+def test_a_small_system_is_measured_in_full():
+    from tests.workflows.entangle_density import watch_set
+    paths = {0: line([5, 5, 2], [0, 0, 1]), 1: line([5, 6, 2], [0, 0, 1])}
+    pairs, scale = watch_set(paths, BOX, [], cutoff=3.0, sample=100,
+                             rng=np.random.default_rng(2))
+    assert pairs == [(0, 1)]
+    assert scale[(0, 1)] == 1.0
+
+
+def test_a_designed_pair_out_of_contact_is_still_watched():
+    """It is out of contact now; routing is about to put it in contact."""
+    from tests.workflows.entangle_density import watch_set
+    paths = {0: line([2, 2, 2], [0, 0, 1]), 1: line([15, 15, 2], [0, 0, 1])}
+    pairs, _s = watch_set(paths, BOX, [(0, 1)], cutoff=3.0, sample=10,
+                          rng=np.random.default_rng(3))
+    assert (0, 1) in pairs

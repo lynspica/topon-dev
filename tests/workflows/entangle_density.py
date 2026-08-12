@@ -94,30 +94,65 @@ def close_pairs(paths, box, cutoff=3.0):
     return sorted(out)
 
 
-def measure_system(data_file, seq, keys, work, paths, box, cutoff=3.0):
-    """Entanglement points per chain, summed over every pair in contact.
+def measure_system(data_file, seq, keys, work, watch):
+    """Entanglement points per chain, over a fixed set of pairs.
 
-    Built from the per-pair export rather than a whole-system one. The
-    whole-system export is not usable here: Z1+ refuses a configuration once a
-    chain is longer than the periodic cell, which at the low densities routing
-    needs is routine, and it has a size ceiling besides -- 8544 beads measured,
-    52056 did not. The per-pair export has worked throughout.
+    ``watch`` is decided once and reused for every round, so the before and
+    after numbers are a paired comparison of the same pairs and the difference
+    between them is the increment the design is responsible for.
 
-    Returns ``(points_per_chain, partners_per_chain, pairs_measured,
-    pairs_unmeasured)``.
+    Measuring every pair in contact would be exact and is unaffordable: a
+    melt at density 0.85 has 14754 of them, each needing its own export. The
+    set is instead every designed pair, which is where the increment is meant
+    to appear, plus a fixed random sample of the rest to carry the background
+    and any collateral.
+
+    Returns ``(points_per_chain, partners_per_chain, measured, unmeasured)``,
+    scaled from the sample back to the whole system.
     """
     from tests.workflows.entangle_relaxed import measure_pairs
 
-    pairs = close_pairs(paths, box, cutoff)
+    pairs, scale = watch
     if not pairs:
         return 0.0, 0.0, 0, 0
     got = measure_pairs(data_file, seq, pairs, work)
-    live = [v for v in got.values() if v is not None]
     blind = sum(1 for v in got.values() if v is None)
-    pts = sum(live)
-    partners = sum(1 for v in live if v)
+
+    pts = partners = 0.0
+    for q in pairs:
+        v = got.get(q)
+        if v is None:
+            continue
+        w = scale.get(q, 1.0)
+        pts += w * v
+        partners += w * (1 if v else 0)
     n = len(keys)
-    return 2.0 * pts / n, 2.0 * partners / n, len(pairs), blind
+    return 2.0 * pts / n, 2.0 * partners / n, len(pairs) - blind, blind
+
+
+def watch_set(paths, box, designed, cutoff=3.0, sample=400, rng=None):
+    """The pairs to measure, and what each one stands for.
+
+    Every designed pair counts for itself. The rest of the contact pairs are
+    represented by a random sample, each standing for ``len(rest)/len(sample)``
+    of them, so the total is an unbiased estimate of the background rather
+    than a count of the part that happened to be looked at.
+    """
+    rng = np.random.default_rng() if rng is None else rng
+    contact = set(close_pairs(paths, box, cutoff))
+    named = {(min(a, b), max(a, b)) for a, b in designed}
+    contact |= named
+    rest = sorted(contact - named)
+    if len(rest) > sample:
+        pick = rng.choice(len(rest), size=sample, replace=False)
+        chosen = [rest[i] for i in sorted(pick)]
+        w = len(rest) / float(sample)
+    else:
+        chosen, w = rest, 1.0
+    pairs = sorted(named) + chosen
+    scale = {q: 1.0 for q in named}
+    scale.update({q: w for q in chosen})
+    return pairs, scale
 
 
 def main():
@@ -147,6 +182,10 @@ def main():
     ap.add_argument("--cutoff", type=float, default=3.0,
                     help="chains further apart than this everywhere cannot be "
                          "entangled, so they are not measured")
+    ap.add_argument("--sample", type=int, default=400,
+                    help="how many undesigned contact pairs to measure. They "
+                         "carry the background and any collateral; the "
+                         "designed pairs are always measured in full.")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--tag", default="_density")
     args = ap.parse_args()
@@ -227,8 +266,9 @@ def main():
     box, paths, xyz0 = paths_from(relaxed, keys, seq)
 
     work = OUT / f"density_work_{os.getpid()}"
-    base = measure_system(relaxed, seq, keys, work, paths, box,
-                          args.cutoff)
+    watch = watch_set(paths, box, [(a, b) for a, b, _c in plan],
+                      args.cutoff, args.sample, rng)
+    base = measure_system(relaxed, seq, keys, work, watch)
     print(f"  the plain melt already carries {base[0]:.2f} per chain over "
           f"{base[1]:.1f} partners ({base[2]} pairs in contact"
           + (f", {base[3]} unmeasured)" if base[3] else ")"))
@@ -282,8 +322,7 @@ def main():
         if out is None:
             print(f"  {rnd:>6}   relaxation failed")
             return 1
-        got = measure_system(out, seq, keys, work, paths, box,
-                             args.cutoff)
+        got = measure_system(out, seq, keys, work, watch)
         print(f"  {rnd:>6} {len(done):>7} {got[0]:>10.2f} {got[1]:>9.1f} "
               f"{len(done):>9}"
               + (f"   ({got[3]} of {got[2]} pairs unmeasured)"
