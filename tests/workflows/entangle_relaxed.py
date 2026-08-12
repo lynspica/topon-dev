@@ -27,7 +27,6 @@ rearrangement.
 from __future__ import annotations
 
 import argparse
-import collections
 import os
 import sys
 from pathlib import Path
@@ -460,9 +459,20 @@ def construct_exact(paths, routed, target, want, box, avoid, seq, template,
     if not shapes:
         return None, None
 
+    counts = measure_many(template, seq, routed, target, shapes, work)
+    blind = sum(1 for c in counts if c is None)
+    if blind:
+        # Z1+ refuses a chain longer than the periodic cell, and a routed
+        # chain is much longer than the estimate the box was sized from: the
+        # nominal route is 32 sigma but measured chains reached 53 in a 43
+        # sigma box. Those candidates are not bad, they are unmeasured, and a
+        # search that cannot see them is choosing from a smaller set than it
+        # appears to be. Raising --dims grows the box while leaving the route
+        # the same length, which is the way out.
+        print(f"      note: {blind} of {len(counts)} placements for "
+              f"{routed}-{target} could not be measured")
     built = []
-    for p, got in zip(shapes, measure_many(template, seq, routed, target,
-                                           shapes, work)):
+    for p, got in zip(shapes, counts):
         if got is None:
             continue
         if relax is None:
@@ -518,6 +528,10 @@ def main():
                          "request gives the same system.")
     ap.add_argument("--want", type=int, default=2,
                     help="entanglements per designed pair")
+    ap.add_argument("--chains", type=int, default=2,
+                    help="how many chains to route. Raising this is the scale "
+                         "test: every routed chain adds collateral, and the "
+                         "question is where that starts breaking the designs.")
     ap.add_argument("--partners", type=int, default=1,
                     help="how many named partners each routed chain gets")
     ap.add_argument("--site-lo", type=float, default=0.30)
@@ -591,8 +605,19 @@ def main():
                 best, out = gap, b
         return out
 
-    plan, taken = [], set()
-    for a in (0, 20):
+    # Routed chains spread evenly through the edge list, so raising --chains
+    # samples the network rather than crowding one corner of it. Routed chains
+    # are in `taken` from the start, so one is never also somebody's target:
+    # re-placing it would move a strand another design is wound around.
+    n_edges = len(edges)
+    picks = []
+    for i in range(max(1, args.chains)):
+        c = (i * n_edges // max(1, args.chains)) % n_edges
+        if c not in picks:
+            picks.append(c)
+
+    plan, taken = [], set(picks)
+    for a in picks:
         w = {}
         for _ in range(args.partners):
             t = nearest_chord(a, taken | set(w))
@@ -702,11 +727,12 @@ def main():
     current = root / "04_Simulation" / "current.data"
     xyz_now = dict(xyz0)
     rewrite_coords(relaxed, current, xyz_now)
-    # Two chains may be sent to the same partner, and winding both at the same
-    # place puts the second ring inside the first. Measured: the second pair
-    # built nothing at all. Spread the sites across the permitted stretch so
-    # each has its own piece of the target.
-    used = collections.Counter()
+    # Two chains sent to the same partner used to wind it at the same place,
+    # putting the second ring inside the first, and the second pair built
+    # nothing at all. Two things fixed that and neither needs bookkeeping
+    # here: `nearest_chord` will not hand the same partner to two routed
+    # chains, and `construct_exact` enumerates its own sites along whichever
+    # target it is given.
 
     def place(routed, want):
         target, n = list(want.items())[0]
@@ -746,8 +772,6 @@ def main():
                     f"{before:.2f} -> {avoid.worst(p[1:-1]):.2f} sigma]")
             return
         if args.construct:
-            k = used[target]
-            used[target] += 1
             try:
                 p, got = construct_exact(
                     paths, routed, target, n, box, avoid, seq, current, work,
