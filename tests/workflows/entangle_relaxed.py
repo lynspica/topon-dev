@@ -194,7 +194,7 @@ def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
     return best
 
 
-def construct(paths, routed, target, want, box, avoid, at=None, radius=2.0,
+def construct(paths, routed, target, turns, box, avoid, at=None, radius=2.0,
               phase=0.0, dp=DP, bond=BOND, span=(0.3, 0.7), rank=0):
     """Build the requested count instead of searching for it.
 
@@ -220,15 +220,25 @@ def construct(paths, routed, target, want, box, avoid, at=None, radius=2.0,
     to sit where the chain already passes. ``rank`` takes the second-closest
     such place, and so on, so two chains sent to one target do not stack.
 
-    Odd counts are not available this way. Raises rather than quietly building
-    the nearest even number, since a count you did not ask for is worse than a
-    refusal.
+    ``turns`` is how far round the target to go, in whole or half turns. A
+    full turn contributes two entanglement points, since pulled taut the loop
+    presses on the strand from both sides, but it is not the only contributor:
+    the legs reaching the ring and leaving it cross the target as well, and
+    those crossings can be odd. That is why odd counts are reachable at all,
+    and why the number cannot be read off the winding alone -- it has to be
+    measured, which is what ``construct_exact`` does.
     """
-    if want <= 0 or want % 2:
-        raise ValueError(
-            f"{want} is not buildable: one turn is two entanglement points, "
-            f"so this construction makes even counts only")
-    turns = want // 2
+    ring, hub = _ring_for(paths, routed, target, turns, box, avoid, at,
+                          radius, phase, bond, span, rank)
+    return route_through(paths[routed][0], paths[routed][-1], list(ring),
+                         dp + 1, bond, avoid)
+
+
+def _ring_for(paths, routed, target, turns, box, avoid, at, radius, phase,
+              bond, span, rank):
+    """Waypoints encircling one target, and the point they are centred on."""
+    if turns <= 0:
+        raise ValueError("turns must be positive")
     tgt = paths[target]
     tgt = tgt + box * np.round((paths[routed].mean(0) - tgt.mean(0)) / box)
     if at is not None:
@@ -243,9 +253,131 @@ def construct(paths, routed, target, want, box, avoid, at=None, radius=2.0,
         i = int(lo + order[min(rank, len(order) - 1)])
     n_pts = int(np.clip(round(2.0 * np.pi * radius * turns / (1.6 * bond)),
                         4, 24))
-    ring = loop_around(tgt, i, radius, n_pts, phase, avoid, float(turns))
-    return route_through(paths[routed][0], paths[routed][-1], list(ring),
-                         dp + 1, bond, tgt[i], avoid)
+    return (loop_around(tgt, i, radius, n_pts, phase, avoid, float(turns)),
+            tgt[i])
+
+
+def construct_multi(paths, routed, turns_by_target, box, avoid, radius=2.0,
+                    dp=DP, bond=BOND, span=(0.3, 0.7), rank_by_target=None,
+                    phase_by_target=None):
+    """One path winding around several named partners in turn.
+
+    A chain with more than one requested partner cannot be built by taking
+    each in isolation and keeping the best: whichever was aimed at last is the
+    one that gets built and the others are lost. The rings all go into a single
+    route instead.
+
+    Visited in the order the partners lie along the routed chain's own chord,
+    so the path does not cross the box and come back between them. That
+    ordering is not cosmetic -- out of order the route is long enough to
+    exhaust the chain's contour and nothing builds at all.
+    """
+    a0, a1 = paths[routed][0], paths[routed][-1]
+    chord = a1 - a0
+    rank_by_target = rank_by_target or {}
+    phase_by_target = phase_by_target or {}
+
+    rings = []
+    for t, turns in turns_by_target.items():
+        ring, hub = _ring_for(paths, routed, t, turns, box, avoid, None,
+                              radius, phase_by_target.get(t, 0.0), bond, span,
+                              rank_by_target.get(t, 0))
+        rings.append((float((hub - a0) @ chord), ring, hub))
+    rings.sort(key=lambda r: r[0])
+
+    way = [w for _o, ring, _h in rings for w in ring]
+    return route_through(a0, a1, way, dp + 1, bond, avoid)
+
+
+def construct_exact_multi(paths, routed, wants, box, avoid, seq, template,
+                          work, span, radius, dp, ranks=4, phases=4,
+                          relax=None):
+    """Build a chain's whole wish list at once, scored on the total miss.
+
+    The single-partner enumeration cannot be run once per partner and the
+    results combined, because each run replaces the chain's path and undoes
+    the last. One path has to satisfy every request, so the placements are
+    enumerated together and scored by how far the whole set is from what was
+    asked.
+
+    Returns ``(path, {target: count})``, or the closest set if nothing is
+    exact. The counts are what was actually measured, not what was requested.
+    """
+    targets = list(wants)
+    pairs = [(min(routed, t), max(routed, t)) for t in targets]
+
+    def miss(counts):
+        return sum(abs(counts[t] - wants[t]) for t in targets)
+
+    def read(f):
+        got = measure_pairs(f, seq, pairs, work)
+        if any(got[q] is None for q in pairs):
+            return None
+        return {t: got[(min(routed, t), max(routed, t))] for t in targets}
+
+    built, best = [], None
+    for scale in (1.0, 0.5, 1.5, 2.0):
+        for rank in range(ranks):
+            for k in range(phases):
+                phase = 2.0 * np.pi * k / phases
+                tb = {t: max(0.5, round(0.5 * wants[t] * scale, 1))
+                      for t in targets}
+                try:
+                    p = construct_multi(
+                        paths, routed, tb, box, avoid, radius=radius, dp=dp,
+                        span=span,
+                        rank_by_target={t: rank for t in targets},
+                        phase_by_target={t: phase for t in targets})
+                except ValueError:
+                    continue
+                rewrite_coords(template, work / "try.data",
+                               dict(zip(seq[routed], p)))
+                got = read(work / "try.data")
+                if got is None:
+                    continue
+                if relax is None:
+                    if miss(got) == 0:
+                        return p, got
+                    if best is None or miss(got) < miss(best[1]):
+                        best = (p, got)
+                else:
+                    built.append((miss(got), p))
+
+    if relax is None:
+        return best if best is not None else (None, None)
+
+    built.sort(key=lambda t: t[0])
+    for _m, p in built:
+        rewrite_coords(template, work / "try.data",
+                       dict(zip(seq[routed], p)))
+        out = relax(work / "try.data")
+        if out is None:
+            continue
+        got = read(out)
+        if got is None:
+            continue
+        if miss(got) == 0:
+            return p, got
+        if best is None or miss(got) < miss(best[1]):
+            best = (p, got)
+    return best if best is not None else (None, None)
+
+
+def turn_options(want, extra=(0.0, -0.5, 0.5, -1.0, 1.0)):
+    """Windings to try for a requested count, nearest guess first.
+
+    A full turn is worth about two entanglement points, so ``want/2`` is the
+    obvious starting guess, but the legs contribute their own crossings and
+    the total is not fixed by the winding. Half turns are included because
+    that is where odd counts come from.
+    """
+    seen, out = set(), []
+    for d in extra:
+        t = round(max(0.5, 0.5 * want + d), 1)
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
 
 
 def construct_exact(paths, routed, target, want, box, avoid, seq, template,
@@ -276,34 +408,64 @@ def construct_exact(paths, routed, target, want, box, avoid, seq, template,
     Returns ``(path, count)``, with the closest miss if no placement is exact,
     so the caller can say what it got rather than imply it got what was asked.
     """
+    pair = (min(routed, target), max(routed, target))
     best = None
-    for rank in range(ranks):
-        for k in range(phases):
-            phase = 2.0 * np.pi * k / phases
-            try:
-                p = construct(paths, routed, target, want, box, avoid,
-                              radius=radius, phase=phase, dp=dp, span=span,
-                              rank=rank)
-            except ValueError:
-                continue
-            trial = dict(zip(seq[routed], p))
-            rewrite_coords(template, work / "try.data", trial)
-            scored = work / "try.data"
-            if relax is not None:
-                r = relax(scored)
-                if r is None:
+    # Two passes, because relaxing every placement is unaffordable.
+    #
+    # Measuring a built placement costs a Z1+ call; relaxing one costs a whole
+    # minimisation. Enumerating turns as well as sites and orientations gives
+    # around a hundred placements, which is over half an hour of minimisation
+    # if every one is relaxed and most of them were never plausible.
+    #
+    # So measure them all as built first, which is cheap, and spend the
+    # minimisations on the ones that already land near the target, closest
+    # first. The as-built count is a poor predictor of the surviving one --
+    # that is the whole reason for verifying -- but it is not unrelated, and
+    # ordering by it puts the likely candidates first without ruling anything
+    # out: if none of them survives at the right number the pass runs on
+    # through the rest.
+    built = []
+    for turns in turn_options(want):
+        for rank in range(ranks):
+            for k in range(phases):
+                phase = 2.0 * np.pi * k / phases
+                try:
+                    p = construct(paths, routed, target, turns, box, avoid,
+                                  radius=radius, phase=phase, dp=dp,
+                                  span=span, rank=rank)
+                except ValueError:
                     continue
-                scored = r
-            got = measure_pairs(scored, seq,
-                                [(min(routed, target), max(routed, target))],
-                                work)[(min(routed, target),
-                                       max(routed, target))]
-            if got is None:
-                continue
-            if got == want:
-                return p, got
-            if best is None or abs(got - want) < abs(best[1] - want):
-                best = (p, got)
+                rewrite_coords(template, work / "try.data",
+                               dict(zip(seq[routed], p)))
+                got = measure_pairs(work / "try.data", seq, [pair],
+                                    work)[pair]
+                if got is None:
+                    continue
+                if relax is None:
+                    if got == want:
+                        return p, got
+                    if best is None or abs(got - want) < abs(best[1] - want):
+                        best = (p, got)
+                else:
+                    built.append((abs(got - want), got, p))
+
+    if relax is None:
+        return best if best is not None else (None, None)
+
+    built.sort(key=lambda t: t[0])
+    for _miss, _as_built, p in built:
+        rewrite_coords(template, work / "try.data",
+                       dict(zip(seq[routed], p)))
+        out = relax(work / "try.data")
+        if out is None:
+            continue
+        got = measure_pairs(out, seq, [pair], work)[pair]
+        if got is None:
+            continue
+        if got == want:
+            return p, got
+        if best is None or abs(got - want) < abs(best[1] - want):
+            best = (p, got)
     return best if best is not None else (None, None)
 
 
@@ -312,6 +474,10 @@ def main():
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--per-round", type=int, default=20)
     ap.add_argument("--dp", type=int, default=DP)
+    ap.add_argument("--ranks", type=int, default=5,
+                    help="how many sites along the target to try")
+    ap.add_argument("--phases", type=int, default=4,
+                    help="how many ring orientations to try at each site")
     ap.add_argument("--verify", action="store_true",
                     help="pick the placement whose count survives a "
                          "minimisation, rather than the one that builds it. "
@@ -323,6 +489,8 @@ def main():
                          "request gives the same system.")
     ap.add_argument("--want", type=int, default=2,
                     help="entanglements per designed pair")
+    ap.add_argument("--partners", type=int, default=1,
+                    help="how many named partners each routed chain gets")
     ap.add_argument("--site-lo", type=float, default=0.30)
     ap.add_argument("--site-hi", type=float, default=0.70,
                     help="the stretch of the target a loop may sit on. Near a "
@@ -396,11 +564,15 @@ def main():
 
     plan, taken = [], set()
     for a in (0, 20):
-        t = nearest_chord(a, taken)
-        if t is None:
-            continue
-        taken.add(t)
-        plan.append((a, {t: args.want}))
+        w = {}
+        for _ in range(args.partners):
+            t = nearest_chord(a, taken | set(w))
+            if t is None:
+                break
+            w[t] = args.want
+        if w:
+            plan.append((a, w))
+            taken |= set(w)
     pairs_g = [(r, t) for r, w in plan for t in w]
 
     if args.density:
@@ -448,7 +620,9 @@ def main():
 
     # ---- 3: route into the relaxed coordinates --------------------------
     pairs = sorted({(min(r, t), max(r, t)) for r, w in plan for t in w})
-    print(f"  plan: " + "; ".join(f"{r} with {list(w)[0]}" for r, w in plan))
+    print("  plan: " + "; ".join(
+        f"{r} with " + ", ".join(f"{t} at {n}" for t, n in w.items())
+        for r, w in plan))
 
     work = OUT / f"relaxed_work_{os.getpid()}"
     base = measure_pairs(relaxed, seq, pairs, work)
@@ -517,6 +691,30 @@ def main():
                            if i not in mine])
         avoid = Clearance(others, box, args.clearance)
         before = avoid.worst(paths[routed])
+        if args.construct and len(want) > 1:
+            try:
+                p, got = construct_exact_multi(
+                    paths, routed, want, box, avoid, seq, current, work,
+                    (args.site_lo, args.site_hi), args.ring, args.dp,
+                    ranks=args.ranks, phases=args.phases,
+                    relax=(relax_candidate if args.verify else None))
+            except ValueError as e:
+                print(f"    chain {routed}: {e}")
+                continue
+            if p is None:
+                print(f"    chain {routed}: nothing built")
+                continue
+            paths[routed] = p
+            for aid, xyzp in zip(seq[routed], p):
+                xyz_now[aid] = xyzp
+            rewrite_coords(relaxed, current, xyz_now)
+            hit = sum(1 for t in want if got[t] == want[t])
+            print(f"    chain {routed} -> "
+                  + ", ".join(f"{t}: {got[t]} (asked {want[t]})"
+                              for t in sorted(want))
+                  + f"   [{hit} of {len(want)} exact, tightest contact "
+                    f"{before:.2f} -> {avoid.worst(p[1:-1]):.2f} sigma]")
+            continue
         if args.construct:
             k = used[target]
             used[target] += 1
@@ -524,6 +722,7 @@ def main():
                 p, got = construct_exact(
                     paths, routed, target, n, box, avoid, seq, current, work,
                     (args.site_lo, args.site_hi), args.ring, args.dp,
+                    ranks=args.ranks, phases=args.phases,
                     relax=(relax_candidate if args.verify else None))
             except ValueError as e:
                 print(f"    chain {routed} -> {target}: {e}")
@@ -599,7 +798,10 @@ def main():
           f"{np.median(dist):.2f}, max {dist.max():.2f} sigma")
 
     surv = measure_pairs(final, seq, pairs, work)
-    print(f"\n  {'pair':>10} {'before':>7} {'designed':>9} {'after MD':>9}")
+    # "as built" is not what is being aimed at when placements are chosen by
+    # what survives: a winding can read zero before relaxation and the
+    # requested count after it. The last column is the one that matters.
+    print(f"\n  {'pair':>10} {'before':>7} {'as built':>9} {'after MD':>9}")
     ok = 0
     for a, b in pairs:
         want = next(n for r, w in plan for t, n in w.items()
@@ -609,6 +811,38 @@ def main():
               f"{str(built[(a, b)]):>9} {str(surv[(a, b)]):>9}"
               + ("   ok" if surv[(a, b)] == want else ""))
     print(f"\n  {ok} of {len(pairs)} survived exactly")
+
+    # What else did the routed chains pick up?
+    #
+    # Hitting the requested count says nothing about the chains that were not
+    # requested, and a routed chain travels a long way to reach its partner. A
+    # design that delivers 2 with its named partner and eight more with
+    # everybody else has not done what was asked. Reported against the same
+    # chains in the relaxed melt, so the number is what the routing added
+    # rather than what a melt carries anyway.
+    owner = {}
+    for routed, want in plan:
+        for b in keys:
+            if b == routed or b in want or set(ends[routed]) & set(ends[b]):
+                continue
+            owner[(min(routed, b), max(routed, b))] = routed
+    if owner:
+        pl = sorted(owner)
+        before_c = measure_pairs(relaxed, seq, pl, work)
+        after_c = measure_pairs(final, seq, pl, work)
+        print("\n  collateral: entanglements with chains nobody asked for")
+        print(f"\n  {'chain':>7} {'before':>20} {'after':>20} {'added':>7}")
+        for routed, _w in plan:
+            mine = [p for p in pl if owner[p] == routed]
+            bef = [before_c[p] for p in mine if before_c[p]]
+            aft = [after_c[p] for p in mine if after_c[p]]
+            miss = sum(1 for p in mine if after_c[p] is None)
+            print(f"  {routed:>7} "
+                  f"{f'{len(bef)} chains, {sum(bef)} pts':>20} "
+                  f"{f'{len(aft)} chains, {sum(aft)} pts':>20} "
+                  f"{sum(aft) - sum(bef):+7d}"
+                  + (f"   ({miss} of {len(mine)} not measured)"
+                     if miss else ""))
     return 0
 
 

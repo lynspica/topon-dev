@@ -519,9 +519,17 @@ def taut_leg(start, end, n_bonds: int, bond: float = 0.97,
                else np.full(len(cand), np.inf))
         if len(mine) > 1:
             # Its own beads, minus the one it is stepping off.
+            #
+            # Minimum image where a box is known. The path is built unwrapped,
+            # so a chain long enough to cross the cell and fold back meets
+            # itself through the boundary at a separation that raw distances
+            # do not see, and its own beads are the one set `avoid` cannot
+            # cover.
             prev = np.array(mine[:-1])
-            own = np.linalg.norm(cand[:, None, :] - prev[None, :, :], axis=2)
-            gap = np.minimum(gap, own.min(axis=1))
+            d = cand[:, None, :] - prev[None, :, :]
+            if avoid is not None and avoid.box is not None:
+                d -= avoid.box * np.round(d / avoid.box)
+            gap = np.minimum(gap, np.linalg.norm(d, axis=2).min(axis=1))
 
         # Spend the slack evenly, and prefer a step that clears.
         #

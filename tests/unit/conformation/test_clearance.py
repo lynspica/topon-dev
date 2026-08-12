@@ -261,3 +261,20 @@ def test_route_through_refuses_a_route_longer_than_the_chain():
     with pytest.raises(ValueError, match="route is"):
         route_through(np.zeros(3), np.array([5.0, 0.0, 0.0]),
                       [np.array([80.0, 0.0, 0.0])], 20, 0.95)
+
+
+def test_taut_leg_avoids_itself_across_the_periodic_boundary():
+    """Its own beads are the one set `avoid` cannot cover.
+
+    The path is built unwrapped, so a leg long enough to cross the cell and
+    fold back meets itself through the boundary at a separation raw distances
+    do not see.
+    """
+    from topon.conformation.paths import taut_leg
+    box = np.array([20.0, 20.0, 20.0])
+    c = Clearance(np.array([[50.0, 50.0, 50.0]]), box, 0.9)
+    p = taut_leg(np.zeros(3), np.array([2.0, 0.0, 0.0]), 70, 0.95, c)
+    d = p[:, None, :] - p[None, :, :]
+    d -= box * np.round(d / box)
+    r = np.linalg.norm(d, axis=2)
+    assert r[np.triu_indices(len(p), 2)].min() > 0.7
