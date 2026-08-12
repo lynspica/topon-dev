@@ -191,3 +191,108 @@ def test_equal_yields_change_nothing():
                          rng=np.random.default_rng(11),
                          yield_by_shell={1: 0.3, 2: 0.3})
     assert a == b
+
+
+# ---------------------------------------------------------------------------
+# Spatial placement
+# ---------------------------------------------------------------------------
+
+def pair_positions(G, sel, dims):
+    """Where each selected pair sits, as fractional coordinates."""
+    out = []
+    for a, b, c in sel:
+        mids = []
+        for u, v, _k in (a, b):
+            pu = np.asarray(G.nodes[u]["pos"], float)
+            pv = np.asarray(G.nodes[v]["pos"], float)
+            d = pv - pu
+            d -= dims * np.round(d / dims)
+            mids.append(pu + 0.5 * d)
+        d = mids[1] - mids[0]
+        d -= dims * np.round(d / dims)
+        p = mids[0] + 0.5 * d
+        out += [(p - dims * np.floor(p / dims)) / dims] * c
+    return np.array(out)
+
+
+def test_a_region_concentrates_the_entanglements_inside_it():
+    """The stretch goal: put them where you want them, not everywhere."""
+    G, dims = grid(6)
+    sh = neighbour_shells(G, dims, max_shell=2)
+    plain = select_by_shells(G, 2.0, {1: 1.0}, dims, shells=sh,
+                             rng=np.random.default_rng(0))
+    biased = select_by_shells(G, 2.0, {1: 1.0}, dims, shells=sh,
+                              rng=np.random.default_rng(0),
+                              bias_kind="region",
+                              bias_params={"center": [0.5, 0.5, 0.5],
+                                           "radius": 0.25,
+                                           "strength": 20.0})
+
+    def inside(sel):
+        p = pair_positions(G, sel, dims)
+        r = np.linalg.norm(p - 0.5, axis=1)
+        return float((r < 0.25).mean())
+
+    assert inside(biased) > inside(plain) + 0.2
+
+
+def test_a_gradient_puts_more_at_one_end_than_the_other():
+    G, dims = grid(6)
+    sh = neighbour_shells(G, dims, max_shell=2)
+    sel = select_by_shells(G, 3.0, {1: 1.0}, dims, shells=sh,
+                           rng=np.random.default_rng(1),
+                           bias_kind="gradient",
+                           bias_params={"axis": "z", "strength": 3.0})
+    z = pair_positions(G, sel, dims)[:, 2]
+    assert (z > 0.5).mean() > 0.65
+
+
+def test_anti_region_depletes_instead_of_concentrating():
+    G, dims = grid(6)
+    sh = neighbour_shells(G, dims, max_shell=2)
+    plain = select_by_shells(G, 2.0, {1: 1.0}, dims, shells=sh,
+                             rng=np.random.default_rng(2))
+    hole = select_by_shells(G, 2.0, {1: 1.0}, dims, shells=sh,
+                            rng=np.random.default_rng(2),
+                            bias_kind="anti_region",
+                            bias_params={"center": [0.5, 0.5, 0.5],
+                                         "radius": 0.3,
+                                         "strength": 20.0})
+
+    def inside(sel):
+        p = pair_positions(G, sel, dims)
+        return float((np.linalg.norm(p - 0.5, axis=1) < 0.3).mean())
+
+    assert inside(hole) < inside(plain)
+
+
+def test_uniform_is_the_behaviour_without_a_bias():
+    G, dims = grid()
+    sh = neighbour_shells(G, dims, max_shell=2)
+    a = select_by_shells(G, 1.5, {1: 1.0}, dims, shells=sh,
+                         rng=np.random.default_rng(4))
+    b = select_by_shells(G, 1.5, {1: 1.0}, dims, shells=sh,
+                         rng=np.random.default_rng(4), bias_kind="uniform")
+    assert a == b
+
+
+def test_a_spatial_bias_and_a_shell_mix_compose():
+    """Both requests are honoured at once, not one instead of the other."""
+    G, dims = grid(6)
+    sh = neighbour_shells(G, dims, max_shell=3)
+    sel = select_by_shells(G, 2.0, {1: 0.5, 2: 0.5}, dims, shells=sh,
+                           rng=np.random.default_rng(6),
+                           bias_kind="region",
+                           bias_params={"center": [0.5, 0.5, 0.5],
+                                        "radius": 0.3, "strength": 20.0})
+    of_shell = {s: {(min(c, o), max(c, o))
+                    for c, by in sh.items() for o in by.get(s, ())}
+                for s in (1, 2)}
+    got = {s: sum(c for a, b, c in sel
+                  if (min(a, b), max(a, b)) in of_shell[s]) for s in (1, 2)}
+    tot = sum(got.values())
+    # The shell mix survives the spatial bias.
+    assert 0.35 < got[1] / tot < 0.65
+    # And the spatial bias is still doing something.
+    p = pair_positions(G, sel, dims)
+    assert (np.linalg.norm(p - 0.5, axis=1) < 0.3).mean() > 0.35

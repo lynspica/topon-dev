@@ -761,7 +761,8 @@ def neighbour_shells(G, dims=None, max_shell=6, tol=0.02, samples=12,
 
 def select_by_shells(G, per_chain, shell_fractions, dims=None,
                      num_chains=None, rng=None, max_per_pair=None,
-                     shells=None, tol=0.02, yield_by_shell=None):
+                     shells=None, tol=0.02, yield_by_shell=None,
+                     bias_kind="uniform", bias_params=None):
     """Pairs and counts hitting a per-chain density with a shell mix.
 
     ``per_chain`` is the system-averaged number of entanglements per chain and
@@ -778,6 +779,14 @@ def select_by_shells(G, per_chain, shell_fractions, dims=None,
     pairs in the shells where each pair is worth less, so the *delivered* mix
     matches the request rather than the drawn one. Without it every shell is
     taken as equally productive, which it is not.
+
+    ``bias_kind`` and ``bias_params`` place the entanglements non-uniformly in
+    space, using the same vocabulary the legacy path already understands:
+    ``region`` and ``anti_region`` for a dense or depleted sphere, ``gradient``
+    for a power law along an axis, ``clusters`` for gaussian peaks. A pair is
+    placed at the midpoint between its two chains' midpoints, which is where
+    the entanglement between them ends up. The bias multiplies into the draw
+    rather than replacing it, so a spatial request and a shell request compose.
 
     What this does *not* promise is that the built system will measure the
     same mix. Selection says which pairs to wind; whether the winding survives
@@ -842,6 +851,27 @@ def select_by_shells(G, per_chain, shell_fractions, dims=None,
                     pool.setdefault(s, set()).add(
                         (chain, o) if chain < o else (o, chain))
 
+    # Where each pair sits, when the draw is to be biased in space.
+    #
+    # A pair's position is the midpoint between the two chains' midpoints,
+    # which is where the entanglement between them will end up. Computed only
+    # when a bias is asked for, since it costs a pass over the pool.
+    def pair_centre(q):
+        a, b = q
+        out = []
+        for u, v, _k in (a, b):
+            pu = _np.asarray(G.nodes[u]["pos"], float)
+            pv = _np.asarray(G.nodes[v]["pos"], float)
+            d = pv - pu
+            if dims is not None:
+                d = d - dims * _np.round(d / dims)
+            out.append(pu + 0.5 * d)
+        d = out[1] - out[0]
+        if dims is not None:
+            d = d - dims * _np.round(d / dims)
+        c = out[0] + 0.5 * d
+        return c - dims * _np.floor(c / dims) if dims is not None else c
+
     counts = {}
     short = {}
     for s, n in draws.items():
@@ -850,8 +880,19 @@ def select_by_shells(G, per_chain, shell_fractions, dims=None,
             if n:
                 short[s] = n
             continue
+
+        w = None
+        if bias_kind and bias_kind != "uniform":
+            w = _np.asarray(compute_bias_weights(
+                [pair_centre(q) for q in avail], dims, bias_kind,
+                bias_params or {}), float)
+            tot = w.sum()
+            w = w / tot if tot > 0 else None
+
         for _ in range(n):
-            pair = avail[int(rng.integers(len(avail)))]
+            i = (int(rng.choice(len(avail), p=w)) if w is not None
+                 else int(rng.integers(len(avail))))
+            pair = avail[i]
             if (max_per_pair is not None
                     and counts.get(pair, 0) >= max_per_pair):
                 continue
