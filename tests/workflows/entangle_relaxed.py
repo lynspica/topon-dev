@@ -528,6 +528,10 @@ def main():
                          "request gives the same system.")
     ap.add_argument("--want", type=int, default=2,
                     help="entanglements per designed pair")
+    ap.add_argument("--tag", default="",
+                    help="suffix for the output directories, so two runs can "
+                         "go at once instead of overwriting each other's "
+                         "relaxed melt")
     ap.add_argument("--chains", type=int, default=2,
                     help="how many chains to route. Raising this is the scale "
                          "test: every routed chain adds collateral, and the "
@@ -652,7 +656,7 @@ def main():
               for k, (c0, c1) in ch.items()}
 
     # ---- 1 and 2: a plain melt, relaxed ---------------------------------
-    root = OUT / "relaxed"
+    root = OUT / f"relaxed{args.tag}"
     _n, node_atom, chain_atoms = write_system(graph, geo, paths0, root)
     seq = {k: chain_ids(k, node_atom, chain_atoms, ends) for k in keys}
     sim = conform_and_script(root, graph, geo, pair_style="repulsive",
@@ -851,7 +855,7 @@ def main():
     print(f"\n  as designed:    "
           + ", ".join(f"{a}-{b}={v}" for (a, b), v in built.items()))
 
-    root2 = OUT / "relaxed_again"
+    root2 = OUT / f"relaxed{args.tag}_again"
     (root2 / "04_Simulation").mkdir(parents=True, exist_ok=True)
     for f in (root / "04_Simulation").glob("*.in"):
         (root2 / "04_Simulation" / f.name).write_text(f.read_text())
