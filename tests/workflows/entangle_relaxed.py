@@ -844,10 +844,15 @@ def main():
             place(routed, want)
 
     # ---- 4: write it back and minimise again ----------------------------
-    new_xyz = {}
-    for k in keys:
-        for aid, xyzp in zip(seq[k], paths[k]):
-            new_xyz[aid] = xyzp
+    #
+    # From `xyz_now`, which is exactly what the corrective sweeps validated.
+    # Rebuilding it from `paths` instead wrote unwrapped coordinates for every
+    # chain, including the ones nothing had touched, so the file the final
+    # minimisation ran differed from the one the probe had just approved --
+    # 2479 bytes apart, and LAMMPS warned about inconsistent image flags. The
+    # sweep would report every count holding and the final table would then
+    # disagree, which made the guarantee worthless.
+    new_xyz = xyz_now
     designed = root / "04_Simulation" / "designed.data"
     rewrite_coords(relaxed, designed, new_xyz)
 
