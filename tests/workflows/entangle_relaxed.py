@@ -249,7 +249,7 @@ def construct(paths, routed, target, want, box, avoid, at=None, radius=2.0,
 
 
 def construct_exact(paths, routed, target, want, box, avoid, seq, template,
-                    work, span, radius, dp, ranks=8, phases=6):
+                    work, span, radius, dp, ranks=8, phases=6, relax=None):
     """Build the exact count, by enumerating placements rather than drawing.
 
     One turn is two entanglement points where the routed chain passes its
@@ -262,15 +262,16 @@ def construct_exact(paths, routed, target, want, box, avoid, seq, template,
     this is an enumeration and not a search: the same request gives the same
     system every time.
 
-    It deliberately does *not* prefer the roomiest exact placement, which is
-    counter-intuitive and was measured the hard way. Selecting for clearance
-    gave two windings sitting at 0.88 and 0.90 sigma and lost both of them
-    during minimisation; the placements this rule picks sat at 0.65 and 0.14
-    and both survived. A loop with room around it can slide off the strand it
-    is on, while one that hugs it is committed. Clearance still matters -- it
-    is what stops minimisation pushing chains through each other -- so the two
-    pull against each other and where the balance lies is not yet known. What
-    is known is that ordering by clearance is the wrong way round.
+    With ``relax`` the count is measured *after* a minimisation rather than as
+    built, and that is the difference between a design that usually holds and
+    one that holds by construction. Enumerated over 24 placements of one pair:
+    17 built the number asked for, and 15 of those kept it, so building it
+    correctly still left one in eight to be lost later. Neither clearance
+    (correlation -0.27) nor how much of the chain lay against the target
+    (-0.18) predicted which. Since what survives cannot be predicted from the
+    built geometry, the only sound thing to do is relax each placement and
+    look, and 17 of the 24 give the right count afterwards, so a surviving
+    placement is not hard to find.
 
     Returns ``(path, count)``, with the closest miss if no placement is exact,
     so the caller can say what it got rather than imply it got what was asked.
@@ -287,7 +288,13 @@ def construct_exact(paths, routed, target, want, box, avoid, seq, template,
                 continue
             trial = dict(zip(seq[routed], p))
             rewrite_coords(template, work / "try.data", trial)
-            got = measure_pairs(work / "try.data", seq,
+            scored = work / "try.data"
+            if relax is not None:
+                r = relax(scored)
+                if r is None:
+                    continue
+                scored = r
+            got = measure_pairs(scored, seq,
                                 [(min(routed, target), max(routed, target))],
                                 work)[(min(routed, target),
                                        max(routed, target))]
@@ -305,6 +312,11 @@ def main():
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--per-round", type=int, default=20)
     ap.add_argument("--dp", type=int, default=DP)
+    ap.add_argument("--verify", action="store_true",
+                    help="pick the placement whose count survives a "
+                         "minimisation, rather than the one that builds it. "
+                         "Building it right still loses one in eight, and "
+                         "nothing about the built geometry says which.")
     ap.add_argument("--construct", action="store_true",
                     help="build the requested count from the winding instead "
                          "of searching for it. Deterministic: the same "
@@ -454,21 +466,39 @@ def main():
     for f in (root / "04_Simulation").glob("*.in"):
         (cand_root / "04_Simulation" / f.name).write_text(f.read_text())
 
-    def relax_candidate(data_file, i):
+    def relax_candidate(data_file, i=0):
+        """Relax one candidate under the protocol it will be judged by.
+
+        The same number of stages as the final check, not a cheaper screen.
+        Selecting a placement for surviving one minimisation and then
+        reporting it under a different one would be choosing against the wrong
+        test, and the residual loss this is meant to remove is exactly the
+        kind of thing that would slip through.
+        """
         (cand_root / "03_Conformation" / "system_relaxed.data").write_text(
             Path(data_file).read_text())
-        for stale in ("system_after_soft.data",):
+        for stale in ("system_after_soft.data", "system_ramped.data",
+                      "system_equilibrated.data"):
             q = cand_root / "04_Simulation" / stale
             if q.exists():
                 q.unlink()
         try:
-            run_md(cand_root / "04_Simulation", 1)
+            run_md(cand_root / "04_Simulation", args.stages)
         except Exception:
             return None
-        out = cand_root / "04_Simulation" / "system_after_soft.data"
+        out = cand_root / "04_Simulation" / after
         return out if out.exists() else None
 
+    # A template that carries the chains routed so far.
+    #
+    # Placements used to be judged against the pristine melt, so the screen for
+    # the second pair never saw the first pair's new path. Measured: both
+    # pairs screened at 2 on their own and the finished system read 3 and 1.
+    # Designed windings interact, so each has to be chosen against what is
+    # already committed.
+    current = root / "04_Simulation" / "current.data"
     xyz_now = dict(xyz0)
+    rewrite_coords(relaxed, current, xyz_now)
     # Two chains may be sent to the same partner, and winding both at the same
     # place puts the second ring inside the first. Measured: the second pair
     # built nothing at all. Spread the sites across the permitted stretch so
@@ -492,8 +522,9 @@ def main():
             used[target] += 1
             try:
                 p, got = construct_exact(
-                    paths, routed, target, n, box, avoid, seq, relaxed, work,
-                    (args.site_lo, args.site_hi), args.ring, args.dp)
+                    paths, routed, target, n, box, avoid, seq, current, work,
+                    (args.site_lo, args.site_hi), args.ring, args.dp,
+                    relax=(relax_candidate if args.verify else None))
             except ValueError as e:
                 print(f"    chain {routed} -> {target}: {e}")
                 continue
@@ -506,6 +537,7 @@ def main():
             paths[routed] = p
             for aid, xyzp in zip(seq[routed], p):
                 xyz_now[aid] = xyzp
+            rewrite_coords(relaxed, current, xyz_now)
             print(f"    chain {routed} -> {target}: built {got} by "
                   f"construction"
                   f"   (tightest contact {before:.2f} -> "

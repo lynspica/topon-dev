@@ -14,6 +14,45 @@ Newest first.
 
 ---
 
+## 2026-08-11 — The clearance paradox was noise; select on what survives
+
+**Change:** `--verify` in `tests/workflows/entangle_relaxed.py`, a running
+template so each placement is screened against the chains already committed,
+and `tests/workflows/entangle_retention.py`.
+
+**Why:** the previous entry recorded that ordering placements by clearance
+lost them, and kept a rule that picked a 0.14 sigma contact. That was measured
+on two placements and was the shakiest thing in the method.
+
+**Issue / solution:** it was noise. Enumerating 24 placements of one pair and
+recording clearance, grip, build and survival for each gives a correlation
+between clearance and retention of **-0.27**, which is weak, and grip is
+**-0.18**. Two samples said nothing. The claim that a roomy loop slides off
+and a tight one is committed is withdrawn.
+
+What the enumeration does show is a different structure. Seventeen of the 24
+placements built the number asked for and 15 of those kept it, so building it
+correctly still loses one in eight, and nothing measured here predicts which
+one. Since the loss cannot be predicted from the built geometry, the placement
+should be selected on the count that *survives* rather than the count as
+built. Seventeen of 24 placements give the right number after minimisation, so
+a surviving placement is not hard to find, and `--verify` takes the first one.
+
+Two things had to be right for that to work:
+
+- The screening minimisation runs the same number of stages as the final
+  check. Selecting for survival of a cheaper protocol than the one being
+  reported would be choosing against the wrong test.
+- Placements are screened against a template carrying the chains routed so
+  far, not the pristine melt. Designed windings interact: judged against the
+  original melt, both pairs screened at 2 on their own and the finished system
+  read 3 and 1.
+
+**Result:** 2 of 2 pairs asked for 2 and survived at 2, run twice,
+byte-identical. Note that a pair may now read zero as built and the requested
+count after relaxation, since the post-relaxation number is the one being
+chosen; the "as built" column was relabelled accordingly.
+
 ## 2026-08-11 — Determinism: ask for a count, get that count, twice
 
 **Change:** `taut_leg`, `route_through` and `zigzag` in
