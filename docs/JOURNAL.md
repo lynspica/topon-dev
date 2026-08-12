@@ -14,6 +14,44 @@ Newest first.
 
 ---
 
+## 2026-08-12 — Scale: the failures belong to pairs, not to the count
+
+**Change:** `--chains` and `--tag` in `tests/workflows/entangle_relaxed.py`;
+the corrective loop now ends on a verification.
+
+**Why:** the outstanding question of how many chains can be designed at once
+before it stops working.
+
+**Result:** it is not the number of chains.
+
+| routed chains | exact and surviving |
+|---|---|
+| 2 | 2 of 2 |
+| 4 | 2 of 4 |
+| 6 | 5 of 6 |
+
+Six does better than four, so the first reading -- that four chains was the
+limit -- was one data point over-interpreted. What the two larger runs share is
+the *pair* that fails: `45-53` came back 0 against a requested 2 in both, and
+chain 53 also carries by far the most collateral in both, +4 at four chains and
++16 at six. Other chains in the same runs added +1 or +2, and one came back at
+-2. So the failures are a property of particular pairs, most likely of how the
+routed chain has to travel to reach that partner, and not of how many designs
+are in flight.
+
+**A real limit did show up, separately.** The corrective sweeps cycle rather
+than converge: at four chains they chased 0, 26, 53, then 26, then 0; at six,
+35, then 17, then 35 and 88. Re-placing one chain moves the melt around the
+others. Both runs hit the pass limit without settling, and the six-chain run
+still got 5 of 6, so cycling is not the same as failing. What was wrong was
+that the loop ended on a placement rather than a verification, so the final
+state was never checked and was reported as though it had been. It now says
+when it did not settle.
+
+**Next**, if this is worth pursuing: find what makes `45-53` hard. The
+collateral figure is the obvious lead, since the chain that fails is the chain
+that picks up the most on its way.
+
 ## 2026-08-12 — What the legacy kink actually delivers
 
 **Change:** `tests/workflows/entangle_legacy_check.py` measures per pair and
