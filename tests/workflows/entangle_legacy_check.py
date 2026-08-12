@@ -177,6 +177,30 @@ def main():
     print("\n  asked -> got, most common:")
     for (a, b), n in hist.most_common(8):
         print(f"    asked {a}, got {b}: {n} pairs")
+
+    # Against the same pairs in a network built with no kinks at all.
+    #
+    # Without this the measured total means very little. A melt at this density
+    # is entangled whether or not anybody designed it, so the question is not
+    # how many entanglements the kinked system carries but how many of them the
+    # kink is responsible for.
+    both = [(c, g, base[(a, b)]) for a, b, c, g in rows
+            if base.get((a, b)) is not None]
+    if not both:
+        print("\n  no plain baseline was measured, so none of the above can "
+              "be separated from what a melt carries anyway")
+        return 0
+
+    asked = sum(c for c, _g, _b in both)
+    kinked = sum(g for _c, g, _b in both)
+    plainly = sum(b for _c, _g, b in both)
+    print(f"\n  the same {len(both)} pairs in a network with no kinks built:")
+    print(f"    asked for {asked}, measured {kinked} with kinks, "
+          f"{plainly} without")
+    print(f"    so the kinks account for {kinked - plainly} of them and the "
+          f"melt for {plainly}")
+    print(f"    {sum(1 for c, _g, b in both if b == c)} of {len(both)} pairs "
+          f"already carried exactly the requested count with no kink at all")
     return 0
 
 
