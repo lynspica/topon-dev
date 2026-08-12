@@ -434,11 +434,44 @@ def main():
         tot = sum(got_mix.values())
         print(f"\n  shell mix over {len(done)} designed pairs"
               + (f", {blind} unmeasured" if blind else ""))
-        print(f"\n  {'shell':>6} {'asked':>8} {'delivered':>10}")
+        print(f"\n  {'shell':>6} {'asked':>8} {'delivered':>10} "
+              f"{'yield':>8} {'ask next':>9}")
+
+        # What to ask for next time, and why asking for the delivered mix
+        # would not work.
+        #
+        # A pair in an outer shell delivers about twice what a first-shell pair
+        # does, so a mix of pairs is not a mix of entanglements. That makes the
+        # map from asked to delivered not a fixed point: feeding the delivered
+        # mix back in drifts further out rather than settling. Measured,
+        # asking 0.11/0.57/0.32 returns 0.05/0.58/0.37.
+        #
+        # Dividing the target by the measured yield is the correction, and it
+        # is what `select_by_shells(yield_by_shell=...)` consumes. A shell with
+        # zero yield gets no request, because no weighting reaches a shell that
+        # delivers nothing.
+        yields, next_ask = {}, {}
         for s in sorted(set(mix) | set(got_mix)):
             want_f = mix.get(s, 0.0) / sum(mix.values())
             have_f = got_mix.get(s, 0) / tot if tot else 0.0
-            print(f"  {s:>6} {want_f:>8.2f} {have_f:>10.2f}")
+            y = have_f / want_f if want_f > 0 else 0.0
+            yields[s] = y
+            next_ask[s] = want_f / y if y > 0 else 0.0
+        nrm = sum(next_ask.values())
+        for s in sorted(set(mix) | set(got_mix)):
+            want_f = mix.get(s, 0.0) / sum(mix.values())
+            have_f = got_mix.get(s, 0) / tot if tot else 0.0
+            nxt = next_ask[s] / nrm if nrm else 0.0
+            print(f"  {s:>6} {want_f:>8.2f} {have_f:>10.2f} "
+                  f"{yields[s]:>8.2f} {nxt:>9.2f}"
+                  + ("   unreachable" if yields[s] == 0 and want_f > 0
+                     else ""))
+        if nrm:
+            print(f"\n  to deliver the mix asked for, run again with "
+                  f"--shells "
+                  + ",".join(f"{s}:{next_ask[s] / nrm:.2f}"
+                             for s in sorted(next_ask)
+                             if next_ask[s] > 0))
 
     Path(root / "04_Simulation" / "designed.data").write_text(
         Path(rewrite_coords(relaxed,
