@@ -161,7 +161,11 @@ def main():
                     help="target entanglements per chain")
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
-    ap.add_argument("--rounds", type=int, default=4)
+    ap.add_argument("--rounds", type=int, default=6)
+    ap.add_argument("--calibrate", type=float, default=0.15,
+                    help="fraction of the selected pairs to route in the "
+                         "first batch, before what a pair is worth in this "
+                         "system has been measured")
     ap.add_argument("--tol", type=float, default=0.15,
                     help="stop when within this many entanglements per chain")
     ap.add_argument("--dims", type=int, default=4)
@@ -296,18 +300,47 @@ def main():
         out = cand / "04_Simulation" / after
         return out if out.exists() else None
 
+    # Coordinates as an array with a row index, not a dict.
+    #
+    # The obstacle set is rebuilt for every routed chain, and doing it by dict
+    # comprehension over every atom costs more than the routing: 52k lookups
+    # times 380 chains is 20 million, and the first run stalled in round one.
+    # With rows, excluding a chain is a boolean mask.
+    ids = sorted(xyz0)
+    row = {a: i for i, a in enumerate(ids)}
+    xyz_arr = np.array([xyz0[a] for a in ids])
+
     xyz_now = dict(xyz0)
-    done, target = set(), args.want + base[0]
-    print(f"\n  {'round':>6} {'routed':>7} {'per chain':>10} "
-          f"{'partners':>9} {'designed':>9}")
+    done = set()
+
+    # A calibrated controller, not a single shot.
+    #
+    # Routing every selected pair at once overshoots badly: measured, 102 pairs
+    # asked for 2.00 per chain and delivered 5.48. A designed pair is worth
+    # more than the entanglements it was asked for, because the routed chain
+    # picks others up on its way and for a density those count.
+    #
+    # So route a small batch first, measure what a pair is actually worth in
+    # this system, and size every later batch from that. The yield is
+    # re-estimated each round, so it corrects itself rather than trusting the
+    # first estimate.
+    pool = list(plan)
+    batch = max(1, int(args.calibrate * len(pool)))
+    added, yield_per = 0.0, None
+    print(f"\n  {'round':>6} {'routed':>7} {'added':>7} {'per pair':>9} "
+          f"{'target':>7}")
     for rnd in range(1, args.rounds + 1):
-        for a, b, count in plan:
-            if (a, b) in done:
-                continue
-            mine = set(seq[a])
-            avoid = Clearance(np.array([xyz_now[i] for i in sorted(xyz_now)
-                                        if i not in mine]), box,
-                              args.clearance)
+        take = pool[:batch]
+        pool = pool[batch:]
+        if not take:
+            print(f"  no pairs left; delivered {added:.2f} against "
+                  f"{args.want:.2f}")
+            break
+
+        for a, b, count in take:
+            keep = np.ones(len(ids), bool)
+            keep[[row[i] for i in seq[a]]] = False
+            avoid = Clearance(xyz_arr[keep], box, args.clearance)
             try:
                 p = construct(paths, a, b, max(0.5, 0.5 * count), box, avoid,
                               radius=args.ring, dp=args.dp, span=(0.3, 0.7))
@@ -316,6 +349,7 @@ def main():
             paths[a] = p
             for aid, xyzp in zip(seq[a], p):
                 xyz_now[aid] = xyzp
+                xyz_arr[row[aid]] = xyzp
             done.add((a, b))
 
         out = relax(xyz_now)
@@ -323,31 +357,66 @@ def main():
             print(f"  {rnd:>6}   relaxation failed")
             return 1
         got = measure_system(out, seq, keys, work, watch)
-        print(f"  {rnd:>6} {len(done):>7} {got[0]:>10.2f} {got[1]:>9.1f} "
-              f"{len(done):>9}"
-              + (f"   ({got[3]} of {got[2]} pairs unmeasured)"
-                 if got[3] else ""))
-
         added = got[0] - base[0]
+        yield_per = added / max(len(done), 1)
+        print(f"  {rnd:>6} {len(done):>7} {added:>7.2f} {yield_per:>9.3f} "
+              f"{args.want:>7.2f}"
+              + (f"   ({got[3]} unmeasured)" if got[3] else ""))
+
         if abs(added - args.want) <= args.tol:
             print(f"\n  delivered {added:.2f} per chain against a target of "
                   f"{args.want:.2f}, within {args.tol}")
             break
-        if added > args.want:
-            print(f"\n  overshot: {added:.2f} against {args.want:.2f}")
+        if added > args.want + args.tol:
+            print(f"\n  overshot: {added:.2f} against {args.want:.2f}. "
+                  f"A pair is worth {yield_per:.3f} here, so "
+                  f"{int(args.want / max(yield_per, 1e-9))} pairs is the "
+                  f"number to ask for.")
             break
-        # Top up only the shortfall, so the loop converges instead of
-        # doubling.
-        short = args.want - added
-        more = to_idx(select_by_shells(G, short, mix, dims, shells=shells,
-                                       rng=rng))
-        plan = [q for q in more if (q[0], q[1]) not in done]
-        if not plan:
-            print(f"\n  no unused pair left; delivered {added:.2f} against "
-                  f"{args.want:.2f}")
-            break
+        # Size the next batch from what a pair is actually worth.
+        batch = max(1, int(round((args.want - added) / max(yield_per, 1e-9))))
     else:
-        print(f"\n  did not reach the target in {args.rounds} rounds")
+        print(f"\n  did not reach the target in {args.rounds} rounds; "
+              f"delivered {added:.2f} against {args.want:.2f}")
+
+    # The delivered shell mix, against the requested one.
+    #
+    # Selection produces the requested mix by construction; whether the built
+    # and relaxed system carries it is a separate question, and the only one
+    # that matters. Counted over the designed pairs that survived, since a
+    # background entanglement was not placed in any shell by anybody.
+    from tests.workflows.entangle_relaxed import measure_pairs
+    shell_of = {}
+    for chain, by in shells.items():
+        a = idx_of.get(frozenset((chain[0], chain[1])))
+        if a is None:
+            continue
+        for s, others in by.items():
+            for o in others:
+                b = idx_of.get(frozenset((o[0], o[1])))
+                if b is not None and a != b:
+                    shell_of.setdefault((min(a, b), max(a, b)), s)
+
+    if done:
+        out = relax(xyz_now)
+        final = measure_pairs(out, seq, sorted(done), work) if out else {}
+        base_d = measure_pairs(relaxed, seq, sorted(done), work)
+        got_mix, blind = {}, 0
+        for q in sorted(done):
+            s = shell_of.get(q)
+            v, b0 = final.get(q), base_d.get(q)
+            if s is None or v is None or b0 is None:
+                blind += 1
+                continue
+            got_mix[s] = got_mix.get(s, 0) + max(0, v - b0)
+        tot = sum(got_mix.values())
+        print(f"\n  shell mix over {len(done)} designed pairs"
+              + (f", {blind} unmeasured" if blind else ""))
+        print(f"\n  {'shell':>6} {'asked':>8} {'delivered':>10}")
+        for s in sorted(set(mix) | set(got_mix)):
+            want_f = mix.get(s, 0.0) / sum(mix.values())
+            have_f = got_mix.get(s, 0) / tot if tot else 0.0
+            print(f"  {s:>6} {want_f:>8.2f} {have_f:>10.2f}")
 
     Path(root / "04_Simulation" / "designed.data").write_text(
         Path(rewrite_coords(relaxed,
