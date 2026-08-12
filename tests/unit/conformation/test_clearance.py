@@ -241,8 +241,8 @@ def test_route_through_is_reproducible():
     from topon.conformation.paths import route_through
     a, b = np.zeros(3), np.array([5.0, 0.0, 0.0])
     w = [np.array([3.0, 2.0, 0.0]), np.array([3.0, -2.0, 1.0])]
-    p1 = route_through(a, b, w, 81, 0.95, away_from=np.array([3.0, 0.0, 0.0]))
-    p2 = route_through(a, b, w, 81, 0.95, away_from=np.array([3.0, 0.0, 0.0]))
+    p1 = route_through(a, b, w, 81, 0.95)
+    p2 = route_through(a, b, w, 81, 0.95)
     assert np.array_equal(p1, p2)
     assert len(p1) == 82
 

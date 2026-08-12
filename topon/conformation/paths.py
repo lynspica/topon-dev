@@ -407,20 +407,18 @@ def zigzag(start, end, n_bonds: int, bond: float = 0.97, hint=None):
 
 
 def route_through(start, end, waypoints, n_bonds: int, bond: float = 0.97,
-                  away_from=None, avoid: "Clearance | None" = None):
+                  avoid: "Clearance | None" = None):
     """Visit every waypoint in order, spending all the contour deterministically.
 
     The same job as ``walk_through`` and the same guarantees -- exact bonds,
-    lands on both junctions, hits each waypoint -- but the legs are zigzags
-    rather than random walks, so the same design gives the same path every
-    time. That is what makes a requested entanglement count reproducible: with
-    random legs the leftover contour wanders back across the target and adds
-    crossings of its own.
+    lands on both junctions, hits each waypoint -- but the legs come from
+    ``taut_leg`` rather than a random walk, so the same design gives the same
+    path every time. That is what makes a requested entanglement count
+    reproducible: with random legs the leftover contour wanders back across the
+    target and adds crossings of its own.
 
-    ``away_from`` is a point the slack should fold away from, normally the
-    target being wound. With ``avoid``, the fold direction is chosen from a
-    fixed set of candidates by which one clears best, which keeps the result
-    deterministic while still keeping the path off the beads already there.
+    ``avoid`` keeps the legs off the beads already in the box, and each leg
+    also avoids the ones laid down before it.
     """
     pts = [np.asarray(start, float)]
     pts += [np.asarray(w, float) for w in waypoints]

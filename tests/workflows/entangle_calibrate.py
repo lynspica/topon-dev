@@ -81,7 +81,7 @@ def build(routed_path, target_path, at, radius, span, phase, avoid, rng,
                        phase, avoid, span)
     if taut:
         return route_through(routed_path[0], routed_path[-1], list(ring),
-                             dp + 1, bond, target_path[i], avoid)
+                             dp + 1, bond, avoid)
     return walk_through(routed_path[0], routed_path[-1], list(ring),
                         dp + 1, bond, rng, avoid)
 
