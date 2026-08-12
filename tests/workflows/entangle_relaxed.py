@@ -116,6 +116,27 @@ def measure_pairs(data_file, seq, pairs, work):
                      if f"p{a}_{b}" in res else None) for a, b in pairs}
 
 
+def measure_many(template, seq, routed, target, cands, work):
+    """Counts for many candidate paths of one pair, in a single Z1+ batch.
+
+    One call per candidate spends a WSL start-up on each, and that dominates
+    everything else: sixty candidates took eight minutes, nearly all of it
+    process launch. Exporting them all and measuring once takes seconds, which
+    is what makes enumerating over windings as well as sites and orientations
+    affordable at all.
+    """
+    work.mkdir(parents=True, exist_ok=True)
+    for old in list(work.glob("*.Z1")) + list(work.glob("SP_*.dat")):
+        old.unlink()
+    tmp = work / "cand.data"
+    for i, path in enumerate(cands):
+        rewrite_coords(template, tmp, dict(zip(seq[routed], path)))
+        z1_export(tmp, [seq[routed], seq[target]], work / f"c{i:04d}.Z1")
+    res = measure_batch(work) or {}
+    return [(_both(res[f"c{i:04d}"], 1, 2) if f"c{i:04d}" in res else None)
+            for i in range(len(cands))]
+
+
 def route_pairwise(paths, keys, seq, geo, routed, target, want, template,
                    rounds, per_round, rng, work, relax=None, avoid=None,
                    site_span=(0.05, 0.95)):
@@ -424,30 +445,33 @@ def construct_exact(paths, routed, target, want, box, avoid, seq, template,
     # ordering by it puts the likely candidates first without ruling anything
     # out: if none of them survives at the right number the pass runs on
     # through the rest.
-    built = []
+    shapes = []
     for turns in turn_options(want):
         for rank in range(ranks):
             for k in range(phases):
                 phase = 2.0 * np.pi * k / phases
                 try:
-                    p = construct(paths, routed, target, turns, box, avoid,
-                                  radius=radius, phase=phase, dp=dp,
-                                  span=span, rank=rank)
+                    shapes.append(construct(
+                        paths, routed, target, turns, box, avoid,
+                        radius=radius, phase=phase, dp=dp, span=span,
+                        rank=rank))
                 except ValueError:
                     continue
-                rewrite_coords(template, work / "try.data",
-                               dict(zip(seq[routed], p)))
-                got = measure_pairs(work / "try.data", seq, [pair],
-                                    work)[pair]
-                if got is None:
-                    continue
-                if relax is None:
-                    if got == want:
-                        return p, got
-                    if best is None or abs(got - want) < abs(best[1] - want):
-                        best = (p, got)
-                else:
-                    built.append((abs(got - want), got, p))
+    if not shapes:
+        return None, None
+
+    built = []
+    for p, got in zip(shapes, measure_many(template, seq, routed, target,
+                                           shapes, work)):
+        if got is None:
+            continue
+        if relax is None:
+            if got == want:
+                return p, got
+            if best is None or abs(got - want) < abs(best[1] - want):
+                best = (p, got)
+        else:
+            built.append((abs(got - want), got, p))
 
     if relax is None:
         return best if best is not None else (None, None)

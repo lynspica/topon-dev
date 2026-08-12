@@ -14,6 +14,51 @@ Newest first.
 
 ---
 
+## 2026-08-12 — Collateral measured; multi-partner chains; batched scoring
+
+**Change:** collateral reporting and `construct_multi` /
+`construct_exact_multi` in `tests/workflows/entangle_relaxed.py`,
+`measure_many` to batch candidate scoring, `--partners`.
+
+**Why:** three of the gaps left open after the determinism work. Nothing
+measured what a routed chain picked up besides its named partner; a chain
+could only be given one partner, so the A-B-C-D case from the original goal
+could not be built; and the enumeration was too slow to use.
+
+**Issue / solution:**
+
+*Collateral.* Hitting the requested count says nothing about the chains that
+were not requested, and a routed chain travels a long way to reach its
+partner. Now measured against the same chains in the relaxed melt, so the
+number reported is what the routing added rather than what a melt carries
+anyway. First measurement, two designed pairs, both exact: chain 0 went from 2
+unrequested partners to 3, and from 4 points to 7; chain 20 from none to 2
+partners and 3 points. So a designed pair costs about three unrequested
+entanglement points. That is a real cost and it was invisible until now.
+
+*Multi-partner.* A chain with several requested partners cannot be built by
+taking each in turn and keeping the best, because each attempt replaces the
+path and undoes the last. The rings now go into a single route, visited in the
+order the partners lie along the routed chain's own chord so the path does not
+cross the box and come back between them. Verified on synthetic geometry:
+three partners in one path, exact bonds, both junctions, all three reached
+within 1.2 sigma, identical on repeat.
+
+*Speed.* Scoring made one Z1+ call per candidate and each call pays a WSL
+start-up, so sixty candidates took eight minutes of almost pure process
+launch. Batching the export and measuring once takes seconds. That is what
+makes enumerating over windings as well as sites and orientations affordable,
+and it is why odd counts could be attempted at all.
+
+**Also:** `route_through` had an `away_from` argument that stopped doing
+anything when the zigzag legs were replaced by `taut_leg`. Three callers
+passed it positionally, so deleting it without touching them would have
+quietly promoted each caller's hub point into the `avoid` slot. Removed with
+every caller updated. And `taut_leg` now applies the minimum image to its own
+beads: the path is built unwrapped, so a leg long enough to cross the cell and
+fold back met itself through the boundary at a separation raw distances never
+saw.
+
 ## 2026-08-11 — The clearance paradox was noise; select on what survives
 
 **Change:** `--verify` in `tests/workflows/entangle_relaxed.py`, a running
