@@ -16,17 +16,13 @@ near 0.07 sigma -- a collapsed chain that Z1+ refuses outright. That is not a
 fault of the method; the soft push is what expands it, and the expanded state
 is the one that means anything.
 
-STATUS: does not yet produce an answer. Z1+ rejects the minimised
-configuration as well, and it is not clear why. The file is well formed --
-106 chains, 82 beads each, box 21.58, bonds 0.373 to 1.636 with none over 2
-sigma, coordinates spanning 35 sigma because chains are unwrapped across the
-boundary. The same export path works on a two-chain pair, and the same
-whole-system shape works when the paths are written directly rather than read
-back from a data file, so the failing combination is whole-system *and* read
-from LAMMPS output. Until that is resolved, whether the legacy kink delivers
-the counts it selects is unmeasured -- which is worth stating plainly, since
-the count has always been an input to the geometry and never an output
-checked against it.
+The whole-system export used to fail here and the reason is now known: Z1+
+rejects a configuration read back from LAMMPS output whenever a chain is
+longer than the periodic cell, which after minimisation is routine rather than
+exceptional. Measuring one pair at a time avoids it, and that is what the
+designed-entanglement workflows do. Pairs that still cannot be measured are
+reported and excluded, never counted as zero, because a failed measurement and
+an absent entanglement print identically.
 """
 from __future__ import annotations
 
@@ -49,7 +45,7 @@ from topon.assignment.entanglements import (  # noqa: E402
 )
 from topon.config.schema import EntanglementsConfig  # noqa: E402
 from tests.workflows.entangle_all import CASES  # noqa: E402
-from tests.workflows.entangle_search import _both, measure_batch  # noqa: E402
+from tests.workflows.entangle_relaxed import measure_pairs  # noqa: E402
 from tests.workflows.entangle_spatial import kinked_paths  # noqa: E402
 from tests.workflows.entangle_steps import (  # noqa: E402
     BOND,
@@ -120,39 +116,49 @@ def main():
         return 1
 
     keys = sorted(geo["chords"])
-    idx = {k: i + 1 for i, k in enumerate(keys)}
-    seqs = [chain_ids(k, node_atom, chain_atoms, geo["ends"]) for k in keys]
+    seq = {k: chain_ids(k, node_atom, chain_atoms, geo["ends"]) for k in keys}
 
-    work = OUT / f"legacy_z1_{os.getpid()}"
-    work.mkdir(parents=True, exist_ok=True)
-    for old in list(work.glob("*.Z1")) + list(work.glob("SP_*.dat")):
-        old.unlink()
-    z1_export(final, seqs, work / "final.Z1")
-    res = (measure_batch(work) or {}).get("final", {})
-    total = sum(sum(v.values()) for v in res.values())
-    print(f"\n  Z1+ after minimisation: {total} entanglement points "
-          f"over {len(keys)} chains")
-    if not total:
-        print("  nothing measured; the numbers below mean nothing")
-        return 1
-
+    # One pair at a time, not the whole system.
+    #
+    # Exporting every chain at once is what stalled this measurement. Z1+
+    # rejects a configuration read back from LAMMPS output whenever a chain is
+    # longer than the periodic cell, and after minimisation that is routine.
+    # Per pair it works, which is how the designed-entanglement workflows
+    # measure survival, and it is the same question being asked here.
     key_of = {frozenset(v): k for k, v in geo["ends"].items()}
-    hit = 0
-    rows = []
-    hist = collections.Counter()
+    wanted = []
     for e1, e2, cnt in sel:
         k1 = key_of.get(frozenset((e1[0], e1[1])))
         k2 = key_of.get(frozenset((e2[0], e2[1])))
-        if k1 is None or k2 is None:
-            continue
-        got = _both(res, idx[k1], idx[k2])
-        rows.append((k1, k2, cnt, got))
-        hist[(cnt, got)] += 1
-        hit += (got == cnt)
+        if k1 is not None and k2 is not None and k1 != k2:
+            wanted.append((min(k1, k2), max(k1, k2), cnt))
+    if not wanted:
+        print("\n  no selected pair maps onto a chain, nothing to check")
+        return 1
 
+    work = OUT / f"legacy_z1_{os.getpid()}"
+    got = measure_pairs(final, seq, [(a, b) for a, b, _c in wanted], work)
+
+    blind = sum(1 for a, b, _c in wanted if got[(a, b)] is None)
+    if blind:
+        print(f"\n  {blind} of {len(wanted)} pairs could not be measured. "
+              f"They are left out below rather than counted as zero, since a "
+              f"failed measurement and an absent entanglement look identical.")
+
+    rows = [(a, b, c, got[(a, b)]) for a, b, c in wanted
+            if got[(a, b)] is not None]
+    if not rows:
+        print("  nothing measured at all; no conclusion can be drawn")
+        return 1
+
+    hit = sum(1 for _a, _b, c, g in rows if g == c)
+    hist = collections.Counter((c, g) for _a, _b, c, g in rows)
     print(f"\n  {hit} of {len(rows)} requested pairs carry exactly the "
-          f"count they were given ({100.0 * hit / max(len(rows), 1):.0f}%)")
-    print(f"  {sum(1 for _, _, _, g in rows if g == 0)} carry none at all")
+          f"count they were given ({100.0 * hit / len(rows):.0f}%)")
+    print(f"  {sum(1 for _a, _b, _c, g in rows if g == 0)} carry none at all")
+    print(f"  asked for {sum(c for _a, _b, c, _g in rows)} entanglements "
+          f"over these pairs, measured "
+          f"{sum(g for _a, _b, _c, g in rows)}")
     print("\n  asked -> got, most common:")
     for (a, b), n in hist.most_common(8):
         print(f"    asked {a}, got {b}: {n} pairs")
