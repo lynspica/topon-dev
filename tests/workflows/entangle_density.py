@@ -61,6 +61,12 @@ from tests.workflows.entangle_steps import (  # noqa: E402
 )
 
 
+def keep_pairs_with_counts(plan, wanted):
+    """The plan entries for a set of pairs, in the plan's own order."""
+    want = set(wanted)
+    return [q for q in plan if (q[0], q[1]) in want]
+
+
 def close_pairs(paths, box, cutoff=3.0):
     """Chain pairs that come within ``cutoff`` of each other.
 
@@ -368,11 +374,27 @@ def main():
                   f"{args.want:.2f}, within {args.tol}")
             break
         if added > args.want + args.tol:
-            print(f"\n  overshot: {added:.2f} against {args.want:.2f}. "
-                  f"A pair is worth {yield_per:.3f} here, so "
-                  f"{int(args.want / max(yield_per, 1e-9))} pairs is the "
-                  f"number to ask for.")
-            break
+            # Back off rather than stop.
+            #
+            # An overshoot is not a failure, it is a calibration: the yield is
+            # now known, so the right number of pairs is known too. Start again
+            # from the plain melt with that many, which is exact, instead of
+            # trying to unpick entanglements from the system that overshot.
+            n_want = max(1, int(args.want / max(yield_per, 1e-9)))
+            if n_want >= len(done) or rnd >= args.rounds:
+                print(f"\n  overshot: {added:.2f} against {args.want:.2f}; a "
+                      f"pair is worth {yield_per:.3f} here")
+                break
+            print(f"  {'':>6} backing off to {n_want} pairs, since a pair is "
+                  f"worth {yield_per:.3f}")
+            keep_pairs = sorted(done)[:n_want]
+            paths.update({k: v.copy() for k, v in paths0.items()})
+            xyz_now = dict(xyz0)
+            xyz_arr[:] = np.array([xyz0[a] for a in ids])
+            done = set()
+            pool = keep_pairs_with_counts(plan, keep_pairs) + pool
+            batch = n_want
+            continue
         # Size the next batch from what a pair is actually worth.
         batch = max(1, int(round((args.want - added) / max(yield_per, 1e-9))))
     else:
