@@ -137,3 +137,57 @@ def test_max_per_pair_caps_repeat_draws():
     sel = select_by_shells(G, 4.0, {1: 1.0}, dims, shells=sh,
                            rng=np.random.default_rng(3), max_per_pair=2)
     assert sel and max(c for _a, _b, c in sel) <= 2
+
+
+def test_yield_weighting_asks_for_more_where_a_pair_is_worth_less():
+    """The request is a mix of entanglements, not of pairs.
+
+    A pair in an outer shell delivers more, because the routed chain travels
+    further and picks up more on the way. Measured over 62 designed pairs on
+    SC, asked 0.20/0.50/0.25/0.05 and delivered 0.11/0.57/0.32/0.00.
+    """
+    G, dims = grid()
+    sh = neighbour_shells(G, dims, max_shell=3)
+    want = {1: 0.5, 2: 0.5}
+    # Shell 2 pairs are worth four times shell 1 pairs here.
+    yields = {1: 0.05, 2: 0.20}
+    plain = select_by_shells(G, 2.0, want, dims, shells=sh,
+                             rng=np.random.default_rng(5))
+    tuned = select_by_shells(G, 2.0, want, dims, shells=sh,
+                             rng=np.random.default_rng(5),
+                             yield_by_shell=yields)
+
+    of_shell = {s: {(min(c, o), max(c, o))
+                    for c, by in sh.items() for o in by.get(s, ())}
+                for s in want}
+
+    def share(sel, s):
+        n = sum(c for a, b, c in sel
+                if (min(a, b), max(a, b)) in of_shell[s])
+        tot = sum(c for _a, _b, c in sel)
+        return n / tot if tot else 0.0
+
+    # Weighting must move draws toward the shell whose pairs are worth less.
+    assert share(tuned, 1) > share(plain, 1)
+    assert share(tuned, 2) < share(plain, 2)
+
+
+def test_no_yield_given_is_the_old_behaviour():
+    G, dims = grid()
+    sh = neighbour_shells(G, dims, max_shell=3)
+    a = select_by_shells(G, 1.5, {1: 0.5, 2: 0.5}, dims, shells=sh,
+                         rng=np.random.default_rng(9))
+    b = select_by_shells(G, 1.5, {1: 0.5, 2: 0.5}, dims, shells=sh,
+                         rng=np.random.default_rng(9), yield_by_shell=None)
+    assert a == b
+
+
+def test_equal_yields_change_nothing():
+    G, dims = grid()
+    sh = neighbour_shells(G, dims, max_shell=3)
+    a = select_by_shells(G, 1.5, {1: 0.5, 2: 0.5}, dims, shells=sh,
+                         rng=np.random.default_rng(11))
+    b = select_by_shells(G, 1.5, {1: 0.5, 2: 0.5}, dims, shells=sh,
+                         rng=np.random.default_rng(11),
+                         yield_by_shell={1: 0.3, 2: 0.3})
+    assert a == b

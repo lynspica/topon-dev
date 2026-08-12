@@ -761,7 +761,7 @@ def neighbour_shells(G, dims=None, max_shell=6, tol=0.02, samples=12,
 
 def select_by_shells(G, per_chain, shell_fractions, dims=None,
                      num_chains=None, rng=None, max_per_pair=None,
-                     shells=None, tol=0.02):
+                     shells=None, tol=0.02, yield_by_shell=None):
     """Pairs and counts hitting a per-chain density with a shell mix.
 
     ``per_chain`` is the system-averaged number of entanglements per chain and
@@ -772,6 +772,12 @@ def select_by_shells(G, per_chain, shell_fractions, dims=None,
     ``{1: 0.2, 2: 0.5, 3: 0.25, 4: 0.05}``. Fractions are normalised, and
     draws are allocated to shells by largest remainder so the realised mix is
     as close to the request as whole draws allow.
+
+    ``yield_by_shell`` is ``{shell: entanglements delivered per designed
+    pair}``, measured on a built system. Given it, the allocation asks for more
+    pairs in the shells where each pair is worth less, so the *delivered* mix
+    matches the request rather than the drawn one. Without it every shell is
+    taken as equally productive, which it is not.
 
     What this does *not* promise is that the built system will measure the
     same mix. Selection says which pairs to wind; whether the winding survives
@@ -797,6 +803,25 @@ def select_by_shells(G, per_chain, shell_fractions, dims=None,
     if shells is None:
         shells = neighbour_shells(G, dims, max_shell=max(wanted), tol=tol)
     norm = sum(wanted.values())
+
+    # Weight by what a pair in each shell is actually worth.
+    #
+    # The request is a mix of *entanglements*, and drawing that mix of *pairs*
+    # is not the same thing: a pair in an outer shell delivers more, because
+    # the routed chain travels further and picks up more on the way. Measured
+    # over 62 designed pairs on SC, asked 0.20 / 0.50 / 0.25 / 0.05 across four
+    # shells and delivered 0.11 / 0.57 / 0.32 / 0.00 -- the inner shell short,
+    # the outer ones long, in the direction the yield explains.
+    #
+    # Dividing the requested fraction by the yield asks for proportionally more
+    # pairs where each is worth less. Without a measured yield every shell is
+    # taken as worth the same, which is the old behaviour.
+    if yield_by_shell:
+        wanted = {s: f / max(yield_by_shell.get(s, 1.0), 1e-9)
+                  for s, f in wanted.items()}
+        norm = sum(wanted.values())
+        if norm <= 0:
+            return []
 
     # Largest remainder, so the realised mix is the closest whole-draw
     # approximation of the request rather than however rounding falls.
