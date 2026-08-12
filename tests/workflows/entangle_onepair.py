@@ -84,6 +84,11 @@ def main():
     ap.add_argument("--ranks", type=int, default=5)
     ap.add_argument("--phases", type=int, default=4)
     ap.add_argument("--clearance", type=float, default=0.9)
+    ap.add_argument("--old-protocol", default="generated",
+                    choices=("generated", "hardcore"),
+                    help="which LAMMPS protocol the old kink is built under. "
+                         "Its own is 'generated', whose soft push expands the "
+                         "collapsed chords it starts from.")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -175,9 +180,15 @@ def main():
     shutil.rmtree(old_root, ignore_errors=True)
     _n2, na2, ca2 = write_system(graph, geo, kinked, old_root)
     seq_old = {k: chain_ids(k, na2, ca2, geo["ends"]) for k in keys}
+    # The old kink gets its own protocol by default.
+    #
+    # It lays chains along their chords, which at DP 80 means bonds near 0.07
+    # sigma, and the soft push in the generated scripts is what expands them.
+    # Judging it under the hard-core protocol instead would be judging it on a
+    # conformation it was never built for.
     sim2 = conform_and_script(old_root, graph, geo, pair_style="repulsive",
-                              protocol="hardcore")
-    print("  --- old kink, one pair ---")
+                              protocol=args.old_protocol)
+    print(f"  --- old kink, one pair, {args.old_protocol} protocol ---")
     run_md(sim2, args.stages)
     old_f = old_root / "04_Simulation" / after
     old_got = (measure_pairs(old_f, seq_old, [pick], work)[pick]
