@@ -14,6 +14,50 @@ Newest first.
 
 ---
 
+## 2026-08-12 — The corrective sweep was approving a different system
+
+**Change:** the final minimisation now runs `xyz_now`, the coordinates the
+corrective sweep actually probed. Blind placements are counted and reported.
+`--tag` and `--chains` added.
+
+**Why:** a count of 3 gave 1 of 2, and the sweep had already printed "every
+count holds" for the run that failed.
+
+**Issue / solution:** the sweep probed `xyz_now` -- the wrapped base
+coordinates with the routed chains laid over them -- while the final
+minimisation rebuilt its input from `paths`, which holds *unwrapped*
+coordinates for every chain, including the ones nothing had touched. The two
+files were 2479 bytes apart and LAMMPS warned about inconsistent image flags
+on the second. So the sweep approved one system and the run then minimised
+another, and a pair the probe passed at 3 came back 2. That is not a weak
+guarantee, it is a meaningless one.
+
+With the final running what was approved, a count of 3 gives **2 of 2 exact and
+surviving**, and the earlier guess that the trouble was specific to tighter
+windings was wrong.
+
+A second measurement problem was masking this. Z1+ refuses a chain longer than
+the periodic cell, and a routed chain is far longer than the estimate its box
+was sized from: the nominal route is 32 sigma but measured chains reached 53.5
+in a 42.9 sigma box, 31 rejections in one run. Those placements were not bad,
+they were unmeasured, and the enumeration was choosing from a smaller set than
+it appeared to be while saying nothing about it. It now reports what it could
+not see. Raising `--dims` is the way out, since it grows the box while leaving
+the route the same length: dims 4 gives 42.9 sigma, dims 6 gives 64.4, both
+with the same 32.2 sigma route.
+
+**Collateral scales badly with the count.** Two designed pairs, measured
+against the same chains in the relaxed melt:
+
+| requested count | unrequested points added per routed chain |
+|---|---|
+| 2 | +3 |
+| 3 | +9 to +11 |
+
+So asking for more entanglements with a named partner buys a great many with
+everybody else. Whether that matters depends on the use, but it is now visible
+rather than assumed away.
+
 ## 2026-08-12 — Odd counts are buildable; several partners per chain
 
 **Change:** `turn_options` and enumeration over windings, a per-routed-chain
