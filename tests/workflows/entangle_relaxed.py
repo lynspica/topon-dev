@@ -826,6 +826,14 @@ def main():
     # system read 6 and 2. A corrective sweep re-places only the chains that
     # are off, against the complete system this time, and stops as soon as
     # nothing is.
+    # The loop must end on a verification, not on a placement. Ending on a
+    # placement leaves the final state unchecked, and it will not generally be
+    # right: measured with four chains, the last sweep re-placed chain 0 and
+    # the run then reported two pairs correct that the finished system did not
+    # carry. So `settled` is only true when a probe has just seen every count
+    # hold, and when it is false the run says so rather than presenting the
+    # last placement as though it had been confirmed.
+    settled = False
     for sweep in range(1, max(1, args.passes)):
         probe = relax_candidate(current)
         if probe is None:
@@ -836,12 +844,21 @@ def main():
                if any(now.get((min(r, t), max(r, t))) != n
                       for t, n in w.items())]
         if not off:
+            settled = True
             print(f"  every count holds after pass {sweep}")
             break
         print(f"  pass {sweep + 1}: re-placing "
               + ", ".join(str(r) for r, _w in off))
         for routed, want in off:
             place(routed, want)
+
+    if not settled and args.passes > 1:
+        # Re-placing one chain moves the melt around the others, so the sweeps
+        # can chase each other: with four chains they cycled 0, 26, 53 then 26
+        # then 0 without ever settling. Nothing below is wrong, but it is the
+        # last placement rather than a confirmed one.
+        print(f"  did not settle in {args.passes} passes; the counts below "
+              f"are the last placement, not a verified one")
 
     # ---- 4: write it back and minimise again ----------------------------
     #
