@@ -666,3 +666,174 @@ def get_kink_params(config: EntanglementsConfig) -> dict:
         "z_amp": config.kink_params.z_amp,
         "sigma": config.kink_params.sigma,
     }
+
+
+# ---------------------------------------------------------------------------
+# Shell-resolved selection
+#
+# `find_crossing_candidates` gives each chain its single nearest disjoint
+# neighbour, so the pool it returns is almost entirely first-shell pairs.
+# That is a hard ceiling on any request for a neighbourhood mix: a draw
+# weighted toward third neighbours cannot find third neighbours that are not
+# in the pool. These two functions build the full ranking instead, and select
+# against a requested per-chain density and shell distribution.
+# ---------------------------------------------------------------------------
+
+def chain_distances(G, dims=None, samples=12):
+    """Closest approach between every pair of disjoint chains.
+
+    Chord to chord, sampled, rather than midpoint to midpoint. Two chains can
+    have distant midpoints and still run alongside each other, and it is the
+    running-alongside that decides whether an entanglement between them is
+    reachable.
+
+    Returns ``{(edge_a, edge_b): distance}`` with ``edge_a < edge_b``, in the
+    units of the node positions.
+    """
+    import numpy as _np
+
+    edges, pts, nodes = [], [], {}
+    t = _np.linspace(0.0, 1.0, samples)[:, None]
+    for u, v, key in G.edges(keys=True):
+        if G.degree(u) <= 1 or G.degree(v) <= 1:
+            continue
+        pu, pv = G.nodes[u].get("pos"), G.nodes[v].get("pos")
+        if pu is None or pv is None:
+            continue
+        pu, pv = _np.asarray(pu, float), _np.asarray(pv, float)
+        vec = pv - pu
+        if dims is not None:
+            vec = vec - dims * _np.round(vec / dims)
+        e = (u, v, key)
+        edges.append(e)
+        pts.append(pu + t * vec)
+        nodes[e] = {u, v}
+
+    out = {}
+    for i, a in enumerate(edges):
+        for j in range(i + 1, len(edges)):
+            b = edges[j]
+            if nodes[a] & nodes[b]:
+                continue
+            d = pts[i][:, None, :] - pts[j][None, :, :]
+            if dims is not None:
+                d = d - dims * _np.round(d / dims)
+            out[(a, b)] = float(_np.linalg.norm(d, axis=2).min())
+    return out
+
+
+def neighbour_shells(G, dims=None, max_shell=6, tol=0.02, samples=12,
+                     distances=None):
+    """Each chain's disjoint neighbours, grouped into distance shells.
+
+    A shell is every neighbour at the same closest approach, not the n-th
+    entry of a sorted list. On a lattice those distances are discrete and
+    heavily degenerate -- a chain in an SC network has several neighbours at
+    exactly the same distance -- so "second neighbour" means the second
+    distinct distance, which is the physically meaningful reading and the one
+    a shell distribution is normally expressed in.
+
+    Returns ``{edge: {shell: [edges]}}``, shells numbered from 1, closest
+    first. ``tol`` is the fraction by which two distances may differ and still
+    count as the same shell.
+    """
+    d = (chain_distances(G, dims, samples) if distances is None
+         else distances)
+    by_chain = {}
+    for (a, b), r in d.items():
+        by_chain.setdefault(a, []).append((r, b))
+        by_chain.setdefault(b, []).append((r, a))
+
+    shells = {}
+    for chain, lst in by_chain.items():
+        lst.sort()
+        here, shell, ref = {}, 0, None
+        for r, other in lst:
+            if ref is None or r > ref * (1.0 + tol):
+                shell += 1
+                ref = r
+                if shell > max_shell:
+                    break
+            here.setdefault(shell, []).append(other)
+        shells[chain] = here
+    return shells
+
+
+def select_by_shells(G, per_chain, shell_fractions, dims=None,
+                     num_chains=None, rng=None, max_per_pair=None,
+                     shells=None, tol=0.02):
+    """Pairs and counts hitting a per-chain density with a shell mix.
+
+    ``per_chain`` is the system-averaged number of entanglements per chain and
+    follows the existing convention, ``total = per_chain * 0.5 * num_chains``
+    draws, so a chain takes part in ``per_chain`` of them on average.
+
+    ``shell_fractions`` is ``{shell: fraction}``, e.g.
+    ``{1: 0.2, 2: 0.5, 3: 0.25, 4: 0.05}``. Fractions are normalised, and
+    draws are allocated to shells by largest remainder so the realised mix is
+    as close to the request as whole draws allow.
+
+    What this does *not* promise is that the built system will measure the
+    same mix. Selection says which pairs to wind; whether the winding survives
+    is a question for the conformation stage and has to be measured there.
+
+    Returns ``[(edge_a, edge_b, count)]``, the same shape
+    ``select_entanglements`` returns.
+    """
+    import numpy as _np
+
+    rng = _np.random.default_rng() if rng is None else rng
+    if num_chains is None:
+        num_chains = G.number_of_edges()
+
+    # Everything that can rule the request out is checked before the shells
+    # are computed, which is the expensive part: ranking every disjoint pair
+    # is quadratic in the chain count.
+    wanted = {int(s): float(f) for s, f in shell_fractions.items() if f > 0}
+    total = int(round(per_chain * 0.5 * num_chains))
+    if total <= 0 or not wanted:
+        return []
+
+    if shells is None:
+        shells = neighbour_shells(G, dims, max_shell=max(wanted), tol=tol)
+    norm = sum(wanted.values())
+
+    # Largest remainder, so the realised mix is the closest whole-draw
+    # approximation of the request rather than however rounding falls.
+    exact = {s: total * f / norm for s, f in wanted.items()}
+    draws = {s: int(v) for s, v in exact.items()}
+    for s in sorted(wanted, key=lambda k: -(exact[k] - draws[k])):
+        if sum(draws.values()) >= total:
+            break
+        draws[s] += 1
+
+    # The pool for each shell, deduplicated: a pair reachable in shell 2 from
+    # both sides is one pair, not two.
+    pool = {}
+    for chain, by_shell in shells.items():
+        for s, others in by_shell.items():
+            if s in wanted:
+                for o in others:
+                    pool.setdefault(s, set()).add(
+                        (chain, o) if chain < o else (o, chain))
+
+    counts = {}
+    short = {}
+    for s, n in draws.items():
+        avail = sorted(pool.get(s, ()))
+        if not avail:
+            if n:
+                short[s] = n
+            continue
+        for _ in range(n):
+            pair = avail[int(rng.integers(len(avail)))]
+            if (max_per_pair is not None
+                    and counts.get(pair, 0) >= max_per_pair):
+                continue
+            counts[pair] = counts.get(pair, 0) + 1
+
+    if short:
+        print(f"    shells with no candidate pairs, {sum(short.values())} "
+              f"draws dropped: "
+              + ", ".join(f"shell {s}: {n}" for s, n in sorted(short.items())))
+    return [(a, b, c) for (a, b), c in sorted(counts.items())]

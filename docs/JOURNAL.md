@@ -14,6 +14,64 @@ Newest first.
 
 ---
 
+## 2026-08-12 — Neighbour shells, and the outer-shell limit is gone
+
+**Change:** `chain_distances`, `neighbour_shells` and `select_by_shells` in
+`topon/assignment/entanglements.py`; `tests/workflows/entangle_shells.py`;
+`tests/unit/assignment/test_neighbour_shells.py`.
+
+**Why:** the requirement is a *distribution* -- a system-averaged density and a
+neighbourhood mix like 20% first shell, 50% second, 25% third, 5% fourth --
+not a named pair with a named count. That is a selection problem, so it belongs
+in the assignment stage.
+
+**Issue / solution:** `find_crossing_candidates` gives each chain its single
+nearest disjoint neighbour, so the pool it returns is first-shell and nothing
+else. Measured on SC 4x4x4: 89 candidate pairs, 89 of them in shell 1. No
+reweighting of that pool can reach a second or third neighbour that is not in
+it, which is why `shell_weights` could never deliver a mix.
+
+`neighbour_shells` builds the full ranking. A shell is every neighbour at the
+same closest approach, not the n-th entry of a sorted list, because on a
+lattice those distances are discrete and heavily degenerate. The shells it
+finds on SC are exactly the lattice distances:
+
+| shell | distance | neighbours per chain |
+|---|---|---|
+| 1 | 1.000 | 24.9 |
+| 2 | 1.414 | 30.9 |
+| 3 | 1.732 | 11.1 |
+| 4 | 2.000 | 7.7 |
+
+`select_by_shells` then hits a requested per-chain density with a requested
+mix, using the existing convention `total = per_chain * 0.5 * num_chains` and
+allocating draws across shells by largest remainder.
+
+**The outer-shell limit turns out to belong to the old construction, not to
+the lattice.** `compute_shell_weights` warns that only the first shell
+delivers -- band 1 gave 5 of 7, band 2 gave 2 of 16, band 3 gave 0 of 16 --
+and attributes it to the pair's gap over the chord, which is a property of the
+lattice. Re-measured with routing instead of a sideways bulge, three pairs per
+shell, each relaxed alone so no design interferes with another:
+
+| shell | old kink, after protocol | new, built | new, survived |
+|---|---|---|---|
+| 1 | 5 of 7 | 3 of 3 | 1 of 3 |
+| 2 | 2 of 16 | 3 of 3 | 1 of 3 |
+| 3 | 0 of 16 | 3 of 3 | 2 of 3 |
+| 4 | not reachable | 3 of 3 | 2 of 3 |
+
+Every shell builds, and survival is flat at about half rather than decaying to
+nothing. The old numbers are what a bulge can reach; a chain that routes out to
+its partner and back is not limited that way. Survival here is without the
+placement verification that reached 100% on named pairs, so half is the floor
+rather than the ceiling.
+
+**Not yet measured:** whether a requested system-averaged density comes back as
+the density asked for, and whether a requested mix comes back as the mix asked
+for. Selection produces them; only the built and relaxed system can confirm
+them.
+
 ## 2026-08-12 — Scale: the failures belong to pairs, not to the count
 
 **Change:** `--chains` and `--tag` in `tests/workflows/entangle_relaxed.py`;
