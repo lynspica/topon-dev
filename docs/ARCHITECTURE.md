@@ -153,6 +153,7 @@ Two further modules sit beside it and are **not** on the default pipeline path; 
 
 - `conformation/entanglement/` — building chain paths that wind around each other a prescribed number of times. `waypoints.py` draws a chain through points the caller chooses (`Site(at, turns)`) and is the current approach; `braid.py` and `allocation.py` are an earlier search-based construction that picks its own positions, kept because its budgeting and obstruction checks have no equivalent yet in the waypoint path.
 - `conformation/junction_shell.py` — spreads the chains leaving a crosslink so their first beads do not overlap, with the shell radius growing with functionality.
+- `conformation/paths.py` — plain geometry: two junctions and a bead count in, a path out. `bridging_walk` is melt-like and random; `route_through` is deterministic, for when a prescribed topology has to be repeatable. Both keep every bond exact and land on both junctions. `Clearance` lets any of them be drawn around the beads already in the box, which is what stops the following minimisation from resolving an overlap by pushing two chains through each other.
 
 Conformation defaults (`pipeline.py:47`):
 

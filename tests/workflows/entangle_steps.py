@@ -235,26 +235,44 @@ def scale_for_design(graph, pairs, dp=DP, bond=BOND, radius=2.0,
         t = np.linspace(span[0], span[1], samples)[:, None]
         return a + t * mic
 
-    # The ring does not scale with the lattice, so it comes off the budget
-    # before the rest is divided by anything.
-    budget = (dp + 1) * bond - 2.0 * np.pi * radius
-    if budget <= 0:
-        raise ValueError(
-            f"a ring of radius {radius} needs {2 * np.pi * radius:.1f} sigma "
-            f"but the chain carries only {(dp + 1) * bond:.1f}")
+    # Budget per routed chain, not per pair.
+    #
+    # A chain sent to two partners pays for both detours and both rings out of
+    # one contour budget. Taking the worst single pair instead sizes the box
+    # for a route the chain cannot walk: measured, a chain given two partners
+    # built nothing at all, while a chain given one built both of its counts
+    # exactly in the same run.
+    by_routed = {}
+    for routed, target in pairs:
+        by_routed.setdefault(routed, []).append(target)
+    if not by_routed:
+        raise ValueError("no pairs given, so nothing sets the scale")
 
     worst = np.inf
-    for routed, target in pairs:
-        A, B = chord_pts(routed), chord_pts(target, site_span)
-        d = A[:, None, :] - B[None, :, :]
-        d -= box * np.round(d / box)
-        gap = float(np.linalg.norm(d, axis=2).min())
+    for routed, targets in by_routed.items():
+        # The rings do not scale with the lattice, so they come off the
+        # budget before the rest is divided by anything.
+        rings = len(targets) * 2.0 * np.pi * radius
+        budget = (dp + 1) * bond - rings
+        if budget <= 0:
+            raise ValueError(
+                f"chain {routed} needs {len(targets)} rings of radius "
+                f"{radius}, which is {rings:.1f} sigma, but the chain carries "
+                f"only {(dp + 1) * bond:.1f}")
+
+        A = chord_pts(routed)
         span = float(np.linalg.norm(A[-1] - A[0]))
-        need = span + 2.0 * gap          # out to the partner and back
+        detour = 0.0
+        for target in targets:
+            B = chord_pts(target, site_span)
+            d = A[:, None, :] - B[None, :, :]
+            d -= box * np.round(d / box)
+            detour += 2.0 * float(np.linalg.norm(d, axis=2).min())
+        need = span + detour             # out to each partner and back
         if need > 1e-12:
             worst = min(worst, budget / (margin * need))
     if not np.isfinite(worst):
-        raise ValueError("no pairs given, so nothing sets the scale")
+        raise ValueError("no route in the design has any length to size to")
     return float(worst)
 
 

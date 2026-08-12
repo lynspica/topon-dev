@@ -1172,6 +1172,45 @@ Measured on a 354-chain network, 281 candidates, 0.20 entanglements per chain:
 The pool median is 50, so the default ranking is slightly worse than choosing
 at random.
 
+##### Drawing a path around what is already there
+
+`topon/conformation/paths.py` also carries the pieces used to place a chain
+into an occupied box. None of it is wired into `Pipeline`; it is called from
+the workflow scripts under `tests/workflows/`.
+
+| name | does |
+|---|---|
+| `Clearance(points, box, radius)` | the beads already present, as a minimum-image nearest-neighbour query. `near`, `worst`, `ok` |
+| `bridging_walk(..., avoid=)` | the same fixed-bond random walk, keeping each step clear of `avoid` |
+| `loop_around(target, i, radius, n_pts, phase, avoid, span)` | waypoints encircling a strand. `span` is turns, so 0.5 is a hook and 2.0 is two turns |
+| `taut_leg(start, end, n_bonds, bond, avoid, placed)` | a deterministic leg: exact bonds, lands on its end, avoids `avoid`, its own earlier beads, and `placed` |
+| `route_through(start, end, waypoints, n_bonds, bond, avoid)` | visits every waypoint in order using `taut_leg` for each leg |
+
+Two things about this matter more than they look.
+
+**Draw around, not through.** A path placed with no regard for the beads
+already there lands on top of them. Measured on a relaxed melt at density
+0.85, routing one chain took the closest pair in the system from 0.502 σ to
+0.195 and put 153 beads inside 0.5 σ where there had been none. At 0.195 σ the
+WCA energy is of order 10⁵ kT, so the next minimisation does not relax that
+contact, it shoves — hard enough to drag chains through each other, which
+rewrites whatever topology was just built. `Clearance` is what avoids making
+the overlap in the first place; through a real relaxed melt it takes the
+tightest contact a routed path makes from 0.081 σ to 0.822.
+
+**Spend the slack deliberately.** A chain carries far more contour than its
+route needs, 77 σ for a route of about 21 in one measured case. A random walk
+disposes of the rest by wandering, and the wandering crosses the target again
+on its own account, so the entanglement count stops being a property of the
+design: the same pair, same site, same winding, drawn on three seeds, measured
+4, 7 and 0. `route_through` spends it deterministically instead, which is what
+makes a requested count repeatable.
+
+`walk_through` (random legs) and `route_through` (deterministic legs) take the
+same arguments and give the same guarantees about bonds and junctions. Use the
+first when a melt-like conformation is wanted and the second when a specific
+topology is.
+
 ##### Choosing which neighbour shell to entangle
 
 `shell_weights` biases the draw toward particular neighbour shells. Shells are

@@ -14,6 +14,45 @@ Newest first.
 
 ---
 
+## 2026-08-12 — Odd counts are buildable; several partners per chain
+
+**Change:** `turn_options` and enumeration over windings, a per-routed-chain
+contour budget in `scale_for_design`, and a corrective sweep (`--passes`) in
+`tests/workflows/entangle_relaxed.py`.
+
+**Why:** two of the gaps left open. Odd counts were refused outright, and a
+chain given more than one partner built nothing.
+
+**Issue / solution:**
+
+*Odd counts were never impossible.* The refusal came from "one turn is two
+entanglement points", which is true of the ring and false of the total: the
+legs reaching the ring and leaving it cross the target as well, and those
+crossings can be odd. The retention enumeration had already built 1 and 3 at
+several placements while the code was still refusing to ask for them.
+Removing the refusal and enumerating over half turns as well as whole ones is
+enough. Asked for 1, one pair built 1 and kept it.
+
+*Several partners.* Two bugs, both real:
+
+- `scale_for_design` took the worst single pair when sizing the box. A chain
+  sent to two partners pays for both detours and both rings out of one contour
+  budget, so the box was sized for a route the chain could not walk and it
+  built nothing at all. Summed per routed chain now.
+- Placements are screened one chain at a time against what is already
+  committed, so the first chain never sees the last. `--passes` adds
+  corrective sweeps that re-place only the chains whose counts drifted, judged
+  against the complete system, stopping as soon as none are.
+
+**Result:** two chains with two partners each, **4 of 4 counts exact and
+surviving**, and the corrective pass reported every count holding after the
+first sweep.
+
+**Still open:** a count of 3 gives 1 of 2. The corrective sweep fixes the chain
+that drifted, but re-placing it disturbs the other, which then drifts itself.
+Whether more sweeps converge or oscillate is being measured. Counts of 1 and 2
+do not show this, so it is specific to the tighter windings a count of 3 needs.
+
 ## 2026-08-12 — Collateral measured; multi-partner chains; batched scoring
 
 **Change:** collateral reporting and `construct_multi` /

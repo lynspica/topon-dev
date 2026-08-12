@@ -502,6 +502,11 @@ def main():
                     help="how many sites along the target to try")
     ap.add_argument("--phases", type=int, default=4,
                     help="how many ring orientations to try at each site")
+    ap.add_argument("--passes", type=int, default=2,
+                    help="corrective sweeps. Chains are placed one at a time "
+                         "against what is already built, so the first never "
+                         "sees the last; a second sweep re-places only those "
+                         "whose counts drifted.")
     ap.add_argument("--verify", action="store_true",
                     help="pick the placement whose count survives a "
                          "minimisation, rather than the one that builds it. "
@@ -702,7 +707,8 @@ def main():
     # built nothing at all. Spread the sites across the permitted stretch so
     # each has its own piece of the target.
     used = collections.Counter()
-    for routed, want in plan:
+
+    def place(routed, want):
         target, n = list(want.items())[0]
         # Everything except the chain being redrawn, by atom id rather than
         # by chain: a crosslink junction belongs to every chain meeting there,
@@ -724,10 +730,10 @@ def main():
                     relax=(relax_candidate if args.verify else None))
             except ValueError as e:
                 print(f"    chain {routed}: {e}")
-                continue
+                return
             if p is None:
                 print(f"    chain {routed}: nothing built")
-                continue
+                return
             paths[routed] = p
             for aid, xyzp in zip(seq[routed], p):
                 xyz_now[aid] = xyzp
@@ -738,7 +744,7 @@ def main():
                               for t in sorted(want))
                   + f"   [{hit} of {len(want)} exact, tightest contact "
                     f"{before:.2f} -> {avoid.worst(p[1:-1]):.2f} sigma]")
-            continue
+            return
         if args.construct:
             k = used[target]
             used[target] += 1
@@ -750,10 +756,10 @@ def main():
                     relax=(relax_candidate if args.verify else None))
             except ValueError as e:
                 print(f"    chain {routed} -> {target}: {e}")
-                continue
+                return
             if p is None:
                 print(f"    chain {routed} -> {target}: nothing built")
-                continue
+                return
             if got != n:
                 print(f"    chain {routed} -> {target}: asked {n}, "
                       f"closest placement gives {got}")
@@ -765,20 +771,49 @@ def main():
                   f"construction"
                   f"   (tightest contact {before:.2f} -> "
                   f"{avoid.worst(p[1:-1]):.2f} sigma)")
-            continue
+            return
         best = route_pairwise(paths, keys, seq, geo_r, routed, target, n,
                               relaxed, args.rounds, args.per_round, rng, work,
                               relax=relax_candidate, avoid=avoid,
                               site_span=(args.site_lo, args.site_hi))
         if best is None:
             print(f"    chain {routed}: nothing built")
-            continue
+            return
         paths[routed] = best[3]
         for aid, xyzp in zip(seq[routed], best[3]):
             xyz_now[aid] = xyzp
         print(f"    chain {routed} -> {target}: got {best[1]}, wanted {n}"
               f"   (tightest contact {before:.2f} -> "
               f"{avoid.worst(best[3]):.2f} sigma)")
+
+
+    for routed, want in plan:
+        place(routed, want)
+
+    # Re-place chains whose counts drifted once the others were built.
+    #
+    # Placements are screened one chain at a time against what is already
+    # committed, so the first chain never sees the last. Measured asking for
+    # three: both chains screened at the number requested and the finished
+    # system read 6 and 2. A corrective sweep re-places only the chains that
+    # are off, against the complete system this time, and stops as soon as
+    # nothing is.
+    for sweep in range(1, max(1, args.passes)):
+        probe = relax_candidate(current)
+        if probe is None:
+            print(f"  pass {sweep + 1}: could not relax, stopping")
+            break
+        now = measure_pairs(probe, seq, pairs, work)
+        off = [(r, w) for r, w in plan
+               if any(now.get((min(r, t), max(r, t))) != n
+                      for t, n in w.items())]
+        if not off:
+            print(f"  every count holds after pass {sweep}")
+            break
+        print(f"  pass {sweep + 1}: re-placing "
+              + ", ".join(str(r) for r, _w in off))
+        for routed, want in off:
+            place(routed, want)
 
     # ---- 4: write it back and minimise again ----------------------------
     new_xyz = {}
