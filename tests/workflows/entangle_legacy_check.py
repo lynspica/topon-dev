@@ -137,7 +137,10 @@ def main():
         return 1
 
     work = OUT / f"legacy_z1_{os.getpid()}"
-    got = measure_pairs(final, seq, [(a, b) for a, b, _c in wanted], work)
+    pl = [(a, b) for a, b, _c in wanted]
+    got = measure_pairs(final, seq, pl, work)
+    base = measure_pairs(base_final, seq, pl, work) if base_final else {
+        q: None for q in pl}
 
     blind = sum(1 for a, b, _c in wanted if got[(a, b)] is None)
     if blind:
