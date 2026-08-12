@@ -14,6 +14,52 @@ Newest first.
 
 ---
 
+## 2026-08-12 — What the legacy kink actually delivers
+
+**Change:** `tests/workflows/entangle_legacy_check.py` measures per pair and
+against a no-kink baseline.
+
+**Why:** `select_entanglements` assigns each pair a count and
+`calculate_entangled_kink` builds a bulge sized for it, but whether the built
+system carries those counts had never been measured. The count has always been
+an input to the geometry, never an output checked against it. The script
+existed and could not produce an answer.
+
+**Issue / solution:** two things were blocking it. The whole-system export was
+rejected by Z1+, for a reason now known -- it refuses a configuration read back
+from LAMMPS output whenever a chain is longer than the periodic cell, which
+after minimisation is routine. Measuring one pair at a time works. And a raw
+count on the kinked system says little on its own, since a melt at this density
+is entangled regardless, so the same network is now built a second time with no
+kinks and the same pairs measured in both.
+
+**Result**, SC 4x4x4, DP 80, density 0.85, 2.0 crosslinks per chain, seed 1,
+35 pairs carrying 105 requested entanglements:
+
+| | value |
+|---|---|
+| requested over these pairs | 105 |
+| measured, kinked | 212 |
+| measured, same pairs, no kinks | 100 |
+| attributable to the kinks | 112 |
+| pairs carrying exactly their count, kinked | 3 of 35 (9%) |
+| pairs carrying exactly their count, no kinks | 4 of 35 (11%) |
+
+Read carefully, this says the aggregate is well calibrated and the placement is
+not. The kinks add 112 entanglements against 105 requested, within 7%, which is
+a good number and may well be what the method was tuned for. What they do not
+do is put them where they were asked: 9% of pairs carry their exact count,
+which is not better than the 11% the same network reaches with no kinks built
+at all.
+
+That is a measurement of the shipped path, not a defect report. If what matters
+downstream is the entanglement density of the network, the legacy kink delivers
+it. If what matters is that a named pair carries a named count, it does not,
+and that is the gap the designed-entanglement work fills.
+
+**Caveats:** one network, one seed, one crosslink density. The comparison is
+per pair on the pairs that were selected, not over the whole system.
+
 ## 2026-08-12 — The corrective sweep was approving a different system
 
 **Change:** the final minimisation now runs `xyz_now`, the coordinates the
