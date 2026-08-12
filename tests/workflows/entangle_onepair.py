@@ -252,7 +252,7 @@ def main():
     print(f"\n  {'':<32} {'entanglements on this pair':>28}")
     print(f"  {'asked for':<32} {args.count:>28}")
     print(f"  {'the melt already had':<32} {show(base):>28}")
-    print(f"  {'old Gaussian kink delivered':<32} {show(old_got):>28}")
+    print(f"  {f'old kink ({args.old_protocol})':<32} {show(old_got):>28}")
     print(f"  {'new construction delivered':<32} {show(new_got):>28}")
     if old_got is not None and new_got is not None:
         same = old_got == new_got
