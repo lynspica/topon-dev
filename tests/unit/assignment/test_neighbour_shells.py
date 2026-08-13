@@ -37,9 +37,12 @@ def grid(n=4, spacing=1.0):
 def test_shells_land_on_the_lattice_distances():
     """Shell k is the k-th distinct distance, not the k-th sorted neighbour.
 
-    On a simple cubic lattice those are 1, sqrt(2), sqrt(3), 2, and each is
-    heavily degenerate, so a sorted-list reading of "second neighbour" would
-    return another chain at distance 1.
+    Shell 1 is the chains that share a crosslink, at distance zero: they are
+    the closest strands in the network and they can wind around each other,
+    since fixing the junction constrains where the winding sits rather than
+    whether there is one. After that come the simple cubic distances 1,
+    sqrt(2), sqrt(3), each heavily degenerate, so a sorted-list reading of
+    "second neighbour" would return another chain at the same distance.
     """
     G, dims = grid()
     d = chain_distances(G, dims)
@@ -50,7 +53,7 @@ def test_shells_land_on_the_lattice_distances():
             for o in others:
                 r = d.get((chain, o), d.get((o, chain)))
                 seen.setdefault(s, []).append(r)
-    for s, want in ((1, 1.0), (2, np.sqrt(2)), (3, np.sqrt(3))):
+    for s, want in ((1, 0.0), (2, 1.0), (3, np.sqrt(2)), (4, np.sqrt(3))):
         assert np.mean(seen[s]) == pytest.approx(want, abs=0.02)
 
 
@@ -63,11 +66,31 @@ def test_a_shell_holds_every_neighbour_at_that_distance():
     assert min(counts) > 1
 
 
-def test_chains_sharing_a_junction_are_not_neighbours():
+def test_chains_sharing_a_junction_are_the_closest_shell():
+    """They are included, and they are shell 1.
+
+    Excluding them was a code limitation mistaken for physics. On SC 4x4x4 it
+    discarded 263 pairs, five per chain, each strand carrying 77 sigma of
+    contour on a 5.4 sigma chord.
+    """
+    G, dims = grid()
+    d = chain_distances(G, dims)
+    shared = [(a, b) for (a, b) in d
+              if len({a[0], a[1]} & {b[0], b[1]}) == 1]
+    assert shared, "junction-sharing pairs must be ranked, not discarded"
+    assert all(d[q] == pytest.approx(0.0, abs=1e-9) for q in shared)
+
+    sh = neighbour_shells(G, dims, max_shell=2)
+    a, b = shared[0]
+    assert b in sh[a].get(1, ()), "a shared junction is the closest shell"
+
+
+def test_parallel_edges_are_still_excluded():
+    """Two chains joining the same two junctions are one contact, not a pair."""
     G, dims = grid()
     d = chain_distances(G, dims)
     for (a, b) in d:
-        assert not ({a[0], a[1]} & {b[0], b[1]})
+        assert {a[0], a[1]} != {b[0], b[1]}
 
 
 def test_density_follows_the_existing_convention():

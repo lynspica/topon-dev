@@ -317,7 +317,7 @@ def main():
     xyz_arr = np.array([xyz0[a] for a in ids])
 
     xyz_now = dict(xyz0)
-    done = set()
+    done, routed_chains = set(), set()
 
     # A calibrated controller, not a single shot.
     #
@@ -344,6 +344,17 @@ def main():
             break
 
         for a, b, count in take:
+            # One routing per chain, ever.
+            #
+            # `done` tracks pairs, so a chain appearing in two of them was
+            # routed twice and the second path replaced the first, destroying
+            # the entanglement it carried and moving coordinates that later
+            # chains had been routed around. Including junction-sharing pairs
+            # made this common, since a chain then has five more partners:
+            # the yield fell 0.247, 0.101, 0.038 over three rounds and the
+            # relaxation then failed with beads at zero separation.
+            if a in routed_chains or b in routed_chains:
+                continue
             keep = np.ones(len(ids), bool)
             keep[[row[i] for i in seq[a]]] = False
             avoid = Clearance(xyz_arr[keep], box, args.clearance)
@@ -357,6 +368,7 @@ def main():
                 xyz_now[aid] = xyzp
                 xyz_arr[row[aid]] = xyzp
             done.add((a, b))
+            routed_chains.add(a)
 
         out = relax(xyz_now)
         if out is None:
@@ -391,7 +403,7 @@ def main():
             paths.update({k: v.copy() for k, v in paths0.items()})
             xyz_now = dict(xyz0)
             xyz_arr[:] = np.array([xyz0[a] for a in ids])
-            done = set()
+            done, routed_chains = set(), set()
             pool = keep_pairs_with_counts(plan, keep_pairs) + pool
             batch = n_want
             continue
