@@ -118,13 +118,20 @@ def measure_pairs(data_file, seq, pairs, work):
     work.mkdir(parents=True, exist_ok=True)
     for old in list(work.glob("*.Z1")) + list(work.glob("SP_*.dat")):
         old.unlink()
+    # Parse the data file once for the whole batch.
+    #
+    # `z1_export` re-reads it per call, which is fine for a handful of pairs
+    # and quadratic nonsense for thousands: a 31096-atom file parsed 4076
+    # times. `cache` hands the parsed contents to every export in the batch.
+    cache = read_data(data_file)
     for a, b in pairs:
         first = list(seq[a])
         shared = set(first)
         second = [i for i in seq[b] if i not in shared]
         if len(second) < 3:
             continue
-        z1_export(data_file, [first, second], work / f"p{a}_{b}.Z1")
+        z1_export(data_file, [first, second], work / f"p{a}_{b}.Z1",
+                  parsed=cache)
     res = measure_batch(work) or {}
     return {(a, b): (_both(res[f"p{a}_{b}"], 1, 2)
                      if f"p{a}_{b}" in res else None) for a, b in pairs}

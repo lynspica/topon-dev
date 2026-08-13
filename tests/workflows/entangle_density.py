@@ -234,8 +234,16 @@ def main():
                          "carry the background and any collateral; the "
                          "designed pairs are always measured in full.")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--tag", default="_density")
+    ap.add_argument("--tag", default=None,
+                    help="output directory suffix. Defaults to the lattice "
+                         "size and target, so two runs at different sizes do "
+                         "not delete each other's files -- which is exactly "
+                         "what happened when a dims 5 run was started while a "
+                         "dims 6 run was still going.")
     args = ap.parse_args()
+
+    if args.tag is None:
+        args.tag = f"_d{args.dims}_e{args.want:g}"
 
     mix = {}
     for part in args.shells.split(","):

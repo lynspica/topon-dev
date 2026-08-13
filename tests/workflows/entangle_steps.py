@@ -825,7 +825,7 @@ def chain_ids(chain, node_atom, chain_atoms, ends):
 
 def measure_pair(data_file, seq_a, seq_b, contact=None):
     """Linking number and closest approach of two chains in a data file."""
-    box, xyz, _ = read_data(data_file)
+    box, xyz, _ = parsed if parsed is not None else read_data(data_file)
     pa = unwrap_chain(seq_a, xyz, box)
     pb = unwrap_chain(seq_b, xyz, box)
     # Bring b into the image nearest a, or the linking integral sees two
@@ -851,7 +851,7 @@ def write_z1(path, chains, box):
     return path
 
 
-def z1_export(data_file, sequences, out_path):
+def z1_export(data_file, sequences, out_path, parsed=None):
     """Pull named chains out of a data file and write them for Z1+.
 
     Taking only the prescribed pair is what makes the answer unambiguous.
