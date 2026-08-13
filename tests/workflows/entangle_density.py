@@ -185,6 +185,11 @@ def main():
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
     ap.add_argument("--rounds", type=int, default=6)
+    ap.add_argument("--reject-below", type=float, default=0.55,
+                    help="drop a routed path whose tightest contact is below "
+                         "this. At melt density a path cannot always be drawn "
+                         "clear, and one overlapping path takes the whole "
+                         "round down with a pair energy of 4e9.")
     ap.add_argument("--headroom", type=float, default=3.0,
                     help="how many times the expected pair count to watch. "
                          "Covers the back-off restarting with a different "
@@ -408,6 +413,7 @@ def main():
     for rnd in range(1, args.rounds + 1):
         take = pool[:batch]
         pool = pool[batch:]
+        skipped = 0
         if not take:
             print(f"  no pairs left; delivered {added:.2f} against "
                   f"{args.want:.2f}")
@@ -433,6 +439,20 @@ def main():
                               radius=args.ring, dp=args.dp, span=(0.3, 0.7))
             except ValueError:
                 continue
+            # Refuse a path that would make the minimisation unstable.
+            #
+            # At melt density there is very little free volume -- a point lies
+            # within 0.9 sigma of 2.6 beads on average -- so `taut_leg` often
+            # cannot find a clearing step and falls back to the roomiest one
+            # available, which may still be an overlap. One such path is
+            # enough: LAMMPS came back with a pair energy of 4e9 and stopped,
+            # losing the whole round. Committing only paths that clear costs a
+            # few candidates and keeps the system runnable.
+            room = avoid.worst(p[1:-1])
+            if room < args.reject_below:
+                skipped += 1
+                continue
+
             paths[a] = p
             for aid, xyzp in zip(seq[a], p):
                 xyz_now[aid] = xyzp
@@ -440,6 +460,9 @@ def main():
             done.add((a, b))
             routed_chains.add(a)
 
+        if skipped:
+            print(f"  {'':>6} {skipped} of {len(take)} paths dropped for "
+                  f"landing closer than {args.reject_below} sigma")
         out = relax(xyz_now)
         if out is None:
             print(f"  {rnd:>6}   relaxation failed")
