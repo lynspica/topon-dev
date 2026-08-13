@@ -185,6 +185,10 @@ def main():
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
     ap.add_argument("--rounds", type=int, default=6)
+    ap.add_argument("--headroom", type=float, default=3.0,
+                    help="how many times the expected pair count to watch. "
+                         "Covers the back-off restarting with a different "
+                         "number without measuring the whole selection.")
     ap.add_argument("--min-pairs", type=int, default=25,
                     help="pairs that must be routed before the measured yield "
                          "is trusted. Below this the background sampling "
@@ -320,7 +324,17 @@ def main():
     # Watch every pair that touches a chain the plan might route, and measure
     # them exactly. The rest of the system does not move, so it contributes the
     # same amount before and after and cancels out of the difference.
-    may_route = {a for a, _b, _c in plan} | {b for _a, b, _c in plan}
+    # Only the chains that will plausibly be routed, not every selected pair.
+    #
+    # The plan selects far more pairs than the target needs -- 380 for a
+    # request of 2.0 per chain that takes about 20 -- and watching both members
+    # of all of them measured 12134 contact pairs to observe twenty chains. A
+    # round then took longer than the whole run should. The pool is ordered, so
+    # the pairs that will be used are at the front of it, and the headroom
+    # covers the back-off restarting with a different count.
+    n_likely = int(args.headroom * args.want / max(args.pair_yield, 1e-9))
+    likely = plan[:max(n_likely, args.min_pairs)]
+    may_route = {a for a, _b, _c in likely} | {b for _a, b, _c in likely}
     wp = routed_watch(paths, box, may_route, args.cutoff)
     watch = (wp, {q: 1.0 for q in wp})
     print(f"  watching {len(wp)} contact pairs that touch a routable chain, "
@@ -377,7 +391,7 @@ def main():
     # this system, and size every later batch from that. The yield is
     # re-estimated each round, so it corrects itself rather than trusting the
     # first estimate.
-    pool = list(plan)
+    pool = list(likely) + [q for q in plan if q not in likely]
     # Start with enough pairs to measure a yield from, not a fixed fraction.
     batch = max(args.min_pairs, int(args.calibrate * len(pool)))
     added, yield_per, raw, reliable = 0.0, None, 0.0, False
