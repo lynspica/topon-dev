@@ -14,6 +14,62 @@ Newest first.
 
 ---
 
+## 2026-08-12 — The negative yield was the estimator, not the physics
+
+**Change:** `routed_watch` in `tests/workflows/entangle_density.py` replaces
+the sampled background; junction-sharing pairs are ranked rather than
+discarded; the yield is only trusted once `--min-pairs` are routed.
+
+**Why:** a run reported that routing eight chains *removed* 1.57
+entanglements per chain, the loop divided the shortfall by that negative
+number, and the pool collapsed to three pairs.
+
+**Issue / solution:** routing a chain sharply increases its entanglement.
+Measured directly on one chain, before and after, against all 84 partners it
+touches: **11 points over 4 partners becomes 28 over 12**, and the designed
+partner goes 0 to 2 as asked. The negative was the background estimator. At
+melt density there are 14754 contact pairs; sampling 250 scales each by 59, so
+over 106 chains one fluctuation in the sample moves the reported average by 1.1
+per chain, against a signal from eight routed chains of about 1.3. The noise
+was larger than the measurement.
+
+Only routed chains change, so the watch set is now every contact pair touching
+a routable chain, measured exactly, and the untouched background cancels out of
+the difference.
+
+**Result**, SC 4x4x4, DP 80, density 0.85, asking 2.0 per chain with the mix
+0.20 / 0.50 / 0.25 / 0.05 over the first four shells:
+
+```
+ round  routed   added  per pair  target
+     1      14    1.98     0.142    2.00
+ delivered 1.98 per chain against a target of 2.00
+
+ shell    asked  delivered
+     1     0.20       0.20
+     2     0.50       0.60
+     3     0.25       0.20
+     4     0.05       0.00
+```
+
+One round, not four: the earlier convergence was the loop chasing its own
+noise. Shell 4 at 0.00 is arithmetic rather than failure -- 5% of 14 pairs is
+0.7 pairs, and a fraction of a pair cannot be routed.
+
+**Also:** chains sharing a crosslink are no longer excluded from the ranking.
+They were dropped on the grounds that they cannot be entangled, which is false:
+two strands meeting at a junction can wind around each other, and fixing the
+junction constrains where the winding sits rather than whether there is one. On
+SC 4x4x4 that discarded 263 pairs, five per chain. The obstacle was the export
+-- Z1+ takes each chain as a bead sequence and a shared junction bead would
+appear in both -- so `measure_pairs` drops the shared bead from the second
+sequence. Shell 1 is now the junction-sharing pairs, which makes shell 2 the
+old kink's target.
+
+**Withdrawn:** every density and mix figure measured before this, including
+1.89 for 2.00 and 3.91 for 4.00, carried about 1 per chain of unrecognised
+noise.
+
 ## 2026-08-12 — Requirement 1: a requested entanglement density is delivered
 
 **Change:** `tests/workflows/entangle_density.py`, `close_pairs` /
