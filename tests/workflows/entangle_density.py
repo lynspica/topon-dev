@@ -136,6 +136,23 @@ def measure_system(data_file, seq, keys, work, watch):
     return 2.0 * pts / n, 2.0 * partners / n, len(pairs) - blind, blind
 
 
+def routed_watch(paths, box, chains, cutoff=3.0):
+    """Every contact pair involving a chain that will be routed.
+
+    Only routed chains change, so this is the whole signal and it is measured
+    exactly. Sampling the rest and scaling it up is what made the estimate
+    unusable: at melt density there are 14754 contact pairs, a 250-pair sample
+    scales each one by 59, and over 106 chains a single fluctuation in the
+    sample moves the reported average by 1.1 per chain. The first round of one
+    run came back at -0.197 per pair, implying routing *removed* entanglement,
+    when measuring a routed chain directly shows it going from 11 points over
+    4 partners to 28 over 12.
+    """
+    want = set(chains)
+    return [q for q in close_pairs(paths, box, cutoff)
+            if q[0] in want or q[1] in want]
+
+
 def watch_set(paths, box, designed, cutoff=3.0, sample=400, rng=None):
     """The pairs to measure, and what each one stands for.
 
@@ -284,8 +301,14 @@ def main():
     box, paths, xyz0 = paths_from(relaxed, keys, seq)
 
     work = OUT / f"density_work_{os.getpid()}"
-    watch = watch_set(paths, box, [(a, b) for a, b, _c in plan],
-                      args.cutoff, args.sample, rng)
+    # Watch every pair that touches a chain the plan might route, and measure
+    # them exactly. The rest of the system does not move, so it contributes the
+    # same amount before and after and cancels out of the difference.
+    may_route = {a for a, _b, _c in plan} | {b for _a, b, _c in plan}
+    wp = routed_watch(paths, box, may_route, args.cutoff)
+    watch = (wp, {q: 1.0 for q in wp})
+    print(f"  watching {len(wp)} contact pairs that touch a routable chain, "
+          f"measured exactly")
     base = measure_system(relaxed, seq, keys, work, watch)
     print(f"  the plain melt already carries {base[0]:.2f} per chain over "
           f"{base[1]:.1f} partners ({base[2]} pairs in contact"
