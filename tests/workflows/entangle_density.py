@@ -185,11 +185,14 @@ def main():
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
     ap.add_argument("--rounds", type=int, default=6)
-    ap.add_argument("--reject-below", type=float, default=0.55,
+    ap.add_argument("--reject-below", type=float, default=0.25,
                     help="drop a routed path whose tightest contact is below "
-                         "this. At melt density a path cannot always be drawn "
-                         "clear, and one overlapping path takes the whole "
-                         "round down with a pair energy of 4e9.")
+                         "this. 0.55 was too strict: at melt density no path "
+                         "clears it and every round dropped 25 of 25, while "
+                         "paths built at 0.14 to 0.25 sigma have repeatedly "
+                         "minimised fine. What actually blows LAMMPS up is "
+                         "near-zero separation, and 0.25 keeps that out "
+                         "without vetoing the whole density regime.")
     ap.add_argument("--headroom", type=float, default=3.0,
                     help="how many times the expected pair count to watch. "
                          "Covers the back-off restarting with a different "
