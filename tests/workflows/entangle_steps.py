@@ -187,7 +187,8 @@ def build_network(spec=LATTICE, cache=True):
 
 
 def scale_for_design(graph, pairs, dp=DP, bond=BOND, radius=2.0,
-                     margin=1.35, samples=24, site_span=(0.05, 0.95)):
+                     margin=1.35, samples=24, site_span=(0.05, 0.95),
+                     max_density=0.85):
     """The largest lattice scale on which every designed route still fits.
 
     Density should follow from what is being built rather than be picked ahead
@@ -273,6 +274,28 @@ def scale_for_design(graph, pairs, dp=DP, bond=BOND, radius=2.0,
             worst = min(worst, budget / (margin * need))
     if not np.isfinite(worst):
         raise ValueError("no route in the design has any length to size to")
+
+    # Never shrink the box past the density the system is meant to be built at.
+    #
+    # This returns the largest scale the design fits on, so it only asks for a
+    # small box when the design is demanding, and a small box means a high
+    # density: measured, one plan of a hundred pairs drove it to 2.2 sigma at
+    # density 843, where LAMMPS cannot start. A route that does not fit at the
+    # target density is a route to drop, not a reason to crush the system.
+    #
+    # The cap is a maximum, so a design that fits comfortably still gets the
+    # roomier box it asked for. Building at or below the intended density also
+    # leaves a later attractive or constant-pressure run free to relax inward
+    # rather than starting pre-compressed.
+    if max_density:
+        box = np.asarray(graph.graph["box"], float)
+        n_beads = graph.number_of_edges() * dp + graph.number_of_nodes()
+        floor = (n_beads / (max_density * float(np.prod(box)))) ** (1.0 / 3.0)
+        if worst < floor:
+            print(f"    design would need density "
+                  f"{n_beads / (np.prod(box) * worst ** 3):.2f}; capped at "
+                  f"{max_density}, so the longest routes may not fit")
+            worst = floor
     return float(worst)
 
 

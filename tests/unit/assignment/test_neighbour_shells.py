@@ -319,3 +319,57 @@ def test_a_spatial_bias_and_a_shell_mix_compose():
     # And the spatial bias is still doing something.
     p = pair_positions(G, sel, dims)
     assert (np.linalg.norm(p - 0.5, axis=1) < 0.3).mean() > 0.35
+
+
+# ---------------------------------------------------------------------------
+# Sizing the box from the design
+# ---------------------------------------------------------------------------
+
+def test_the_density_cap_only_bites_when_the_design_would_crush_the_system():
+    """A demanding design must not shrink the box past the build density.
+
+    `scale_for_design` returns the largest box a design fits in, so it asks
+    for a small one only when the design is demanding, and a small box is a
+    high density: one plan drove it to 2.2 sigma at density 843, where LAMMPS
+    cannot start. A route that does not fit at the target density is a route
+    to drop, not a reason to compress the system.
+    """
+    import numpy as _np
+    from tests.workflows.entangle_all import CASES
+    from tests.workflows.entangle_steps import (BOND, DP, LATTICE,
+                                                build_network, geometry,
+                                                scale_for_design)
+
+    spec = dict(LATTICE)
+    spec.update(CASES["SC"])
+    spec["dims"] = (4, 4, 4)
+    g = build_network(spec)
+    n = g.number_of_edges() * DP + g.number_of_nodes()
+
+    def density(plan, cap):
+        sc = scale_for_design(g, plan, dp=DP, bond=BOND, radius=2.0,
+                              max_density=cap)
+        return n / float(_np.prod(geometry(g, dp=DP, scale=sc)["L"]))
+
+    demanding = [(0, b) for b in (29, 35, 44, 51)]
+    assert density(demanding, None) > 1.0
+    assert density(demanding, 0.85) == pytest.approx(0.85, rel=1e-6)
+
+    # An easy design still gets the roomier box it earned.
+    easy = [(0, 29), (20, 51)]
+    assert density(easy, 0.85) == pytest.approx(density(easy, None))
+    assert density(easy, 0.85) < 0.85
+
+
+def test_a_design_that_cannot_fit_at_any_density_is_refused():
+    from tests.workflows.entangle_all import CASES
+    from tests.workflows.entangle_steps import (BOND, DP, LATTICE,
+                                                build_network,
+                                                scale_for_design)
+    spec = dict(LATTICE)
+    spec.update(CASES["SC"])
+    spec["dims"] = (4, 4, 4)
+    g = build_network(spec)
+    with pytest.raises(ValueError, match="rings of radius"):
+        scale_for_design(g, [(0, b) for b in range(1, 12)], dp=DP, bond=BOND,
+                         radius=2.0)
