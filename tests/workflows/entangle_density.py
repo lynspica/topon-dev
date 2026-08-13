@@ -254,7 +254,13 @@ def main():
     args = ap.parse_args()
 
     if args.tag is None:
-        args.tag = f"_d{args.dims}_e{args.want:g}"
+        # The process id, not just the parameters.
+        #
+        # Keying on lattice size and target stopped two *different* runs
+        # colliding and did nothing for two of the *same* kind, which promptly
+        # happened: a second dims 5 run at e=2 deleted the first one's files
+        # mid-flight and it died on FileNotFoundError. Twice in one session.
+        args.tag = f"_d{args.dims}_e{args.want:g}_{os.getpid()}"
 
     mix = {}
     for part in args.shells.split(","):
