@@ -168,6 +168,14 @@ def main():
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
     ap.add_argument("--rounds", type=int, default=6)
+    ap.add_argument("--min-pairs", type=int, default=25,
+                    help="pairs that must be routed before the measured yield "
+                         "is trusted. Below this the background sampling "
+                         "error swamps the signal and the estimate can even "
+                         "come out negative.")
+    ap.add_argument("--pair-yield", type=float, default=0.10,
+                    help="yield assumed before enough pairs are routed to "
+                         "measure it")
     ap.add_argument("--calibrate", type=float, default=0.15,
                     help="fraction of the selected pairs to route in the "
                          "first batch, before what a pair is worth in this "
@@ -331,8 +339,9 @@ def main():
     # re-estimated each round, so it corrects itself rather than trusting the
     # first estimate.
     pool = list(plan)
-    batch = max(1, int(args.calibrate * len(pool)))
-    added, yield_per = 0.0, None
+    # Start with enough pairs to measure a yield from, not a fixed fraction.
+    batch = max(args.min_pairs, int(args.calibrate * len(pool)))
+    added, yield_per, raw, reliable = 0.0, None, 0.0, False
     print(f"\n  {'round':>6} {'routed':>7} {'added':>7} {'per pair':>9} "
           f"{'target':>7}")
     for rnd in range(1, args.rounds + 1):
@@ -376,16 +385,37 @@ def main():
             return 1
         got = measure_system(out, seq, keys, work, watch)
         added = got[0] - base[0]
-        yield_per = added / max(len(done), 1)
-        print(f"  {rnd:>6} {len(done):>7} {added:>7.2f} {yield_per:>9.3f} "
+
+        # A yield estimate has to be a measurement, not one noisy difference.
+        #
+        # Three things went wrong when it was not. The first round measured
+        # -0.197 per pair -- routing eight chains *removed* entanglement,
+        # because rearranging a chain destroys melt entanglement as well as
+        # adding designed entanglement, and over a handful of pairs that can
+        # dominate. The loop then divided the shortfall by that negative
+        # number, and the back-off shrank the pool until nothing was left:
+        # -0.197, 0.186, 0.480, 0.623, 0.464 over five rounds, ending on three
+        # pairs and a mix table describing those three.
+        #
+        # So: no estimate until enough pairs have been routed for the signal
+        # to exceed the sampling error of the background, and no dividing by a
+        # yield that is not positive.
+        raw = added / max(len(done), 1)
+        reliable = len(done) >= args.min_pairs and added > 0
+        if reliable:
+            yield_per = raw
+        elif yield_per is None:
+            yield_per = args.pair_yield
+        print(f"  {rnd:>6} {len(done):>7} {added:>7.2f} {raw:>9.3f} "
               f"{args.want:>7.2f}"
+              + ("" if reliable else "   (too few pairs to trust)")
               + (f"   ({got[3]} unmeasured)" if got[3] else ""))
 
         if abs(added - args.want) <= args.tol:
             print(f"\n  delivered {added:.2f} per chain against a target of "
                   f"{args.want:.2f}, within {args.tol}")
             break
-        if added > args.want + args.tol:
+        if added > args.want + args.tol and reliable:
             # Back off rather than stop.
             #
             # An overshoot is not a failure, it is a calibration: the yield is

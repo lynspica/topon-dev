@@ -79,6 +79,9 @@ def main():
     ap.add_argument("--dims", type=int, default=4)
     ap.add_argument("--dp", type=int, default=DP)
     ap.add_argument("--density", type=float, default=0.85)
+    ap.add_argument("--coil", type=float, default=None,
+                    help="contour over chord, the scale entangle_all.py uses "
+                         "for the legacy work (1.8). Overrides --density.")
     ap.add_argument("--ring", type=float, default=2.0)
     ap.add_argument("--stages", type=int, default=2)
     ap.add_argument("--ranks", type=int, default=5)
@@ -96,7 +99,16 @@ def main():
     spec.update(CASES["SC"])
     spec["dims"] = (args.dims,) * 3
     graph = build_network(spec)
-    geo = geometry(graph, dp=args.dp, density=args.density)
+    # The scale the legacy path was built for, not one picked here.
+    #
+    # At density 0.85 a DP-80 chain laid on its chord has beads 0.067 sigma
+    # apart against a 0.95 sigma bond, so the soft push has to expand every
+    # chain fourteenfold and no designed bulge survives that. The coil route
+    # gives 0.528 sigma instead. Measuring the old kink at 0.85 was measuring
+    # it somewhere it was never meant to run.
+    geo = (geometry(graph, dp=args.dp, bond=BOND, coil=args.coil)
+           if args.coil else
+           geometry(graph, dp=args.dp, density=args.density))
     dims = np.asarray(graph.graph["box"], float)
     keys = sorted(geo["chords"])
     edges = sorted(graph.edges())
