@@ -197,8 +197,16 @@ def main():
                     help="fraction of the selected pairs to route in the "
                          "first batch, before what a pair is worth in this "
                          "system has been measured")
-    ap.add_argument("--tol", type=float, default=0.15,
-                    help="stop when within this many entanglements per chain")
+    ap.add_argument("--tol-pct", type=float, default=5.0,
+                    help="stop when within this percent of the target. Scales "
+                         "with what was asked for, where an absolute "
+                         "tolerance does not: 0.15 is 7.5 percent at e=2 and "
+                         "3.75 at e=4. The floor is one entanglement point on "
+                         "one pair, 2/num_chains per chain, so a larger "
+                         "network can be asked for a tighter percentage.")
+    ap.add_argument("--tol", type=float, default=None,
+                    help="absolute tolerance in entanglements per chain, "
+                         "overriding --tol-pct")
     ap.add_argument("--dims", type=int, default=4)
     ap.add_argument("--dp", type=int, default=DP)
     ap.add_argument("--ring", type=float, default=2.0)
@@ -278,6 +286,14 @@ def main():
            geometry(graph, dp=args.dp, bond=BOND, coil=args.coil))
     keys = sorted(geo["chords"])
     n_beads = graph.number_of_edges() * args.dp + graph.number_of_nodes()
+    tol = (args.tol if args.tol is not None
+           else args.want * args.tol_pct / 100.0)
+    floor = 2.0 / len(sorted(geo["chords"]))
+    print(f"  tolerance {tol:.3f} per chain"
+          + (f" ({args.tol_pct:.1f} percent of {args.want})"
+             if args.tol is None else "")
+          + f"; one entanglement on one pair is {floor:.3f}, the finest step "
+            f"this network can take")
     print(f"  box {geo['L'][0]:.1f} sigma, density "
           f"{n_beads / float(np.prod(geo['L'])):.3f}")
 
@@ -434,11 +450,11 @@ def main():
               + ("" if reliable else "   (too few pairs to trust)")
               + (f"   ({got[3]} unmeasured)" if got[3] else ""))
 
-        if abs(added - args.want) <= args.tol:
+        if abs(added - args.want) <= tol:
             print(f"\n  delivered {added:.2f} per chain against a target of "
-                  f"{args.want:.2f}, within {args.tol}")
+                  f"{args.want:.2f}, within {tol:.3f}")
             break
-        if added > args.want + args.tol and reliable:
+        if added > args.want + tol and reliable:
             # Back off rather than stop.
             #
             # An overshoot is not a failure, it is a calibration: the yield is
