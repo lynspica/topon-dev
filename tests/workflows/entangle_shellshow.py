@@ -153,11 +153,21 @@ def main():
                          "there are both parallel and perpendicular "
                          "neighbours -- shell 2 on SC is 740 parallel pairs "
                          "and 1898 perpendicular. This picks between them.")
+    ap.add_argument("--mix", default=None,
+                    help="SC,BCC,FCC fractions for a mixed lattice, "
+                         "e.g. 0.6,0.2,0.2. Implies --lattice MIX.")
     ap.add_argument("--clearance", type=float, default=0.9)
     args = ap.parse_args()
 
     spec = dict(LATTICE)
     spec.update(CASES[args.lattice])
+    if args.mix:
+        # SC:BCC:FCC as fractions, e.g. "0.6,0.2,0.2". The lattice a strand
+        # belongs to is what sets its neighbour spacing, so the mix is
+        # effectively a knob on how tightly the shells are packed.
+        f = [float(x) for x in args.mix.split(",")]
+        spec["mix"] = {"SC": f[0], "BCC": f[1], "FCC": f[2]}
+        spec["lattice"] = "MIX"
     spec["dims"] = (args.dims,) * 3
     graph = build_network(spec)
     geo = geometry(graph, dp=args.dp, bond=BOND, coil=args.coil)
