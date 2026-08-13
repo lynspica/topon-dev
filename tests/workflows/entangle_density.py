@@ -436,15 +436,57 @@ def main():
     # this system, and size every later batch from that. The yield is
     # re-estimated each round, so it corrects itself rather than trusting the
     # first estimate.
+    # Which shell each pair sits in, built before the loop so the mix can be
+    # steered rather than only reported afterwards.
+    shell_of = {}
+    for chain, by in shells.items():
+        ia = idx_of.get(frozenset((chain[0], chain[1])))
+        if ia is None:
+            continue
+        for sh, others in by.items():
+            for o in others:
+                ib = idx_of.get(frozenset((o[0], o[1])))
+                if ib is not None and ia != ib:
+                    shell_of.setdefault((min(ia, ib), max(ia, ib)), sh)
+
     pool = list(likely) + [q for q in plan if q not in likely]
     # Start with enough pairs to measure a yield from, not a fixed fraction.
     batch = max(args.min_pairs, int(args.calibrate * len(pool)))
     added, yield_per, raw, reliable = 0.0, None, 0.0, False
     print(f"\n  {'round':>6} {'routed':>7} {'added':>7} {'per pair':>9} "
           f"{'target':>7}")
+    # The mix is a target per shell, not just a selection rule.
+    #
+    # Selecting the right fraction of *pairs* does not deliver the right
+    # fraction of *entanglements*: a pair in an outer shell is worth more,
+    # because the routed chain travels further and picks up more on the way.
+    # Asking 0.20 / 0.50 / 0.25 delivered 0.20 / 0.60 / 0.20. So each shell
+    # gets its own target and its own shortfall, and a round routes from the
+    # shells that are behind rather than from the pool in order.
+    nrm = sum(mix.values())
+    want_by_shell = {sh: args.want * f / nrm for sh, f in mix.items()}
+    got_by_shell = {sh: 0.0 for sh in mix}
+
     for rnd in range(1, args.rounds + 1):
-        take = pool[:batch]
-        pool = pool[batch:]
+        # Take from the shells that are short, most-behind first.
+        short = sorted(mix, key=lambda sh: got_by_shell[sh]
+                       - want_by_shell[sh])
+        take, seen_q = [], set()
+        for sh in short:
+            if got_by_shell[sh] >= want_by_shell[sh]:
+                continue
+            for q in pool:
+                if len(take) >= batch:
+                    break
+                if q in seen_q or shell_of.get((q[0], q[1])) != sh:
+                    continue
+                take.append(q)
+                seen_q.add(q)
+            if len(take) >= batch:
+                break
+        if not take:
+            take = pool[:batch]
+        pool = [q for q in pool if q not in set(take)]
         skipped = 0
         if not take:
             print(f"  no pairs left; delivered {added:.2f} against "
@@ -502,6 +544,19 @@ def main():
         got = measure_system(out, seq, keys, work, watch)
         added = got[0] - base[0]
 
+        # Per-shell delivery, so the next round can correct the mix.
+        from tests.workflows.entangle_relaxed import measure_pairs as _mp
+        if done:
+            now = _mp(out, seq, sorted(done), work)
+            was = _mp(relaxed, seq, sorted(done), work)
+            got_by_shell = {sh: 0.0 for sh in mix}
+            n_ch = len(keys)
+            for q in sorted(done):
+                sh = shell_of.get(q)
+                v, v0 = now.get(q), was.get(q)
+                if sh in got_by_shell and v is not None and v0 is not None:
+                    got_by_shell[sh] += 2.0 * max(0, v - v0) / n_ch
+
         # A yield estimate has to be a measurement, not one noisy difference.
         #
         # Three things went wrong when it was not. The first round measured
@@ -527,7 +582,18 @@ def main():
               + ("" if reliable else "   (too few pairs to trust)")
               + (f"   ({got[3]} unmeasured)" if got[3] else ""))
 
-        if abs(added - args.want) <= tol:
+        miss = {sh: want_by_shell[sh] - got_by_shell[sh] for sh in mix}
+        print(f"  {'':>6} by shell: "
+              + ", ".join(f"{sh}: {got_by_shell[sh]:.2f}/"
+                          f"{want_by_shell[sh]:.2f}" for sh in sorted(mix)))
+
+        # Done when every shell is within tolerance, not just the total.
+        per_shell_tol = tol / max(len(mix), 1)
+        if all(abs(m) <= per_shell_tol for m in miss.values()):
+            print(f"\n  every shell within {per_shell_tol:.3f} per chain")
+            break
+        if abs(added - args.want) <= tol and not any(
+                m > per_shell_tol for m in miss.values()):
             print(f"\n  delivered {added:.2f} per chain against a target of "
                   f"{args.want:.2f}, within {tol:.3f}")
             break
