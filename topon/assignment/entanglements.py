@@ -692,6 +692,15 @@ def chain_distances(G, dims=None, samples=12):
     """
     import numpy as _np
 
+    # Chains sharing a junction are included.
+    #
+    # They were excluded on the grounds that they cannot be entangled, which is
+    # not true: two strands meeting at a crosslink can wind around each other,
+    # and fixing the junction constrains where the winding sits rather than
+    # whether there is one. On an SC 4x4x4 network there are 263 such pairs,
+    # five per chain, each strand carrying 77 sigma of contour on a 5.4 sigma
+    # chord. They are the closest strands in the network and were the one
+    # population no shell could reach.
     edges, pts, nodes = [], [], {}
     t = _np.linspace(0.0, 1.0, samples)[:, None]
     for u, v, key in G.edges(keys=True):
@@ -713,8 +722,8 @@ def chain_distances(G, dims=None, samples=12):
     for i, a in enumerate(edges):
         for j in range(i + 1, len(edges)):
             b = edges[j]
-            if nodes[a] & nodes[b]:
-                continue
+            if nodes[a] == nodes[b]:
+                continue          # the same two junctions, a parallel edge
             d = pts[i][:, None, :] - pts[j][None, :, :]
             if dims is not None:
                 d = d - dims * _np.round(d / dims)

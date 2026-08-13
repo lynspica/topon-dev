@@ -104,12 +104,27 @@ def paths_from(data_file, keys, seq):
 
 
 def measure_pairs(data_file, seq, pairs, work):
-    """Each pair on its own -- the only export Z1+ takes reliably."""
+    """Each pair on its own -- the only export Z1+ takes reliably.
+
+    Chains that share a crosslink are handled by dropping the shared bead from
+    the second sequence. Two such strands can perfectly well wind around each
+    other -- fixing the junction constrains where the winding sits, not whether
+    there is one, and on an SC network each chain has five such partners with
+    fourteen times more contour than its chord needs. What cannot be done is
+    handing Z1+ the same bead as a member of two chains at once, which is a
+    degenerate export rather than a statement about the physics. The winding
+    lives in the free portions either way.
+    """
     work.mkdir(parents=True, exist_ok=True)
     for old in list(work.glob("*.Z1")) + list(work.glob("SP_*.dat")):
         old.unlink()
     for a, b in pairs:
-        z1_export(data_file, [seq[a], seq[b]], work / f"p{a}_{b}.Z1")
+        first = list(seq[a])
+        shared = set(first)
+        second = [i for i in seq[b] if i not in shared]
+        if len(second) < 3:
+            continue
+        z1_export(data_file, [first, second], work / f"p{a}_{b}.Z1")
     res = measure_batch(work) or {}
     return {(a, b): (_both(res[f"p{a}_{b}"], 1, 2)
                      if f"p{a}_{b}" in res else None) for a, b in pairs}
