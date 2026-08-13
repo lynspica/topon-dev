@@ -223,7 +223,13 @@ def main():
                     help="melt route: pack to this density instead of sizing "
                          "by coil ratio. 0.85 is the physical melt the LAMMPS "
                          "scripts are calibrated for.")
-    ap.add_argument("--coil", type=float, default=6.0,
+    ap.add_argument("--max-density", type=float, default=0.85,
+                    help="ceiling for auto-sizing. The box is sized from the "
+                         "design, which gives the roomiest box it fits in, "
+                         "and this only bites when a design would otherwise "
+                         "be crushed into a smaller cell than the system is "
+                         "meant to be built at.")
+    ap.add_argument("--coil", type=float, default=None,
                     help="contour over chord, which sets the box. 6 puts "
                          "neighbouring chains 1.5 sigma apart with real free "
                          "volume to route through; 1.8 leaves them 35 sigma "
@@ -298,9 +304,31 @@ def main():
     # and the box collapses -- measured, 2.2 sigma at density 843. A density
     # target does not need every pair to build. It needs a physically sensible
     # box and enough pairs, and the loop replaces whatever does not fit.
-    geo = (geometry(graph, dp=args.dp, density=args.density)
-           if args.density else
-           geometry(graph, dp=args.dp, bond=BOND, coil=args.coil))
+    # Sized from the design, with the build density as a ceiling.
+    #
+    # This is the point of auto-sizing and it took three reminders to get
+    # right: the largest box the design fits in is the *lowest* density, and
+    # 0.85 is a cap that bites only when a design would crush the system.
+    # Pinning every run to 0.85 instead put the routing in the worst case it
+    # could be in -- a point at that density lies within 0.9 sigma of 2.6
+    # beads, so there is no free volume to route through, and the result was
+    # paths landing on beads, a pair energy of 4e9, and chains longer than the
+    # periodic cell.
+    #
+    # Sized on the pairs that will actually be routed rather than the whole
+    # selection, since the rest are spares the loop may never reach.
+    n_likely = int(args.headroom * args.want / max(args.pair_yield, 1e-9))
+    likely = plan[:max(n_likely, args.min_pairs)]
+    if args.density:
+        geo = geometry(graph, dp=args.dp, density=args.density)
+    elif args.coil:
+        geo = geometry(graph, dp=args.dp, bond=BOND, coil=args.coil)
+    else:
+        sc = scale_for_design(graph, [(a, b) for a, b, _c in likely],
+                              dp=args.dp, bond=BOND, radius=args.ring,
+                              margin=args.margin, site_span=(0.3, 0.7),
+                              max_density=args.max_density)
+        geo = geometry(graph, dp=args.dp, scale=sc)
     keys = sorted(geo["chords"])
     n_beads = graph.number_of_edges() * args.dp + graph.number_of_nodes()
     tol = (args.tol if args.tol is not None
@@ -345,8 +373,6 @@ def main():
     # round then took longer than the whole run should. The pool is ordered, so
     # the pairs that will be used are at the front of it, and the headroom
     # covers the back-off restarting with a different count.
-    n_likely = int(args.headroom * args.want / max(args.pair_yield, 1e-9))
-    likely = plan[:max(n_likely, args.min_pairs)]
     may_route = {a for a, _b, _c in likely} | {b for _a, b, _c in likely}
     wp = routed_watch(paths, box, may_route, args.cutoff)
     watch = (wp, {q: 1.0 for q in wp})
