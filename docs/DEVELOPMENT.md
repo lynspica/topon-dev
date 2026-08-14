@@ -32,11 +32,11 @@ The latest five versions, in reverse chronological order, with full detail in §
 
 | Version | Date | Summary |
 |---|---|---|
+| **V50** | 2026-08-14 | **Shell mix, density target and spatial placement, closed-loop in one run.** `entangle_density.py` gained `--bias`/`--bias-params` (region, gradient, clusters placement fed into `select_by_shells`), a measured end-of-run spatial check, `--mix-only` (watch the ~200 designed pairs instead of the 4000+-pair melt watch, hours of Z1 down to minutes), and an in-loop mix controller: per-shell yields learned with damping, quotas on fraction shortfall, gain-scaled give-back of overshooting shells, both chains of a delivered pair locked, pools topped up from the full shell population. Single runs land at the counting-noise floor -- the naive four-shell ask 20/50/25/5 delivers 23/50/23/4 and stops itself; uniform and outward-weighted land within 0.05 per shell. Spatial: a z-gradient delivers quarters 0.03/0.21/0.21/0.55, a x8 hotspot concentrates 2.1x. Findings: spatial bias collapses design auto-sizing to the 0.85 cap (biased runs need an explicit box); the ask-to-delivered map is nonlinear (a heavily routed shell inflates itself through same-shell collateral), so control needs damping on both sides; routing the partner of a delivered pair destroys its winding; survival needs crowding (0.24 per pair at density 0.85 vs 0.005 at 0.066). |
 | **V49** | 2026-08-08 | **Designed entanglements: place them where you want and get the count you asked for.** New `conformation/entanglement/waypoints.py` draws a chain through points the caller chooses, winding it round a partner a prescribed number of times; `conformation/junction_shell.py` spreads the chains leaving a crosslink. Verified with Z1+ on the written data file, network stripped: one entanglement per pair is delivered exactly through all three stages, a chain carries two partners at 2 of 2, and across a five-chain composite plan nothing appears in any pair that was not asked for. Three findings drive it: the stage-1 soft push destroys prescribed topology (finite energy at zero separation lets chains pass through each other), contour-over-chord above ~2.5 makes the coil's own crossings swamp the design, and this lattice's close strand pairs cross rather than run alongside, so several sites on one pair are not geometrically available. |
 | **V48** | 2026-08-06 | **Open axes are no longer wrapped in the data file.** The conformation stage folded every axis with `% box`, so a junction on a free surface ended up at one end of the box with the chains bonded to it at the other. Invisible under `p p p`, wrong under `p f f`. On the flagged run the wraps across the open y and z axes go **98 → 0**. `.nodes` gained a `# PERIODICITY` header; the LAMMPS scripts are untouched. |
 | **V47** | 2026-08-05 | **Diamond added to C, per-axis periodicity added to Python** — the last two asymmetries. Both are deterministic, so parity is now exact: all 16 lattice x periodicity combinations produce identical edge sets, and Diamond matches node-for-node including ids. `lattice_type: "Diamond"` works through the config on both paths. Also fixed a C seeding bug that made **every run started in the same second produce the same network**. Found that open boundaries make `"0:0,1:0"` unsatisfiable on BCC and Diamond (free-surface sites have degree 1). |
 | **V46** | 2026-08-05 | **C/Python parity swept across 24 configurations** (lattices, sizes, mixtures, distribution modes) by the new `tests/workflows/compare_generators.py`; 22 agree and the other 2 are targets both correctly refuse. Two C bugs found: a `strncmp` prefix match let `MIXED`/`MIXTURE` silently build a pure-SC lattice, and the completion check never read targets above `max_func`, so the generator printed "SUCCESS" over networks that did not satisfy the request. Python gained the matching fail-fast guard. |
-| **V45** | 2026-08-05 | **Corrected the vendored C source and sped the Python generator up ~7x.** V44 vendored the newest C by timestamp, but that is an experimental variant that sculpts 1/6 standard configs where the 2025-11-03 version does 6/6; re-vendored the latter. Separately, 99.5% of the Python generator's runtime was a NetworkX subgraph *view* re-evaluating its node filter; a direct adjacency walk is 6-8x faster and provably yields identical networks. |
 
 ---
 
@@ -61,9 +61,83 @@ Open phases and planned next steps are tracked in [`internal/DEVELOPMENT_INTERNA
 
 ---
 
-## 4. Changelog (V1 – V48)
+## 4. Changelog (V1 – V50)
 
 Notable changes are documented in reverse chronological order.
+
+### [V50] — 2026-08-14 — Density, shell mix and spatial placement, all measured on the built system
+
+**What changed.** Workflow-level, no core-module edits:
+
+- `tests/workflows/entangle_density.py` — `--bias` / `--bias-params` pass a
+  spatial placement (`region`, `anti_region`, `gradient`, `clusters`) into
+  `select_by_shells`, and the run now ends with a measured spatial check:
+  the delivered designed entanglements are binned on the bias's own geometry
+  (quarter-profile along the gradient axis, in-against-out density ratio for
+  a sphere). `--mix-only` watches only the designed pairs, so a mix
+  verification costs minutes of Z1 rather than hours: the full melt watch is
+  4000+ contact pairs, the plan is about 200.
+- `tests/workflows/entangle_shellsuite.py` — auto-sized box by default
+  instead of the pinned 0.85 melt, and a `--stages` passthrough (default 1,
+  the quick serial minimize).
+
+**Verified, dims 5, e-target 2.0, Z1+ on the minimised system.** Six
+distributions: all-shell-1 and all-shell-2 delivered exactly 1.00; even 1+2
+came back 0.41/0.59; uniform-over-four 0.24/0.38/0.27/0.11; weighted-outward
+0.09/0.08/0.33/0.51 against 0.05/0.15/0.30/0.50. The four-shell request
+0.20/0.50/0.25/0.05 needed iteration: one pass delivered 0.06/0.71/0.14/0.10,
+the yield-corrected ask over-shot the other way, and a secant step over the
+two measured passes landed 0.26/0.45/0.24/0.05, a worst shell error of 0.06,
+within the counting noise of 108 pairs. Spatially, a strength-3 z-gradient
+delivered rising quarters 0.03/0.21/0.21/0.55 and a x8 sphere holding 11% of
+the box captured 21% of the entanglements (ratio 2.1).
+
+**The in-loop controller** then replaced the manual iteration. Three
+generations in one afternoon, each built from the previous one's logs:
+
+- *v1* allocated mixed batches by shortfall over learned per-shell yields
+  (the old loop filled whole batches from the single most-behind shell,
+  which is what fed the same-shell inflation). Result: better than one-shot
+  everywhere, but every run ended "pool dry" -- the selection stocks pairs
+  in proportion to the ask, the controller consumes them in proportion to
+  shortfall over yield -- and give-back never fired, because it compared
+  each shell to an absolute want no roomy-regime run can reach.
+- *v2* judged overshoot, allocation and convergence on fractions of the
+  delivered total, and topped pools up from the full shell population. The
+  feedback engaged and promptly oscillated: an undamped give-back stripped
+  shell 2 from 0.34 to 0.06 per chain in one round while the allocation
+  flooded the others. It also exposed a quieter channel: routing the
+  *partner* of a delivered pair moves it and destroys the winding it
+  already carries (the outward run's shell 4 decayed 0.49 to 0.38 with no
+  give-back involved).
+- *v3* damps the give-back by the same gain as the routing side and locks
+  both chains of every delivered pair. Single runs, naive asks: the
+  four-shell request delivers 0.23/0.50/0.23/0.04 (worst 0.03, shell 2
+  exact, stops itself on the fraction test), uniform delivers
+  0.24/0.28/0.20/0.29, outward 0.06/0.14/0.26/0.55 (worst 0.05 each). The
+  partner lock also lifted the deliverable total, 0.35 to 0.54 per chain on
+  the outward case, since windings now accumulate instead of churning.
+
+**Findings.**
+
+1. *Spatial bias breaks design-based auto-sizing.* Concentrated placement
+   loads many routes onto few chains, the detour budget dominates
+   `scale_for_design`, and the demanded box collapses until the 0.85 cap
+   bites, which is the density where routing cannot thread (26 of 29 paths
+   dropped, minimise blew up). Biased runs take an explicit `--coil` or
+   `--density`.
+2. *The asked-to-delivered shell map is nonlinear.* A heavily weighted shell
+   over-delivers because routed chains' collateral lands on neighbouring
+   designed pairs of the same shell; ask the same shell moderately and the
+   inflation vanishes. One-shot division by yield therefore over-corrects;
+   two calibration passes plus a secant close the loop.
+3. *Winding survival needs crowding.* Per designed pair, 0.24 entanglements
+   survive at density 0.85 after stage 2 against about 0.005 at 0.066 after
+   stage 1: with free volume, the soft push-off straightens the wound detour
+   through its partner. Mix fractions stay clean at low density because they
+   are normalised over what survives, but absolute e per chain is
+   regime-bound, and one-route-per-chain caps delivered concentration (the
+   x8 hotspot delivers 2.1x).
 
 ### [V49] — 2026-08-08 — Designed entanglements, verified by primitive-path analysis
 

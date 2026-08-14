@@ -9,8 +9,10 @@ luck, or by a bias that happens to point the right way for that particular
 mix. A set of them, including the degenerate single-shell cases and a uniform
 one, is what shows the mix is being controlled rather than approximated.
 
-Each case is a full build: select, route, minimise with LAMMPS, and measure
-with Z1+ on the minimised system. Nothing here reads the built coordinates.
+Each case runs the pipeline end to end: select, route, minimise with LAMMPS
+(--stages sets how far; the default is stage 1, the quick serial minimize),
+and measure with Z1+ on the minimised system. Nothing here reads the built
+coordinates.
 
 The distributions are chosen to probe different failure modes:
 
@@ -66,9 +68,27 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--want", type=float, default=2.0)
     ap.add_argument("--dims", type=int, default=4)
-    ap.add_argument("--density", type=float, default=0.85)
+    ap.add_argument("--density", type=float, default=None,
+                    help="melt route. Default is auto-sizing from the design "
+                         "with 0.85 as the ceiling -- at a pinned 0.85 there "
+                         "is no free volume to route through, which is the "
+                         "regime the user asked to stop building in.")
     ap.add_argument("--rounds", type=int, default=8)
+    ap.add_argument("--stages", type=int, default=1,
+                    help="LAMMPS stages per relax. 1 is the quick serial "
+                         "minimize, which is all the mix check needs: the "
+                         "winding is committed at routing, stage 1 resolves "
+                         "the overlaps Z1 cares about, and the before/after "
+                         "comparison is paired at the same stage. The fuller "
+                         "stages answer a different question -- survival -- "
+                         "measured separately.")
     ap.add_argument("--tol-pct", type=float, default=5.0)
+    ap.add_argument("--mix-only", action="store_true", default=True,
+                    help="watch only the designed pairs (the flag that makes "
+                         "six cases affordable: the melt watch is 4000+ Z1 "
+                         "pairs per sweep, the plan a couple of hundred). "
+                         "--no-mix-only restores the full watch.")
+    ap.add_argument("--no-mix-only", dest="mix_only", action="store_false")
     ap.add_argument("--only", type=int, default=None,
                     help="run just one case, by index")
     args = ap.parse_args()
@@ -81,8 +101,13 @@ def main():
         cmd = [sys.executable,
                str(ROOT / "tests/workflows/entangle_density.py"),
                "--want", str(args.want), "--shells", mix,
-               "--dims", str(args.dims), "--density", str(args.density),
-               "--rounds", str(args.rounds), "--tol-pct", str(args.tol_pct)]
+               "--dims", str(args.dims),
+               "--rounds", str(args.rounds), "--stages", str(args.stages),
+               "--tol-pct", str(args.tol_pct)]
+        if args.density is not None:
+            cmd += ["--density", str(args.density)]
+        if args.mix_only:
+            cmd += ["--mix-only"]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
         rows, delivered, every = parse(r.stdout)
         results.append((name, mix, rows, delivered, every))

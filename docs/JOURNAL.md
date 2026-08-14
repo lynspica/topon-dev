@@ -14,6 +14,130 @@ Newest first.
 
 ---
 
+## 2026-08-14 — Ask for a mix, get the mix; and put it where you point
+
+**Change:** the three entanglement requests are now verified together on
+built systems. `entangle_density.py` gained `--bias`/`--bias-params`
+(spatial placement into `select_by_shells`), a measured spatial check at the
+end of the run, and `--mix-only`, which watches only the designed pairs.
+`entangle_shellsuite.py` defaults to the auto-sized box and passes
+`--stages` through. Six distributions ran end to end at dims 5, plus a
+z-gradient and a x8 hotspot build.
+
+**Why:** the original request: set an average e per chain, set the
+neighbour-shell percentages, set where in the box the entanglements sit.
+Selection-level checks existed; nothing had measured the delivered spatial
+distribution, and the suite had never completed on the current code.
+
+**Issue / solution:** three, all instructive.
+
+1. The first gradient run collapsed the auto-sizer: concentrated placement
+   loads many routes onto few chains, the demanded box shrank to the 0.85
+   cap, and at 0.85 routing cannot thread (26 of 29 paths dropped, then the
+   minimise blew up). Biased runs now take an explicit `--coil`/`--density`.
+2. The suite at 0.85 was also unaffordable: the exact watch there is 4000+
+   contact pairs and each Z1 sweep costs hours. The shell table only ever
+   needed the designed pairs, so `--mix-only` watches those (~200) and a
+   case finishes in ~25 minutes. Six cases ran in parallel lanes.
+3. One pass does not deliver a multi-shell mix. The four-shell request
+   0.20/0.50/0.25/0.05 delivered 0.06/0.71/0.14/0.10; dividing the ask by
+   the measured yield over-shot the other way (0.52/0.24/0.21/0.02),
+   because the yield is ask-dependent: a heavily weighted shell inflates
+   itself through collateral on same-shell neighbours. A secant step over
+   the two measured passes closed it: 0.26/0.45/0.24/0.05, worst error
+   0.06, inside the counting noise of 108 pairs.
+
+Delivered elsewhere on one pass: both single-shell cases exactly 1.00,
+weighted-outward 0.09/0.08/0.33/0.51 on an asked 0.05/0.15/0.30/0.50. The
+gradient build delivers rising z-quarters 0.03/0.21/0.21/0.55; the hotspot
+sphere holds 11% of the box and 21% of the entanglements, ratio 2.1 against
+an asked 8, capped by one-route-per-chain exhausting the local pool.
+
+**Follow-up:** winding survival collapses in free volume (0.24 per designed
+pair at density 0.85 after stage 2; ~0.005 at 0.066 after stage 1), so mix
+fractions verify cleanly at coil 6 but absolute e per chain there tops out
+near 0.8. Composing e=2.0 at melt density with an arbitrary mix in one
+build still runs into routing-against-crowding; the candidate path is the
+v2j sigma-ramp protocol. The secant was moved into the controller the same
+day -- see the next entry.
+
+---
+
+## 2026-08-14 — The mix controller closes the loop by itself
+
+**Change:** the manual iterate-by-hand procedure became an in-loop
+controller in `entangle_density.py`: per-shell yields learned each round
+with 0.5 damping, batch quotas allocated on each shell's fraction shortfall
+over its yield, overshooting shells giving pairs back gain-scaled, both
+chains of every delivered pair locked against later routing, and pools
+topped up from the full shell population. `--gain` (default 0.7) sets both
+the approach rate and the give-back rate; in `--mix-only` the run stops
+itself when every live shell is within tolerance of its delivered fraction.
+
+**Why:** the user's study needs a requested shell distribution delivered in
+one run, not a three-pass manual calibration.
+
+**Issue / solution:** three generations, each diagnosed from the previous
+one's logs. v1 (mixed batches, learned yields) still died on "pool dry" --
+the selection stocks pairs proportional to the ask, the controller consumes
+proportional to shortfall over yield -- and its give-back compared shells to
+absolute wants nothing in the roomy regime reaches, so it never fired while
+shell 1 sat at 0.33 of the total against an asked 0.20. v2 (fractions of
+the delivered total, reserve top-up) engaged the feedback and oscillated:
+the undamped give-back stripped shell 2 from 0.34 to 0.06 per chain in one
+round. It also surfaced the quiet channel: routing the *partner* of a
+delivered pair moves it and destroys the winding it carries -- outward's
+shell 4 decayed 0.49 to 0.38 with no give-back involved. v3 damped the
+give-back by the routing gain and locked both chains of delivered pairs.
+
+Also found the hard way: a local variable named `cand` in the give-back
+shadowed the candidate working directory `relax()` closes over, so the
+first give-back crashed the next relax. Renamed.
+
+**Result**, single runs, naive asks, dims 5: four-shell 20/50/25/5
+delivers 23/50/23/4 (worst 0.03, shell 2 exact, self-stopped); uniform
+25x4 delivers 24/28/20/29; outward 5/15/30/50 delivers 6/14/26/55 (worst
+0.05 each). Counting noise on ~100 pairs is 0.02-0.03 per shell, so this
+is the measurement floor. The partner lock also raised the deliverable
+total from 0.35 to 0.54 per chain on the outward case.
+
+---
+
+## 2026-08-14 — Twelve characteristic-ratio networks and a lattice catalogue
+
+**Change:** `char12.py` builds and analyses twelve plain networks (SC, BCC,
+FCC and three SC:BCC:FCC mixes at DP 40 and DP 80, dims 5, density 0.30, no
+entanglements), driven through the reference `equil_demo.in` protocol and
+measured with the user's own `characteristic_ratio.py`; `char12_fig.py`
+renders the C(s) figure in the fig2d house style. `render_lattices.py`
+renders a seven-panel OVITO catalogue (SC, Diamond, BCC, FCC, three mixes)
+at default OVITO styling with the periodic box drawn.
+
+**Why:** the twelve systems are the no-entanglement baseline for the lattice
+comparison; the catalogue is the showcase picture of what the generator
+builds, Diamond included.
+
+**Issue / solution:** `write_system` writes zero coordinates and defers the
+real ones to the conform stage, so both workflows shipped every atom at the
+origin until the walk coordinates were written in at build time; LAMMPS
+reported it as a neighbour-list overflow, OVITO as a forty-minute render of
+coincident spheres. The data files also carry a placeholder +-50 box, which
+the build now replaces with the real cell, so the files open in OVITO with a
+correct box and the catalogue draws its contours from the file. A second
+defect surfaced in review: each straight chain was written in its own
+minimum image, so a junction shared by wrapped and unwrapped chains landed
+at whichever image was written last and the other chains' bonds to it were
+torn (a quarter to a half of the chains per panel drew as stubs). Wrapping
+every bead into the cell collapses a junction's images to one position and
+leaves boundary-crossing chains as face-to-face stubs, which is what the
+wrapped-bond cut is for. FCC at DP 80
+deadlocked MS-MPI when a rank aborted on a FENE blowup; the OpenMP lane
+(`lmp -sf omp`) both avoids the deadlock and ran 8x faster. DP 40 curves are
+converged and order by connectivity; DP 80 at 200k steps is still
+compressing, and the figure says so on the panel.
+
+---
+
 ## 2026-08-12 — The negative yield was the estimator, not the physics
 
 **Change:** `routed_watch` in `tests/workflows/entangle_density.py` replaces

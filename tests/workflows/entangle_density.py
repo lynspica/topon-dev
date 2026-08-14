@@ -17,10 +17,16 @@ Each round adds only the shortfall, and the measurement is always of the
 relaxed system, so what is reported is what survives rather than what was
 built. Survival of an individual pair stops mattering; the delivered density is
 what is being controlled.
+
+Under ``--mix-only`` the currency narrows: only the designed pairs are
+watched, so collateral on undesigned pairs is not counted, the reported
+total undercounts the system, and the flag exists for verifying the *mix*
+cheaply rather than the density exactly.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -184,6 +190,17 @@ def main():
                     help="target entanglements per chain")
     ap.add_argument("--shells", default="1:0.5,2:0.5",
                     help="shell mix, e.g. '1:0.2,2:0.5,3:0.25,4:0.05'")
+    ap.add_argument("--bias", default="uniform",
+                    choices=("uniform", "region", "anti_region", "gradient",
+                             "clusters"),
+                    help="spatial placement. The shell mix says which "
+                         "neighbour a chain winds; this says where in the "
+                         "box the wound pairs sit.")
+    ap.add_argument("--bias-params", default="{}",
+                    help="JSON for the bias, e.g. "
+                         "'{\"axis\":\"z\",\"strength\":3}' for gradient, "
+                         "'{\"center\":[0.5,0.5,0.5],\"radius\":0.3,"
+                         "\"strength\":8}' for region")
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--reject-below", type=float, default=0.25,
                     help="drop a routed path whose tightest contact is below "
@@ -209,6 +226,14 @@ def main():
                     help="fraction of the selected pairs to route in the "
                          "first batch, before what a pair is worth in this "
                          "system has been measured")
+    ap.add_argument("--gain", type=float, default=0.7,
+                    help="fraction of each shell's estimated need routed per "
+                         "round. Below 1 approaches the target from below, "
+                         "which matters because the per-pair yield is "
+                         "ask-dependent: routing a shell heavily inflates "
+                         "its own yield through same-shell collateral, so "
+                         "meeting the full shortfall at the current estimate "
+                         "overshoots and has to be walked back.")
     ap.add_argument("--tol-pct", type=float, default=5.0,
                     help="stop when within this percent of the target. Scales "
                          "with what was asked for, where an absolute "
@@ -243,10 +268,16 @@ def main():
     ap.add_argument("--cutoff", type=float, default=3.0,
                     help="chains further apart than this everywhere cannot be "
                          "entangled, so they are not measured")
-    ap.add_argument("--sample", type=int, default=400,
-                    help="how many undesigned contact pairs to measure. They "
-                         "carry the background and any collateral; the "
-                         "designed pairs are always measured in full.")
+    ap.add_argument("--mix-only", action="store_true",
+                    help="watch only the designed pairs. The e total then "
+                         "counts designed increments rather than the whole "
+                         "watched neighbourhood, so collateral on undesigned "
+                         "pairs is not counted and the delivered *system* "
+                         "density will exceed --want. The run is Z1-cheap: "
+                         "the full watch at melt density is 4000+ pairs and "
+                         "hours of Z1, the plan is a couple of hundred. The "
+                         "shell table is unchanged -- it was always built "
+                         "from the designed pairs alone.")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--tag", default=None,
                     help="output directory suffix. Defaults to the lattice "
@@ -269,6 +300,25 @@ def main():
     for part in args.shells.split(","):
         s, f = part.split(":")
         mix[int(s)] = float(f)
+
+    # Vet the bias request before the expensive work, not after: a typo'd
+    # axis used to bias along x (compute_bias_weights falls back silently)
+    # and then crash in the report, after the whole build.
+    bias_params = json.loads(args.bias_params)
+    if args.bias == "gradient" and bias_params.get("axis", "x") not in (
+            "x", "y", "z"):
+        print(f"  unknown gradient axis "
+              f"{bias_params.get('axis')!r}; use x, y or z")
+        return 1
+    if (args.bias in ("region", "anti_region")
+            and float(bias_params.get("radius", 0.3)) > 0.5):
+        # Beyond half the box the minimum-image "inside" test is no longer
+        # a sphere and the volume formula exceeds the cell, which turns the
+        # reported density ratio negative.
+        print("  region radius is a fraction of min(box); above 0.5 the "
+              "minimum-image sphere stops being a sphere. Ask for 0.5 or "
+              "less.")
+        return 1
 
     spec = dict(LATTICE)
     spec.update(CASES["SC"])
@@ -296,12 +346,15 @@ def main():
 
     rng = np.random.default_rng(args.seed)
     plan = to_idx(select_by_shells(G, args.want, mix, dims, shells=shells,
-                                   rng=rng))
+                                   rng=rng, bias_kind=args.bias,
+                                   bias_params=bias_params))
     if not plan:
         print("  selection produced nothing")
         return 1
     print(f"  target {args.want:.2f} per chain, mix "
-          f"{ {s: mix[s] for s in sorted(mix)} }")
+          f"{ {s: mix[s] for s in sorted(mix)} }"
+          + (f", bias {args.bias} {bias_params}"
+             if args.bias != "uniform" else ""))
     print(f"  selected {len(plan)} pairs, "
           f"{sum(c for _a, _b, c in plan)} entanglements")
 
@@ -383,14 +436,27 @@ def main():
     # the pairs that will be used are at the front of it, and the headroom
     # covers the back-off restarting with a different count.
     may_route = {a for a, _b, _c in likely} | {b for _a, b, _c in likely}
-    wp = routed_watch(paths, box, may_route, args.cutoff)
+    if args.mix_only:
+        wp = sorted({(min(a, b), max(a, b)) for a, b, _c in plan})
+        print(f"  mix-only: watching the {len(wp)} designed pairs and "
+              f"nothing else")
+    else:
+        wp = routed_watch(paths, box, may_route, args.cutoff)
+        print(f"  watching {len(wp)} contact pairs that touch a routable "
+              f"chain, measured exactly")
     watch = (wp, {q: 1.0 for q in wp})
-    print(f"  watching {len(wp)} contact pairs that touch a routable chain, "
-          f"measured exactly")
     base = measure_system(relaxed, seq, keys, work, watch)
-    print(f"  the plain melt already carries {base[0]:.2f} per chain over "
-          f"{base[1]:.1f} partners ({base[2]} pairs in contact"
-          + (f", {base[3]} unmeasured)" if base[3] else ")"))
+    if args.mix_only:
+        # Not a statement about the melt: the watch is the designed plan,
+        # chosen by graph shell rather than by distance, so this is only the
+        # baseline those particular pairs will be differenced against.
+        print(f"  the designed pairs carry {base[0]:.2f} per chain in the "
+              f"plain melt ({base[2]} measured"
+              + (f", {base[3]} unmeasured)" if base[3] else ")"))
+    else:
+        print(f"  the plain melt already carries {base[0]:.2f} per chain "
+              f"over {base[1]:.1f} partners ({base[2]} pairs in contact"
+              + (f", {base[3]} unmeasured)" if base[3] else ")"))
 
     cand = OUT / f"density_cand_{os.getpid()}"
     (cand / "03_Conformation").mkdir(parents=True, exist_ok=True)
@@ -453,8 +519,25 @@ def main():
                     shell_of.setdefault((min(ia, ib), max(ia, ib)), sh)
 
     pool = list(likely) + [q for q in plan if q not in likely]
-    # Start with enough pairs to measure a yield from, not a fixed fraction.
-    batch = max(args.min_pairs, int(args.calibrate * len(pool)))
+
+    # The full population of each requested shell, as a reserve.
+    #
+    # The plan's pool holds pairs in proportion to the ask, but the
+    # controller consumes them in proportion to shortfall over yield, which
+    # for a low-yield shell runs several times deeper: every first-generation
+    # controller run ended on "pool dry" with the mix unconverged. The
+    # reserve is every pair the geometry offers at that shell distance, so a
+    # shell's pool now runs out only when the network itself does.
+    rng_res = np.random.default_rng(args.seed + 1)
+    in_plan = {(a, b) for a, b, _c in plan}
+    reserve_by_shell = {}
+    for q, sh_r in shell_of.items():
+        if sh_r in mix and q not in in_plan:
+            reserve_by_shell.setdefault(sh_r, []).append((q[0], q[1], 1))
+    for sh_r, lst in reserve_by_shell.items():
+        reserve_by_shell[sh_r] = [lst[i]
+                                  for i in rng_res.permutation(len(lst))]
+
     added, yield_per, raw, reliable = 0.0, None, 0.0, False
     print(f"\n  {'round':>6} {'routed':>7} {'added':>7} {'per pair':>9} "
           f"{'target':>7}")
@@ -470,31 +553,176 @@ def main():
     want_by_shell = {sh: args.want * f / nrm for sh, f in mix.items()}
     got_by_shell = {sh: 0.0 for sh in mix}
 
+    # In-loop mix controller state. The ask-to-delivered map is nonlinear --
+    # measured on the four-shell request, asking 20/50/25/5 delivers
+    # 6/71/14/10, and dividing the ask by that yield over-corrects to
+    # 52/24/21/2 -- so no single ask hits the target. What converged by hand
+    # was iterating with damping (two calibration passes and a secant step
+    # landed within 0.06); this loop is that iteration, run per round inside
+    # one build: per-shell yields learned with damping, each round routing a
+    # gain-scaled shortfall as a *mixed* batch, and overshooting shells
+    # giving pairs back.
+    per_shell_tol = tol / max(len(mix), 1)
+    yield_pair = {sh: None for sh in mix}    # per routed pair, per-chain units
+    inc_of = {}                              # pair -> measured increment
+    base_cache = {}                          # pair -> melt baseline count
+    dead = set()                             # shells measured undeliverable
+    n_ch = len(keys)
+
     for rnd in range(1, args.rounds + 1):
-        # Take from the shells that are short, most-behind first.
-        short = sorted(mix, key=lambda sh: got_by_shell[sh]
-                       - want_by_shell[sh])
-        take, seen_q = [], set()
-        for sh in short:
-            if got_by_shell[sh] >= want_by_shell[sh]:
+        routed_by_shell = {sh: 0 for sh in mix}
+        for q in done:
+            s = shell_of.get(q)
+            if s in routed_by_shell:
+                routed_by_shell[s] += 1
+
+        # Give back from shells that overshot, before asking for more.
+        #
+        # Un-routing restores the chain's original melt path, which was
+        # clear when everything else was in place; other routed chains have
+        # moved since, so the restore is checked against the current
+        # obstacle set and skipped if it would land closer than the same
+        # threshold a new route must clear.
+        unrouted = 0
+        if rnd > 1 and done:
+            # Overshoot judged on fractions of the delivered total in
+            # mix-only mode, absolutes otherwise. The deliverable total in
+            # the roomy regime is far below the absolute want, so no shell
+            # ever exceeded its absolute target and the give-back never
+            # fired -- while shell 1 sat at 0.33 of the total against an
+            # asked 0.20.
+            frac_tol = max(0.03, per_shell_tol / max(args.want, 1e-9))
+
+            def over(sh):
+                if args.mix_only:
+                    t = sum(got_by_shell.values())
+                    if t <= 0:
+                        return False
+                    return (got_by_shell[sh] / t
+                            > want_by_shell[sh] / args.want + frac_tol)
+                return got_by_shell[sh] - want_by_shell[sh] > per_shell_tol
+
+            for sh in sorted(mix):
+                if not over(sh):
+                    continue
+                # Damped: remove gain-worth of the excess, not all of it.
+                # Walking the shell all the way down chased its target
+                # fraction of a shrinking total -- one round stripped shell
+                # 2 from 0.34 to 0.06 per chain, the allocation flooded the
+                # others, and the mix oscillated instead of settling.
+                t0 = sum(got_by_shell.values())
+                excess = (got_by_shell[sh]
+                          - want_by_shell[sh] / args.want * t0
+                          if args.mix_only and t0 > 0
+                          else got_by_shell[sh] - want_by_shell[sh])
+                budget = args.gain * max(excess, 0.0)
+                # Not named `cand`: that is the candidate working directory
+                # relax() closes over, and shadowing it here turned the
+                # first give-back into a crash on the next relax call.
+                gb = sorted(((inc_of.get(q, 0.0), q) for q in list(done)
+                             if shell_of.get(q) == sh), reverse=True)
+                for v, q in gb:
+                    if budget <= 0 or not over(sh):
+                        break
+                    if v <= 0:
+                        continue
+                    a = q[0]
+                    keep = np.ones(len(ids), bool)
+                    keep[[row[i] for i in seq[a]]] = False
+                    avoid = Clearance(xyz_arr[keep], box, args.clearance)
+                    if avoid.worst(paths0[a][1:-1]) < args.reject_below:
+                        continue
+                    paths[a] = paths0[a].copy()
+                    for aid, xyzp in zip(seq[a], paths0[a]):
+                        xyz_now[aid] = xyzp
+                        xyz_arr[row[aid]] = xyzp
+                    done.discard(q)
+                    routed_chains.discard(a)
+                    routed_by_shell[sh] -= 1
+                    pool += keep_pairs_with_counts(plan, [q])
+                    got_by_shell[sh] -= v
+                    budget -= v
+                    unrouted += 1
+            if unrouted:
+                print(f"  {'':>6} gave back {unrouted} pairs from "
+                      f"overshooting shells")
+
+        # Each shell's ask: its shortfall over what one of its pairs is
+        # worth, gain-scaled, routed as one mixed batch.
+        floor_y = 2.0 / n_ch
+        short_amt = {sh: want_by_shell[sh] - got_by_shell[sh] for sh in mix}
+        tot_del = sum(got_by_shell.values())
+        need = {}
+        for sh in mix:
+            if sh in dead or short_amt[sh] <= 0.5 * per_shell_tol:
                 continue
+            # A shell at or above its fraction of the delivered total does
+            # not get more routing in mix-only mode, even though it is
+            # below its absolute want: routing it fights the give-back.
+            if (args.mix_only and tot_del > 0
+                    and got_by_shell[sh] / tot_del
+                    >= want_by_shell[sh] / args.want):
+                continue
+            y = (yield_pair[sh] if yield_pair[sh] and yield_pair[sh] > 0
+                 else max(args.pair_yield, floor_y))
+            need[sh] = max(args.gain * short_amt[sh] / max(y, 1e-4), 1.0)
+        cap = (max(args.min_pairs, int(args.calibrate * len(pool)))
+               if rnd == 1 else 50)
+        total_need = sum(need.values())
+        scale = min(1.0, cap / total_need) if total_need > 0 else 0.0
+        quota = {sh: int(need[sh] * scale) for sh in need}
+        for sh in sorted(need, key=lambda s: -(need[s] * scale
+                                               - quota[s])):
+            if sum(quota.values()) >= min(cap, int(total_need)):
+                break
+            quota[sh] += 1
+
+        # Both chains of every delivered pair are off limits, not just the
+        # routed one. Routing the *partner* of a delivered pair for some
+        # other pair moves it and disturbs the winding it already carries:
+        # the outward run's shell 4 fell from 0.49 of the total to 0.38
+        # across the late rounds with no give-back ever touching it.
+        locked = {c for q in done for c in q} | routed_chains
+        take, seen_q = [], set()
+        pool_dry = []
+        for sh, nq in sorted(quota.items()):
+            got_n = 0
             for q in pool:
-                if len(take) >= batch:
+                if got_n >= nq:
                     break
                 if q in seen_q or shell_of.get((q[0], q[1])) != sh:
                     continue
+                if q[0] in locked or q[1] in locked:
+                    continue
                 take.append(q)
                 seen_q.add(q)
-            if len(take) >= batch:
-                break
-        if not take:
-            take = pool[:batch]
-        pool = [q for q in pool if q not in set(take)]
+                got_n += 1
+            # Top up from the shell's reserve when the plan's pool is dry.
+            extra = reserve_by_shell.get(sh, [])
+            while extra and got_n < nq:
+                q = extra.pop()
+                if (q in seen_q or (q[0], q[1]) in done
+                        or q[0] in locked or q[1] in locked):
+                    continue
+                take.append(q)
+                seen_q.add(q)
+                got_n += 1
+            if got_n < nq:
+                pool_dry.append((sh, nq - got_n))
+        if pool_dry:
+            print(f"  {'':>6} pool dry: "
+                  + ", ".join(f"shell {s} short {m} pairs"
+                              for s, m in pool_dry))
+        pool = [q for q in pool if q not in seen_q]
         skipped = 0
-        if not take:
-            print(f"  no pairs left; delivered {added:.2f} against "
+        if not take and not unrouted:
+            print(f"  no pairs left to route; delivered {added:.2f} against "
                   f"{args.want:.2f}")
             break
+        if quota:
+            print(f"  {'':>6} routing "
+                  + ", ".join(f"shell {s}: {quota[s]}"
+                              for s in sorted(quota)))
 
         for a, b, count in take:
             # One routing per chain, ever.
@@ -506,7 +734,7 @@ def main():
             # made this common, since a chain then has five more partners:
             # the yield fell 0.247, 0.101, 0.038 over three rounds and the
             # relaxation then failed with beads at zero separation.
-            if a in routed_chains or b in routed_chains:
+            if a in locked or b in locked:
                 continue
             keep = np.ones(len(ids), bool)
             keep[[row[i] for i in seq[a]]] = False
@@ -536,6 +764,8 @@ def main():
                 xyz_arr[row[aid]] = xyzp
             done.add((a, b))
             routed_chains.add(a)
+            locked.add(a)
+            locked.add(b)
 
         if skipped:
             print(f"  {'':>6} {skipped} of {len(take)} paths dropped for "
@@ -548,17 +778,44 @@ def main():
         added = got[0] - base[0]
 
         # Per-shell delivery, so the next round can correct the mix.
+        #
+        # Baselines are measured once per pair and cached: the melt does not
+        # change between rounds, and re-measuring it doubled the Z1 cost of
+        # every round.
         from tests.workflows.entangle_relaxed import measure_pairs as _mp
         if done:
+            fresh = [q for q in sorted(done) if q not in base_cache]
+            if fresh:
+                base_cache.update(_mp(relaxed, seq, fresh, work))
             now = _mp(out, seq, sorted(done), work)
-            was = _mp(relaxed, seq, sorted(done), work)
             got_by_shell = {sh: 0.0 for sh in mix}
-            n_ch = len(keys)
+            inc_of = {}
             for q in sorted(done):
                 sh = shell_of.get(q)
-                v, v0 = now.get(q), was.get(q)
+                v, v0 = now.get(q), base_cache.get(q)
                 if sh in got_by_shell and v is not None and v0 is not None:
-                    got_by_shell[sh] += 2.0 * max(0, v - v0) / n_ch
+                    inc_of[q] = 2.0 * max(0, v - v0) / n_ch
+                    got_by_shell[sh] += inc_of[q]
+
+            # What a pair in each shell is worth here, damped: half the new
+            # measurement, half the running estimate, so one noisy round
+            # does not slew the allocation.
+            routed_by_shell = {sh: 0 for sh in mix}
+            for q in done:
+                s = shell_of.get(q)
+                if s in routed_by_shell:
+                    routed_by_shell[s] += 1
+            for sh in mix:
+                if routed_by_shell[sh] > 0:
+                    y_new = got_by_shell[sh] / routed_by_shell[sh]
+                    yield_pair[sh] = (y_new if yield_pair[sh] is None
+                                      else 0.5 * y_new + 0.5 * yield_pair[sh])
+                    if (sh not in dead and routed_by_shell[sh] >= 8
+                            and got_by_shell[sh] <= 0):
+                        dead.add(sh)
+                        print(f"  {'':>6} shell {sh}: {routed_by_shell[sh]} "
+                              f"pairs routed, nothing delivered; no longer "
+                              f"asking")
 
         # A yield estimate has to be a measurement, not one noisy difference.
         #
@@ -586,12 +843,27 @@ def main():
               + (f"   ({got[3]} unmeasured)" if got[3] else ""))
 
         miss = {sh: want_by_shell[sh] - got_by_shell[sh] for sh in mix}
+        tot_del = sum(got_by_shell.values())
         print(f"  {'':>6} by shell: "
-              + ", ".join(f"{sh}: {got_by_shell[sh]:.2f}/"
-                          f"{want_by_shell[sh]:.2f}" for sh in sorted(mix)))
+              + ", ".join(
+                  f"{sh}: {got_by_shell[sh]:.2f}/{want_by_shell[sh]:.2f}"
+                  + (f" ({got_by_shell[sh] / tot_del:.2f})"
+                     if tot_del > 0 else "")
+                  for sh in sorted(mix)))
+
+        # In mix-only mode the run is done when the *fractions* are right:
+        # the absolute total is regime-bound and no absolute test can pass.
+        if args.mix_only and tot_del > 0 and len(done) >= args.min_pairs:
+            frac_tol = max(0.03, per_shell_tol / max(args.want, 1e-9))
+            if all(abs(got_by_shell[sh] / tot_del
+                       - want_by_shell[sh] / args.want) <= frac_tol
+                   for sh in mix if sh not in dead):
+                print(f"\n  mix converged: every live shell within "
+                      f"{frac_tol:.2f} of its fraction over {len(done)} "
+                      f"pairs, {tot_del:.2f} per chain delivered")
+                break
 
         # Done when every shell is within tolerance, not just the total.
-        per_shell_tol = tol / max(len(mix), 1)
         if all(abs(m) <= per_shell_tol for m in miss.values()):
             print(f"\n  every shell within {per_shell_tol:.3f} per chain")
             break
@@ -600,13 +872,13 @@ def main():
             print(f"\n  delivered {added:.2f} per chain against a target of "
                   f"{args.want:.2f}, within {tol:.3f}")
             break
-        if added > args.want + tol and reliable:
-            # Back off rather than stop.
-            #
-            # An overshoot is not a failure, it is a calibration: the yield is
-            # now known, so the right number of pairs is known too. Start again
-            # from the plain melt with that many, which is exact, instead of
-            # trying to unpick entanglements from the system that overshot.
+        if (added > args.want + tol and reliable
+                and not any(m < -per_shell_tol for m in miss.values())):
+            # Total over but no shell over: the excess is collateral outside
+            # the designed pairs (full-watch mode only; in mix-only the
+            # total is the sum of the shells). Per-shell give-back cannot
+            # reach it, so start again from the plain melt with the right
+            # number of pairs, which the measured yield now gives exactly.
             n_want = max(1, int(args.want / max(yield_per, 1e-9)))
             if n_want >= len(done) or rnd >= args.rounds:
                 print(f"\n  overshot: {added:.2f} against {args.want:.2f}; a "
@@ -619,11 +891,10 @@ def main():
             xyz_now = dict(xyz0)
             xyz_arr[:] = np.array([xyz0[a] for a in ids])
             done, routed_chains = set(), set()
+            inc_of, base_cache = {}, {}
+            got_by_shell = {sh: 0.0 for sh in mix}
             pool = keep_pairs_with_counts(plan, keep_pairs) + pool
-            batch = n_want
             continue
-        # Size the next batch from what a pair is actually worth.
-        batch = max(1, int(round((args.want - added) / max(yield_per, 1e-9))))
     else:
         print(f"\n  did not reach the target in {args.rounds} rounds; "
               f"delivered {added:.2f} against {args.want:.2f}")
@@ -699,6 +970,134 @@ def main():
                   + ",".join(f"{s}:{next_ask[s] / nrm:.2f}"
                              for s in sorted(next_ask)
                              if next_ask[s] > 0))
+
+        # Per-pair dump for rendering: which chains, which shell, what
+        # survived, and where the pair actually touches in the final
+        # coordinates. A renderer then needs no topon imports and no
+        # re-measurement -- the site is the closest approach of the two
+        # chains in the coordinates designed.data carries.
+        pairs_out = []
+        for q in sorted(done):
+            v, b0 = final.get(q), base_d.get(q)
+            d = (max(0, v - b0) if v is not None and b0 is not None
+                 else None)
+            pa = np.array([xyz_now[i] for i in seq[q[0]]])
+            pb = np.array([xyz_now[i] for i in seq[q[1]]])
+            diff = pa[:, None, :] - pb[None, :, :]
+            diff -= box * np.round(diff / box)
+            d2 = np.einsum("ijk,ijk->ij", diff, diff)
+            i0, j0 = np.unravel_index(int(np.argmin(d2)), d2.shape)
+            site = pa[i0] - 0.5 * diff[i0, j0]
+            site -= box * np.floor(site / box)
+            pairs_out.append({
+                "a": int(q[0]), "b": int(q[1]),
+                "shell": int(shell_of.get(q, 0)),
+                "delivered": (None if d is None else int(d)),
+                "site": [round(float(x), 3) for x in site],
+                "atoms_a": [int(i) for i in seq[q[0]]],
+                "atoms_b": [int(i) for i in seq[q[1]]]})
+        pj = root / "04_Simulation" / "designed_pairs.json"
+        pj.write_text(json.dumps({
+            "tag": args.tag, "want": args.want,
+            "asked": {str(s): mix[s] / sum(mix.values()) for s in mix},
+            "delivered": {str(s): (got_mix.get(s, 0) / tot if tot else 0.0)
+                          for s in sorted(set(mix) | set(got_mix))},
+            "box": [float(x) for x in box],
+            "pairs": pairs_out}))
+        print(f"  pair dump: {pj}")
+
+        # Where the delivered entanglements ended up, against where the bias
+        # asked for them. Selection placing the *pairs* right is checked in
+        # unit tests; this is the built system, so it is the claim itself.
+        # Binned on the bias's own geometry, because that is what was
+        # promised: a gradient promises a rising profile, a region promises
+        # an in-against-out density ratio.
+        if args.bias != "uniform":
+            def centre_of(q):
+                mids = []
+                for ci in q:
+                    u, v = edges[ci]
+                    pu = np.asarray(graph.nodes[u]["pos"], float)
+                    pv = np.asarray(graph.nodes[v]["pos"], float)
+                    d = pv - pu
+                    d -= dims * np.round(d / dims)
+                    mids.append(pu + 0.5 * d)
+                d = mids[1] - mids[0]
+                d -= dims * np.round(d / dims)
+                c = mids[0] + 0.5 * d
+                return c - dims * np.floor(c / dims)
+
+            spots, vals = [], []
+            for q in sorted(done):
+                v, b0 = final.get(q), base_d.get(q)
+                if v is None or b0 is None:
+                    continue
+                spots.append(centre_of(q))
+                vals.append(max(0, v - b0))
+            spots, vals = np.asarray(spots), np.asarray(vals, float)
+            if not len(vals) or vals.sum() <= 0:
+                print(f"\n  spatial check ({args.bias}): no delivered "
+                      f"designed entanglements to place, nothing to check")
+            if len(vals) and vals.sum() > 0:
+                print(f"\n  spatial check ({args.bias}), over the delivered "
+                      f"designed entanglements:")
+                if args.bias == "gradient":
+                    axn = bias_params.get("axis", "x")
+                    ax = {"x": 0, "y": 1, "z": 2}[axn]
+                    frac = spots[:, ax] / dims[ax]
+                    cut = np.linspace(0.0, 1.0, 5)
+                    for i in range(4):
+                        m = (frac >= cut[i]) & (frac < cut[i + 1] + (i == 3))
+                        print(f"    {axn} in {cut[i]:.2f}..{cut[i + 1]:.2f}: "
+                              f"{vals[m].sum() / vals.sum():.2f} of the "
+                              f"total ({int(m.sum())} pairs)")
+                elif args.bias in ("region", "anti_region"):
+                    c = (np.asarray(bias_params.get("center", [0.5] * 3),
+                                    float) * dims)
+                    r = (float(bias_params.get("radius", 0.3))
+                         * float(dims.min()))
+                    d = spots - c
+                    d -= dims * np.round(d / dims)
+                    inside = np.linalg.norm(d, axis=1) <= r
+                    vol = (4.0 / 3.0) * np.pi * r ** 3 / float(np.prod(dims))
+                    fin = vals[inside].sum() / vals.sum()
+                    # fin == 0 is total depletion (the anti_region success
+                    # case), not infinite concentration; only fin == 1 is.
+                    if fin <= 0:
+                        ratio = 0.0
+                    elif fin >= 1:
+                        ratio = float("inf")
+                    else:
+                        ratio = (fin / vol) / ((1 - fin) / (1 - vol))
+                    print(f"    sphere holds {vol:.0%} of the box and "
+                          f"{fin:.0%} of the entanglements: density ratio "
+                          f"{ratio:.1f} in against out "
+                          f"(asked strength "
+                          f"{bias_params.get('strength', 10.0):g})")
+                else:                                          # clusters
+                    ccs = [np.asarray(x, float) * dims for x in
+                           bias_params.get("centers",
+                                           [[0.25] * 3, [0.75] * 3])]
+                    sg = (float(bias_params.get("sigma", 0.15))
+                          * float(dims.min()))
+                    dmin = np.min([np.linalg.norm(
+                        (spots - cc) - dims * np.round((spots - cc) / dims),
+                        axis=1) for cc in ccs], axis=0)
+                    near = dmin <= 2.0 * sg
+                    # The null expectation, or the fraction reads as an
+                    # absolute when it is only meaningful against the volume
+                    # the balls cover. Monte-Carlo because the balls overlap
+                    # the cell and each other in general.
+                    mc = np.random.default_rng(0).uniform(0, 1, (20000, 3))
+                    mc = mc * dims
+                    mmin = np.min([np.linalg.norm(
+                        (mc - cc) - dims * np.round((mc - cc) / dims),
+                        axis=1) for cc in ccs], axis=0)
+                    cover = float((mmin <= 2.0 * sg).mean())
+                    print(f"    within 2 sigma of a cluster centre: "
+                          f"{vals[near].sum() / vals.sum():.0%} of the "
+                          f"entanglements ({int(near.sum())} pairs), in "
+                          f"{cover:.0%} of the box")
 
     Path(root / "04_Simulation" / "designed.data").write_text(
         Path(rewrite_coords(relaxed,

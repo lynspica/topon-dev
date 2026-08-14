@@ -168,6 +168,13 @@ def main():
         f = [float(x) for x in args.mix.split(",")]
         spec["mix"] = {"SC": f[0], "BCC": f[1], "FCC": f[2]}
         spec["lattice"] = "MIX"
+        # Full site functionality for custom mixes.
+        # The MIX case's degree list demands degree 7 and 8
+        # nodes, and a mix with few BCC/FCC sites has almost
+        # none that can carry them: the rejection sampler then
+        # never converges, and both this build and the lattice
+        # catalogue hung on it for half an hour or more.
+        spec["degree_dist"] = "0:0,1:0"
     spec["dims"] = (args.dims,) * 3
     graph = build_network(spec)
     geo = geometry(graph, dp=args.dp, bond=BOND, coil=args.coil)
