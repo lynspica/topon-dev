@@ -1,8 +1,9 @@
 """Smoke test: CG network with entanglements + LAMMPS stage 1.
 
-5 Gaussian-Kink entanglements on a 5x5x5 CG bead-spring network at DP=10.
-Runs Pipeline through stage-1 LAMMPS minimize. Pins the entanglement
-geometry placement (V15-V21).
+5 entanglements on a 5x5x5 CG bead-spring network at DP=10, both
+realizations: "waypoint" (the prescribed winding, the default since V50)
+and "kink" (the legacy Gaussian bump, pinning the V15-V21 placement).
+Runs Pipeline through stage-1 LAMMPS minimize.
 """
 from __future__ import annotations
 
@@ -35,9 +36,9 @@ SAMPLE_NODES = REPO_ROOT / "tests" / "sample_graphs" / "network_N5x5x5_trial3.no
 SAMPLE_EDGES = REPO_ROOT / "tests" / "sample_graphs" / "network_N5x5x5_trial3.edges"
 
 
-@pytest.fixture
-def smoke_entanglement_config(tmp_path: Path) -> ToponConfig:
-    """5x5x5 CG with 5 Gaussian-Kink entanglements at DP=10."""
+@pytest.fixture(params=["waypoint", "kink"])
+def smoke_entanglement_config(request, tmp_path: Path) -> ToponConfig:
+    """5x5x5 CG with 5 entanglements at DP=10, by either realization."""
     return ToponConfig(
         study=StudyConfig(name="smoke_entanglement", output_dir=str(tmp_path)),
         topology=TopologyConfig(
@@ -53,6 +54,7 @@ def smoke_entanglement_config(tmp_path: Path) -> ToponConfig:
                 enabled=True,
                 target=5,
                 target_type="count",
+                method=request.param,
                 kink_params=KinkParams(overshoot=0.2, z_amp=0.5, sigma=0.15),
             ),
         ),

@@ -306,8 +306,10 @@ class Pipeline:
         from topon.writers import CGWriter, DreidingWriter
         from topon.utils import write_lammps_displacement_file
         from topon.utils.network_helpers import (
-            calculate_entangled_kink,
             generate_approximate_side_chain_coords,
+        )
+        from topon.conformation.entanglement.realize import (
+            entangled_backbone_paths,
         )
 
         self._builder = ChemistryBuilder(
@@ -444,9 +446,20 @@ class Pipeline:
             str(chem_dir / "system_nodes.displace"), "nodes"
         )
 
+        # Entangled edges' paths, both branches, computed once. The method
+        # is the config's: "waypoint" (default) draws each pair together
+        # with a prescribed winding count; "kink" is the legacy Gaussian
+        # bump. Edges not in this dict are linear, as they always were.
+        ent_cfg = self.config.assignment.entanglements
+        ent_paths = entangled_backbone_paths(
+            self.graph, self.dims, self._builder.edge_atom_map,
+            method=ent_cfg.method,
+            kink_params=ent_cfg.kink_params.model_dump(),
+        )
+
         if model == "coarse_grained":
             # CG: same backbone + grafts loop as atomistic (entanglement-aware
-            # kink for backbone, perpendicular placement with 3-way length
+            # winding for backbone, perpendicular placement with 3-way length
             # cap for grafts). CG doesn't have pendant/H passes — graft beads
             # come directly from `_builder.graft_atom_map`.
             backbone_coords: dict[int, tuple] = {}
@@ -468,37 +481,9 @@ class Pipeline:
                     perp = np.cross(unit_vec, np.array([1.0, 0.0, 0.0]))
                 perp_unit = perp / (np.linalg.norm(perp) + 1e-9)
 
-                entangled_partner_key = data.get("entangled_with")
-                backbone_xyz = []
-
-                if entangled_partner_key is not None:
-                    p_u = entangled_partner_key[0]
-                    p_v = entangled_partner_key[1]
-                    p_pos_u = np.array(self.graph.nodes[p_u].get("pos", (0.0, 0.0, 0.0)))
-                    p_pos_v = np.array(self.graph.nodes[p_v].get("pos", (0.0, 0.0, 0.0)))
-                    p_vec = p_pos_v - p_pos_u
-                    p_mic = p_vec - self.dims * np.round(p_vec / self.dims)
-                    my_mid = pos_u + 0.5 * mic
-                    p_mid = p_pos_u + 0.5 * p_mic
-                    delta = p_mid - my_mid
-                    delta -= self.dims * np.round(delta / self.dims)
-                    p_mid_wrapped = my_mid + delta
-                    orient_vec = p_mid_wrapped - my_mid
-                    if np.linalg.norm(orient_vec) < 0.01:
-                        orient_vec = perp_unit
-                    ent_count = data.get("entanglement_count", 1)
-                    kink_dict = calculate_entangled_kink(
-                        start_pos=np.zeros(3),
-                        end_pos=mic,
-                        num_atoms=len(atoms) + 2,
-                        params=self.config.assignment.entanglements.kink_params.model_dump(),
-                        orientation_vec=orient_vec,
-                        z_phase=1.0,
-                        num_entanglements=ent_count,
-                    )
-                    full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
-                    backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
-                else:
+                backbone_xyz = ent_paths.get((u, v, key))
+                if backbone_xyz is None:
+                    backbone_xyz = []
                     for j in range(len(atoms)):
                         frac = (j + 1) / (len(atoms) + 1)
                         backbone_xyz.append(pos_u + frac * mic)
@@ -568,40 +553,9 @@ class Pipeline:
                     perp = np.cross(unit_vec, np.array([1.0, 0.0, 0.0]))
                 perp_unit = perp / (np.linalg.norm(perp) + 1e-9)
 
-                entangled_partner_key = data.get("entangled_with")
-                backbone_xyz = []
-
-                if entangled_partner_key is not None:
-                    p_u = entangled_partner_key[0]
-                    p_v = entangled_partner_key[1]
-                    p_pos_u = np.array(self.graph.nodes[p_u].get("pos", (0.0, 0.0, 0.0)))
-                    p_pos_v = np.array(self.graph.nodes[p_v].get("pos", (0.0, 0.0, 0.0)))
-                    p_vec = p_pos_v - p_pos_u
-                    p_mic = p_vec - self.dims * np.round(p_vec / self.dims)
-
-                    my_mid = pos_u + 0.5 * mic
-                    p_mid = p_pos_u + 0.5 * p_mic
-                    delta = p_mid - my_mid
-                    delta -= self.dims * np.round(delta / self.dims)
-                    p_mid_wrapped = my_mid + delta
-
-                    orient_vec = p_mid_wrapped - my_mid
-                    if np.linalg.norm(orient_vec) < 0.01:
-                        orient_vec = perp_unit
-
-                    ent_count = data.get("entanglement_count", 1)
-                    kink_dict = calculate_entangled_kink(
-                        start_pos=np.zeros(3),
-                        end_pos=mic,
-                        num_atoms=len(atoms) + 2,  # N+2 fix (v21.1)
-                        params=self.config.assignment.entanglements.kink_params.model_dump(),
-                        orientation_vec=orient_vec,
-                        z_phase=1.0,
-                        num_entanglements=ent_count,
-                    )
-                    full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
-                    backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
-                else:
+                backbone_xyz = ent_paths.get((u, v, key))
+                if backbone_xyz is None:
+                    backbone_xyz = []
                     for j in range(len(atoms)):
                         frac = (j + 1) / (len(atoms) + 1)
                         backbone_xyz.append(pos_u + frac * mic)

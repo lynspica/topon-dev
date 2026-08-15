@@ -204,6 +204,22 @@ class EntanglementsConfig(BaseModel):
     target: int = Field(default=0, ge=0)
     target_type: Literal["count", "percentage"] = Field(default="count")
 
+    # How an entangled pair is realised in 3D.
+    #
+    #   * waypoint — the pair is drawn together: both chains are splines
+    #     that spiral about their contact in antiphase, so the pair carries
+    #     exactly `entanglement_count` windings by construction. Verified
+    #     with primitive-path analysis (V49/V50); the default.
+    #   * kink — the legacy Gaussian bump aimed at the partner's midpoint.
+    #     Each chain is drawn alone, so what survives relaxation is
+    #     statistical rather than prescribed. Kept for reproducing pre-V49
+    #     systems.
+    method: Literal["waypoint", "kink"] = Field(
+        default="waypoint",
+        description="Entanglement realisation: 'waypoint' (prescribed "
+                    "winding, default) or 'kink' (legacy Gaussian bump).",
+    )
+
     # Distribution mode: specify average crosslinks per chain
     # Formula: total_draws = avg_crosslinks_per_chain * 0.5 * num_chains
     avg_crosslinks_per_chain: Optional[float] = Field(

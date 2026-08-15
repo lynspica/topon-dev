@@ -1121,8 +1121,7 @@ Controls how graph attributes (types, DP, defects, entanglements, grafts, copoly
 
 ```json
 "entanglements": {
-  "enabled": true, "target": 5, "target_type": "count",
-  "kink_params": { "overshoot": 0.2, "z_amp": 0.5, "sigma": 0.15 }
+  "enabled": true, "target": 5, "target_type": "count"
 }
 ```
 
@@ -1131,10 +1130,18 @@ Or distribution mode (average per chain):
 ```json
 "entanglements": {
   "enabled": true,
-  "avg_crosslinks_per_chain": 2.0,
-  "kink_params": { "overshoot": 0.2, "z_amp": 0.5, "sigma": 0.15 }
+  "avg_crosslinks_per_chain": 2.0
 }
 ```
+
+##### `method` — how an entangled pair is realised in 3D
+
+| `method` | What it draws |
+|---|---|
+| `"waypoint"` (default) | The pair together: both chains are splines spiralling about their contact in antiphase, so the pair carries exactly `entanglement_count` windings by construction. Verified with primitive-path analysis (V49/V50). |
+| `"kink"` | The legacy Gaussian bump aimed at the partner's midpoint. Each chain is drawn alone; what the pair carries after relaxation is statistical. Kept for reproducing pre-V49 systems. |
+
+`kink_params` applies only to `method: "kink"`:
 
 | `kink_params` key | Default | Description |
 |---|---|---|

@@ -63,6 +63,36 @@ day -- see the next entry.
 
 ---
 
+## 2026-08-14 — method: waypoint | kink; the winding is the default
+
+**Change:** `assignment.entanglements.method` chooses how an entangled
+pair is realised in 3D. `"waypoint"` (the new default) is the V49
+prescribed winding, drawn per pair; `"kink"` is the legacy Gaussian bump.
+One shared `entangled_backbone_paths()` in
+`topon/conformation/entanglement/realize.py` serves the pipeline and both
+canonical workflow modules, which each carried a private copy of the kink
+loop. Six fast unit tests pin the contract; the entanglement smoke is
+parametrised over both methods and runs each through Pipeline + LAMMPS.
+
+**Why:** the user asked which constructions the current version supports.
+The audit answer was: linear chains and the kink through the config, the
+winding only through workflow scripts, with no switch anywhere. For a
+package whose point is designed topology, the construction that delivers
+the designed count had to be the reachable default.
+
+**Issue / solution:** two structural mismatches. The pair construction
+needs both chains drawn together while every consumer loops edge by edge --
+solved by computing all entangled paths up front and letting the loop pick
+them up, whichever edge it reaches first. And `entangled_pair` draws both
+chains at one bead count while DP varies per edge -- solved by drawing the
+pair once and re-placing each chain along its own curve by arc length.
+The workflow modules key edges by integer index with no MultiGraph key;
+the key is recovered by data-dict identity, since `G.edges(data=True)`
+hands out the live attribute dicts. Regression-safe: no golden config
+enables entanglements.
+
+---
+
 ## 2026-08-14 — The mix controller closes the loop by itself
 
 **Change:** the manual iterate-by-hand procedure became an in-loop

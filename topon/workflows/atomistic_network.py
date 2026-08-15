@@ -58,7 +58,7 @@ from topon.writers import DreidingWriter, LammpsInputGenerator
 from topon.utils import write_lammps_displacement_file, generate_approximate_side_chain_coords
 from topon.assignment.attributor import EntanglementsConfig
 from topon.assignment.entanglements import select_entanglements
-from topon.utils.network_helpers import calculate_entangled_kink
+from topon.conformation.entanglement.realize import entangled_backbone_paths
 
 # Stage 3 — conformation
 from topon.conformation import ConformationManager
@@ -276,6 +276,24 @@ def run(
     backbone_coords = {}
     graft_coords = {}
 
+    # Entangled edges, realised by the configured method ("waypoint" is the
+    # default, "kink" the legacy bump). Keys recovered by data-dict
+    # identity, as in cg_network.
+    key_of = {}
+    for i, (eu, ev, edata) in enumerate(edges):
+        for k2, d2 in G[eu][ev].items():
+            if d2 is edata:
+                key_of[i] = (eu, ev, k2)
+                break
+    ent_paths_by_key = entangled_backbone_paths(
+        G, dims,
+        {key_of[i]: a for i, a in edge_backbone.items() if i in key_of},
+        method=ent_conf_dict.get("method", "waypoint"),
+        kink_params=(ent_conf_dict.get("kink_params") or {}),
+    )
+    ent_paths = {i: ent_paths_by_key[key_of[i]] for i in edge_backbone
+                 if i in key_of and key_of[i] in ent_paths_by_key}
+
     for i, atoms in edge_backbone.items():
         u, v, data = edges[i]
         pos_u = np.array(G.nodes[u].get("pos", (0, 0, 0)))
@@ -291,36 +309,9 @@ def run(
             perp = np.cross(unit_vec, np.array([1.0, 0.0, 0.0]))
         perp_unit = perp / np.linalg.norm(perp)
 
-        entangled_partner_key = data.get("entangled_with")
-        backbone_xyz = []
-
-        if entangled_partner_key is not None:
-            p_u, p_v = entangled_partner_key[0], entangled_partner_key[1]
-            p_pos_u = np.array(G.nodes[p_u]["pos"])
-            p_pos_v = np.array(G.nodes[p_v]["pos"])
-            p_vec = p_pos_v - p_pos_u
-            p_mic = p_vec - dims * np.round(p_vec / dims)
-
-            my_mid = pos_u + 0.5 * mic
-            p_mid = p_pos_u + 0.5 * p_mic
-            delta = p_mid - my_mid
-            delta -= dims * np.round(delta / dims)
-            p_mid_wrapped = my_mid + delta
-
-            orient_vec = p_mid_wrapped - my_mid
-            if np.linalg.norm(orient_vec) < 0.01:
-                orient_vec = perp_unit
-
-            kink_dict = calculate_entangled_kink(
-                start_pos=np.zeros(3),
-                end_pos=mic,
-                num_atoms=len(atoms) + 2,  # N+2 fix (v21.1)
-                orientation_vec=orient_vec,
-                z_phase=1.0,
-            )
-            full_path = [kink_dict[k] for k in sorted(kink_dict.keys())]
-            backbone_xyz = [pos_u + np.array(pt) for pt in full_path[1:-1]]
-        else:
+        backbone_xyz = ent_paths.get(i)
+        if backbone_xyz is None:
+            backbone_xyz = []
             for j in range(len(atoms)):
                 frac = (j + 1) / (len(atoms) + 1)
                 backbone_xyz.append(pos_u + frac * mic)
